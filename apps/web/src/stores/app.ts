@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Folder, Note, NoteSummary, Tag } from '@notehack/shared';
+import type { Folder, Note, NoteSummary, Tag } from '@360note/shared';
 import { api, ApiError, isNetworkError } from '../lib/api';
 import {
   cacheNote,

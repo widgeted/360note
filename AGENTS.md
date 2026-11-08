@@ -1,72 +1,80 @@
-# AGENTS.md — Working on NoteHack
+# AGENTS.md — Working on 360note
 
-You are working on NoteHack, a production note application at `notehack.com`. Read this before changing code. The server is dedicated to this project; still treat all data and credentials with care.
+You are working on 360note / 360笔记, a production note application.
+
+- Chinese edition: `https://360biji.com`
+- English edition: `https://360note.com`
+- Repository: `github.com/widgeted/360note`
+- Both domains share one API, one PostgreSQL database and one account system. The hostname selects the UI and email language.
 
 ## First reads
 
 1. `README.md`
-2. `docs/DESIGN_SYSTEM.md` — UI changes must follow it
-3. `docs/ARCHITECTURE.md` — data model, sync, security, backup
-4. `docs/FEATURES.md` — priority/placement; do not add features without updating it
-5. `docs/QUALITY.md` — tests, security checklist, release gates
-6. `docs/MEMORY.md` — current state, known bugs, decisions
-7. `docs/decisions/` — ADRs; do not silently reverse a decision
+2. `docs/DESIGN_SYSTEM.md` — UI changes must follow it. The accent colour is green.
+3. `docs/ARCHITECTURE.md` — data model, sync, security, backup.
+4. `docs/FEATURES.md` — priority/placement. Update it when behaviour changes.
+5. `docs/QUALITY.md` — tests, security checklist, release gates.
+6. `docs/MEMORY.md` — current state, known bugs, decisions.
+7. `docs/decisions/` — ADRs; do not silently reverse a decision.
 
 ## Hard constraints
 
-- **Never send email.** No SMTP, no email APIs, no verification/recovery/marketing email. Notifications are in-app only.
-- **Do not pollute the domain.** No spam, no public pages for test content, no third-party analytics/ads.
+- **Email is allowed only for account and security mail**: registration codes, password reset codes, password/email change notices, workspace invitations, and security alerts. Never send marketing mail, never buy lists, never email users who did not request it.
+- **Never test email against random or non-existent addresses.** Use `access@126.com` or an address the operator explicitly provides.
+- **Do not pollute the domain.** No spam, no public test pages, no third-party analytics/ads.
 - **Do not lose user data.** Before destructive changes: backup, preview, preserve a copy. Never silently overwrite notes.
-- **Do not weaken auth/security** (CSRF, rate limits, password hashing, 2FA replay protection, share token hashing, path traversal checks, CSP).
-- **Do not commit secrets** (`/etc/notehack/notehack.env`, `NOTEHACK_MASTER_KEY`, database passwords, admin recovery key, user data).
-- **Do not claim E2EE.** Current version does not provide it; docs and UI must say the server can read note bodies.
+- **Do not weaken auth/security** (CSRF, rate limits, password hashing, email-code attempts/cooldowns, 2FA replay protection, share token hashing, path traversal checks, CSP, workspace permissions).
+- **Do not commit secrets** (`/etc/360note/360note.env`, `NOTE360_MASTER_KEY`, database passwords, admin/demo passwords, user data).
+- **Do not claim E2EE.** The server can read note bodies; docs and UI must say so.
 - **Do not add a second visual language.** Use tokens/components in `apps/web/src/styles/`; update `DESIGN_SYSTEM.md` first if needed.
 - **Never use serif/Songti/Newsreader** anywhere (UI, notes, shares, exports, error pages). Inter/system sans only.
-- **No interface text below 13px** — including privacy/terms/forgot-password, timestamps, hints and error details.
-- **No hover underline, lift, scale or active displacement.** Hover may only change color/background/border.
-- **No marketing homepage.** `/` goes straight to the app or login. No second border/ring on selected elements.
+- **No interface text below 13px** — including privacy/terms, timestamps, hints and error details.
+- **No hover underline, lift, scale or active displacement.** Hover may only change colour/background/border.
 - **Do not cram every feature into the main screen.** High frequency → main path; medium → context/panel; low → settings; extremely low → command palette + wizard.
-- **Push immediately.** After every code, docs or deployment change, commit and `git push` to `github.com:soulizer/notehack` before considering the task done. Do not leave uncommitted work on this server.
+- **Mobile copy must match mobile behaviour.** Do not tell phone users to drag files or use a desktop bookmarklet.
+- **Push immediately.** After every code, docs or deployment change, commit and `git push` to `github.com:widgeted/360note` before considering the task done.
 
 ## Repo map
 
-- `apps/server` — Fastify API, PostgreSQL migrations, services, routes.
+- `apps/server` — Fastify API, PostgreSQL migrations, services, routes, SMTP mailer.
 - `apps/web` — React 19 + Vite PWA, TipTap, Zustand, IndexedDB.
 - `packages/shared` — shared types/permissions.
-- `docs` — the source of truth for design/features/quality/memory.
+- `docs` — source of truth for design/features/quality/memory.
 - `deploy` — systemd/nginx/env templates.
-- `scripts` — manual/e2e/verification scripts (some are local test helpers).
+- `scripts/provision-accounts.mjs` — creates the administrator and the demo account, then seeds demo notes.
+- `tests/manual/` — manual/e2e/security checks.
 
 ## Development
 
 ```bash
-npm install
-cp deploy/notehack.env.example .env   # for dev, use local DB/origin
+npm ci
+cp deploy/360note.env.example .env
 npm run dev
 npm run typecheck
 npm run build
 ```
 
-- Dev origin can be `http://localhost:5173`; production `PUBLIC_ORIGIN=https://notehack.com`.
-- After every web build, restart the API if you are testing against Fastify static (new hashed assets).
-- Manual Playwright checks live in `tests/manual/`; they require `NH_TEST_EMAIL` / `NH_TEST_PASSWORD` (or `NH_ADMIN_*`) and a running server. Never run destructive backup/replace checks against production data.
+- Dev origin may be `http://localhost:5173`.
+- Production origin is `https://360note.com` for generated fallback links; request-aware code keeps 360biji.com links on 360biji.com.
 - Migrations run at server start; add new numbered SQL files, never edit an applied migration.
+- After every web build, restart the API if you test Fastify static.
 
 ## Before you finish
 
 - [ ] Typecheck + build pass.
-- [ ] Relevant e2e/manual checks done.
+- [ ] Relevant e2e/manual/security checks done.
 - [ ] Security-sensitive changes reviewed against `QUALITY.md`.
-- [ ] Docs updated: `CHANGELOG.md`, `MEMORY.md`, and `FEATURES.md` if behavior changes.
+- [ ] Docs updated: `CHANGELOG.md`, `MEMORY.md`, and `FEATURES.md` if behaviour changes.
 - [ ] No test data/secrets left in the production database or repo.
 - [ ] If deployment changed: update `OPERATIONS.md`, restart systemd, health check.
 - [ ] If a decision changed: add/update an ADR.
-- [ ] **Committed and pushed to GitHub immediately** (`git push`); verify the remote commit is current.
+- [ ] **Committed and pushed to GitHub immediately**; verify the remote commit is current.
 
 ## Production notes
 
-- App: `/opt/notehack`; service `notehack.service`; env `/etc/notehack/notehack.env`; data `/var/lib/notehack`.
+- App: `/opt/360note`; service `360note.service`; env `/etc/360note/360note.env`; data `/var/lib/360note`.
+- Node 22 at `/opt/node22/bin/node`.
 - Nginx terminates TLS; Node listens on `127.0.0.1:8787`.
-- Health: `https://notehack.com/health`.
+- Health: `https://360note.com/health` and `https://360biji.com/health`.
 - Backups are encrypted at rest and downloadable; do not delete without a verified replacement.
-- The first registered user is the instance admin. Do not create test users in production without permission and clean up afterward.
+- The first registered user is the instance admin. The provisioned administrator and demo account are operational accounts; treat their passwords as secrets.

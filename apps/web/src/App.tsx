@@ -5,6 +5,8 @@ import { useAuthStore } from './stores/auth';
 import { useAppStore } from './stores/app';
 import { ToastViewport } from './components/Toasts';
 import { LogoLockup } from './components/Logo';
+import { getLocale } from './lib/i18n';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RecoverPage from './pages/RecoverPage';
@@ -30,7 +32,7 @@ function Splash() {
         <LogoLockup inverse />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
           <span className="spinner" />
-          正在加载 NoteHack…
+          {getLocale() === 'zh-CN' ? '正在加载 360笔记…' : 'Loading 360note…'}
         </div>
       </div>
     </div>
@@ -56,6 +58,13 @@ function Protected({ children }: { children: ReactNode }) {
     return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
   }
   return <>{children}</>;
+}
+
+function HomeRoute() {
+  const status = useAuthStore((state) => state.status);
+  if (status === 'loading') return <Splash />;
+  if (status === 'authenticated') return <Navigate to="/app" replace />;
+  return <LandingPage />;
 }
 
 export default function App() {
@@ -89,7 +98,7 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/app" replace />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={status === 'authenticated' ? <Navigate to="/app" replace /> : <LoginPage />} />
         <Route path="/register" element={status === 'authenticated' ? <Navigate to="/app" replace /> : <RegisterPage />} />
         <Route path="/recover" element={<RecoverPage />} />

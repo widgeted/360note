@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export async function migrate(): Promise<void> {
   const client = await pool.connect();
   try {
-    await client.query(`SELECT pg_advisory_lock(hashtext('notehack:migrations'))`);
+    await client.query(`SELECT pg_advisory_lock(hashtext('360note:migrations'))`);
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version integer PRIMARY KEY,
@@ -43,7 +43,7 @@ export async function migrate(): Promise<void> {
     }
     console.log('[db] migrations up to date');
   } finally {
-    await client.query(`SELECT pg_advisory_unlock(hashtext('notehack:migrations'))`).catch(() => {});
+    await client.query(`SELECT pg_advisory_unlock(hashtext('360note:migrations'))`).catch(() => {});
     client.release();
   }
 }

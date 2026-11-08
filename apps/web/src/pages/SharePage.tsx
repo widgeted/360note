@@ -15,7 +15,7 @@ import {
   Send,
   ShieldCheck,
 } from 'lucide-react';
-import type { PublicShare } from '@notehack/shared';
+import type { PublicShare } from '@360note/shared';
 import { api, ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { copyText, formatFullDate, formatPrintDate, formatRelative } from '../lib/utils';
@@ -49,7 +49,7 @@ export default function SharePage() {
       setShare(data);
       setEditContent(data.note.contentMd);
       setEditTitle(data.note.title);
-      document.title = `${data.note.title} — NoteHack`;
+      document.title = `${data.note.title} — 360note`;
       setError(null);
     } catch (error) {
       setError((error as Error).message || t('分享链接不存在或已失效'));
@@ -167,7 +167,7 @@ export default function SharePage() {
           <div className="public-gate-icon"><LockKeyhole size={22} /></div>
           <h1>{t('链接不存在或已失效')}</h1>
           <p>{error ?? t('它可能已被撤销、过期，或链接不完整。')}</p>
-          <Link to="/" className="btn btn-secondary public-gate-cta">{t('了解 NoteHack')}</Link>
+          <Link to="/" className="btn btn-secondary public-gate-cta">{t('了解 360note')}</Link>
         </div>
       </div>
     );
@@ -197,7 +197,7 @@ export default function SharePage() {
             </button>
           </form>
           <div className="public-share-brand">
-            <span style={{ fontWeight: 650 }}>NoteHack.</span> {t('由 NoteHack 保护')}
+            <span style={{ fontWeight: 650 }}>360note.</span> {t('由 360note 保护')}
           </div>
         </div>
       </div>
@@ -258,7 +258,7 @@ export default function SharePage() {
               <div className="public-meta screen-only">
                 <div className="public-byline">
                   <span className="public-author">
-                    <Avatar name={share.authorName} color="#2f6feb" size="sm" />
+                    <Avatar name={share.authorName} color="#17865b" size="sm" />
                     {share.authorName}
                   </span>
                   <span className="dot" />
@@ -311,7 +311,7 @@ export default function SharePage() {
               )}
               <footer className="public-footer">
                 <div className="public-footer-brand">
-                  <span style={{ fontWeight: 650, color: 'var(--text)' }}>NoteHack.</span>
+                  <span style={{ fontWeight: 650, color: 'var(--text)' }}>360note.</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <ShieldCheck size={12} />
@@ -393,7 +393,7 @@ function PublicHeader({ minimal = false }: { minimal?: boolean }) {
   return (
     <header className="public-header">
       <div className="public-header-inner">
-        <Link to="/" aria-label="NoteHack">
+        <Link to="/" aria-label="360note">
           <LogoLockup />
         </Link>
         {!minimal && (
@@ -404,7 +404,7 @@ function PublicHeader({ minimal = false }: { minimal?: boolean }) {
               </span>
             </div>
             <Link to="/register" className="btn btn-secondary btn-sm public-header-cta">
-              {t('创建你的 NoteHack')} <ArrowLeft size={12} style={{ transform: 'rotate(180deg)' }} />
+              {t('创建你的 360note')} <ArrowLeft size={12} style={{ transform: 'rotate(180deg)' }} />
             </Link>
           </>
         )}

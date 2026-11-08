@@ -49,13 +49,13 @@ export function exportHtmlDocument(input: {
   footer?: string;
   accent?: string;
 }): string {
-  const accent = input.accent || '#2f6feb';
+  const accent = input.accent || '#17865b';
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(input.title)} — NoteHack</title>
+<title>${escapeHtml(input.title)} — 360note</title>
 <style>
   :root { --ink:#14161b; --muted:#6b6a66; --paper:#fbfaf7; --line:#e6e2da; --accent:${accent}; }
   * { box-sizing: border-box; }
@@ -113,12 +113,12 @@ export function exportHtmlDocument(input: {
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><strong>NoteHack</strong><span>notehack.com</span></div>
+  <div class="brand"><strong>360note</strong><span>360note.com</span></div>
   <h1>${escapeHtml(input.title)}</h1>
   ${input.meta ? `<div class="meta">${input.meta}</div>` : ''}
   <article>${input.contentHtml}</article>
   ${input.footer || ''}
-  <footer><span>Exported from NoteHack</span><span>${new Date().toISOString().slice(0, 10)}</span></footer>
+  <footer><span>Exported from 360note</span><span>${new Date().toISOString().slice(0, 10)}</span></footer>
 </div>
 </body>
 </html>`;

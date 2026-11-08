@@ -1,3 +1,5 @@
+import { getLocale, translate } from './i18n';
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -26,13 +28,16 @@ type RequestOptions = {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
+  const locale = getLocale();
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
+  headers['Accept-Language'] = locale === 'en' ? 'en' : 'zh-CN';
+  headers['X-Locale'] = locale;
   let body: BodyInit | undefined = options.rawBody;
   if (options.body !== undefined && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
     body = JSON.stringify(options.body);
   }
-  if (!['GET', 'HEAD'].includes(method)) headers['X-NoteHack-CSRF'] = '1';
+  if (!['GET', 'HEAD'].includes(method)) headers['X-360note-CSRF'] = '1';
 
   let response: Response;
   try {
@@ -46,7 +51,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     });
   } catch (error) {
     if ((error as Error).name === 'AbortError') throw error;
-    throw new ApiError(0, 'NETWORK', '网络连接不可用，请检查网络');
+    throw new ApiError(0, 'NETWORK', translate('网络连接不可用，请检查网络'));
   }
 
   if (response.status === 204 || response.status === 304) return undefined as T;
@@ -64,9 +69,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const code = payload?.error?.code ?? `HTTP_${response.status}`;
     const isGateway = [502, 503, 504].includes(response.status);
     const message = isGateway
-      ? '服务暂时不可用，请稍后重试。你的本地草稿与待同步内容不会丢失。'
+      ? translate('服务暂时不可用，请稍后重试。你的本地草稿与待同步内容不会丢失。')
       : payload?.error?.message ??
-        (typeof data === 'string' && !data.trim().startsWith('<') ? data : '请求失败');
+        (typeof data === 'string' && !data.trim().startsWith('<') ? data : translate('请求失败'));
     if (response.status === 401 && !path.includes('/api/auth/')) {
       window.dispatchEvent(new CustomEvent('nh:unauthorized'));
     }

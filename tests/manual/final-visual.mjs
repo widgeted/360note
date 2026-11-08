@@ -4,7 +4,7 @@ const browser=await chromium.launch({headless:true});
 const ctx=await browser.newContext({viewport:{width:1440,height:980},locale:'zh-CN'});
 await ctx.addInitScript(()=>localStorage.setItem('nh-locale','zh-CN'));
 const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(e.message)); page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('401'))errs.push(m.text())});
-await page.goto('https://notehack.com/login',{waitUntil:'networkidle'});
+await page.goto('https://360note.com/login',{waitUntil:'networkidle'});
 await page.fill('#login-email',email); await page.fill('#login-password',password); await page.click('button[type=submit]'); await page.waitForTimeout(2200);
 await page.screenshot({path:'/tmp/final-app.png',fullPage:true});
 console.log('sidebar workspace', (await page.locator('.workspace-switcher').innerText()).replace(/\n/g,' | '));
@@ -18,7 +18,7 @@ await page.waitForTimeout(300); await page.screenshot({path:'/tmp/final-dark.png
 const m=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,locale:'zh-CN'});
 await m.addInitScript(()=>localStorage.setItem('nh-locale','zh-CN'));
 const mp=await m.newPage();
-await mp.goto('https://notehack.com/login',{waitUntil:'networkidle'});
+await mp.goto('https://360note.com/login',{waitUntil:'networkidle'});
 await mp.fill('#login-email',email); await mp.fill('#login-password',password); await mp.click('button[type=submit]'); await mp.waitForTimeout(2000);
 await mp.screenshot({path:'/tmp/final-mobile-list.png',fullPage:true});
 await mp.click('.list-actions .mobile-menu-btn').catch(()=>{});

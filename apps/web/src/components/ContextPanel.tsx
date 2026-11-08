@@ -16,7 +16,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { Backlink, Comment, NoteVersion, NoteVersionDetail } from '@notehack/shared';
+import type { Backlink, Comment, NoteVersion, NoteVersionDetail } from '@360note/shared';
 import { useAppStore } from '../stores/app';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
@@ -318,7 +318,7 @@ export function ContextPanel() {
                 <span style={{ fontWeight: 450, letterSpacing: 0, textTransform: 'none', color: 'var(--text-tertiary)' }}>{visibleAttachments.length}</span>
               </div>
               {visibleAttachments.length === 0 ? (
-                <div className="context-empty">{t('把图片或文件拖进编辑器即可上传。')}</div>
+                <div className="context-empty">{t('上传图片或附件后，它们会显示在这里。')}</div>
               ) : (
                 visibleAttachments.map((attachment) => (
                   <div className="attachment-item" key={attachment.id}>
@@ -394,7 +394,7 @@ export function ContextPanel() {
                     id={`comment-${comment.id}`}
                     key={comment.id}
                   >
-                    <Avatar name={comment.authorName} color={comment.isGuest ? '#6c5ce7' : '#2f6feb'} size="sm" />
+                    <Avatar name={comment.authorName} color={comment.isGuest ? '#6c5ce7' : '#17865b'} size="sm" />
                     <div className="comment-body">
                       <div className="comment-head">
                         <span className="comment-author">{comment.authorName}</span>

@@ -10,7 +10,7 @@ export function initials(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return '?';
   // One initial reads more calmly in circles at 22–56px than two cramped
-  // letters, especially for names like "demonotehack.com".
+  // letters, especially for names like "demo360note.com".
   return trimmed.slice(0, 1).toUpperCase();
 }
 
@@ -28,7 +28,7 @@ export function formatNoteDate(iso: string): string {
   if (isToday(date)) return format(date, 'HH:mm');
   if (isYesterday(date)) return translate('昨天');
   if (isThisWeek(date, { weekStartsOn: 1 })) return format(date, 'EEE', { locale });
-  if (isThisYear(date)) return format(date, 'M月d日', { locale });
+  if (isThisYear(date)) return format(date, getLocale() === 'en' ? 'MMM d' : 'M月d日', { locale });
   return format(date, 'yyyy-MM-dd');
 }
 
@@ -40,7 +40,8 @@ export function formatFullDate(iso: string): string {
 
 export function formatPrintDate(iso: string): string {
   const date = new Date(iso);
-  return format(date, 'yyyy年MM月dd日 HH:mm');
+  const locale = getLocale() === 'en' ? enUS : zhCN;
+  return format(date, getLocale() === 'en' ? 'MMM d, yyyy HH:mm' : 'yyyy年MM月dd日 HH:mm', { locale });
 }
 
 export function formatRelative(iso: string): string {

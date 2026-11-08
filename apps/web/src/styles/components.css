@@ -1,3 +1,88 @@
+.email-edit-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Workspace identity picker */
+.identity-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.identity-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.identity-symbol {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color var(--dur), box-shadow var(--dur), background var(--dur);
+}
+
+.identity-symbol:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+}
+
+.identity-symbol.selected {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px var(--blue-soft);
+}
+
+.identity-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: box-shadow var(--dur), border-color var(--dur);
+}
+
+.identity-color.selected {
+  border-color: var(--surface);
+  box-shadow: 0 0 0 2px var(--text-secondary);
+}
+
+.identity-color-input {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+/* Text-only action that behaves like a link but stays keyboard-accessible. */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--blue);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--blue-strong, var(--blue));
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
@@ -33,7 +118,7 @@
 }
 
 [data-theme='dark'] .btn-primary {
-  color: #07101f;
+  color: #04130c;
 }
 
 .btn-secondary {
@@ -525,7 +610,7 @@
   height: 16px;
   display: grid;
   place-items: center;
-  color: #a9c6ff;
+  color: #a8e6c9;
   margin-top: 2px;
 }
 

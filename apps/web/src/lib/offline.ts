@@ -1,5 +1,5 @@
 import { del, get, set } from 'idb-keyval';
-import type { Folder, Note, NoteSummary, Tag } from '@notehack/shared';
+import type { Folder, Note, NoteSummary, Tag } from '@360note/shared';
 
 const PREFIX = 'nh:v1:';
 

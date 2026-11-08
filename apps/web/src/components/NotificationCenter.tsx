@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, ChevronRight, MessageCircle, PencilLine, ShieldAlert, UserPlus } from 'lucide-react';
-import type { Notification } from '@notehack/shared';
+import type { Notification } from '@360note/shared';
 import { api } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { formatRelativeShort } from '../lib/utils';

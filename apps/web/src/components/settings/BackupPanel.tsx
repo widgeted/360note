@@ -12,7 +12,7 @@ import {
   Trash2,
   UploadCloud,
 } from 'lucide-react';
-import type { BackupInfo, JobInfo } from '@notehack/shared';
+import type { BackupInfo, JobInfo } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAppStore } from '../../stores/app';
 import { useT } from '../../lib/i18n';

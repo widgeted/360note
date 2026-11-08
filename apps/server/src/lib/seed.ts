@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 
-const icons = ['#2f6feb', '#7c5cff', '#0f9d76', '#d97706', '#dc3d5d', '#0e7490', '#9333ea'];
+const icons = ['#17865b', '#7c5cff', '#0f9d76', '#d97706', '#dc3d5d', '#0e7490', '#9333ea'];
 
 export function avatarColor(seed: string): string {
   let hash = 0;
@@ -20,11 +20,11 @@ export function welcomeSeed(locale: string, displayName: string): { folder: stri
       folder: '开始使用',
       notes: [
         {
-          title: '欢迎来到 NoteHack',
+          title: '欢迎来到 360note',
           tags: ['开始'],
           content: `# 欢迎，${displayName}
 
-NoteHack 是一个安静、快速、属于你的笔记空间。它把**记录**、**整理**和**分享**放在同一条路径上，而不是让你先学习一套复杂的系统。
+360note 是一个安静、快速、属于你的笔记空间。它把**记录**、**整理**和**分享**放在同一条路径上，而不是让你先学习一套复杂的系统。
 
 ## 从三个动作开始
 
@@ -52,7 +52,7 @@ NoteHack 是一个安静、快速、属于你的笔记空间。它把**记录**�
           tags: ['开始', '参考'],
           content: `# Markdown 与排版速查
 
-NoteHack 的正文以 **Markdown** 为底层格式，同时提供所见即所得的编辑体验。你可以随时切换到 Markdown 源码模式。
+360note 的正文以 **Markdown** 为底层格式，同时提供所见即所得的编辑体验。你可以随时切换到 Markdown 源码模式。
 
 ## 常用语法
 
@@ -70,7 +70,7 @@ NoteHack 的正文以 **Markdown** 为底层格式，同时提供所见即所得
 
 ## 双向链接
 
-输入 \`[[欢迎来到 NoteHack]]\` 就能链接到另一篇笔记。修改笔记标题时，NoteHack 会尽量同步更新这些链接。
+输入 \`[[欢迎来到 360note]]\` 就能链接到另一篇笔记。修改笔记标题时，360note 会尽量同步更新这些链接。
 
 ## 分享与导出
 
@@ -89,9 +89,9 @@ NoteHack 的正文以 **Markdown** 为底层格式，同时提供所见即所得
 - \`/\` 在正文中插入内容块`,
         },
         {
-          title: '关于 NoteHack 的设计',
+          title: '关于 360note 的设计',
           tags: ['开始'],
-          content: `# 关于 NoteHack 的设计
+          content: `# 关于 360note 的设计
 
 我们参考了 Trilium、Joplin、Standard Notes、SilverBullet、Memos、Blinko、Flatnotes、NoteDiscovery 与 Livebook 的经验，但没有把它们的界面拼在一起。
 
@@ -122,11 +122,11 @@ NoteHack 的正文以 **Markdown** 为底层格式，同时提供所见即所得
     folder: 'Getting started',
     notes: [
       {
-        title: 'Welcome to NoteHack',
+        title: 'Welcome to 360note',
         tags: ['start'],
         content: `# Welcome, ${displayName}
 
-NoteHack is a calm, fast notebook that is genuinely yours. Capture, shape, and share in one place — without learning a system first.
+360note is a calm, fast notebook that is genuinely yours. Capture, shape, and share in one place — without learning a system first.
 
 ## Start with three actions
 
@@ -154,7 +154,7 @@ Now write down the first idea that comes to mind.`,
         tags: ['start', 'reference'],
         content: `# Markdown & formatting cheatsheet
 
-NoteHack stores your writing as **Markdown** while giving you a visual editor. Switch to Markdown source whenever you like.
+360note stores your writing as **Markdown** while giving you a visual editor. Switch to Markdown source whenever you like.
 
 ## The basics
 
@@ -171,7 +171,7 @@ NoteHack stores your writing as **Markdown** while giving you a visual editor. S
 
 ## Wiki links
 
-Type \`[[Welcome to NoteHack]]\` to link another note. NoteHack keeps backlinks up to date and updates links when you rename a note.
+Type \`[[Welcome to 360note]]\` to link another note. 360note keeps backlinks up to date and updates links when you rename a note.
 
 ## Share and export
 
@@ -194,6 +194,6 @@ From the **…** menu:
 }
 
 export const seedMeta = {
-  notehack: true,
+  product: '360note',
   version: config.version,
 };

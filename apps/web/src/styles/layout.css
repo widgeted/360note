@@ -81,10 +81,23 @@
   color: var(--sidebar-text-strong);
 }
 
-.brand-mark svg {
+.brand-mark svg,
+.brand-mark-image {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.brand-logo {
+  display: block;
+  height: 22px;
+  width: auto;
+  max-width: 150px;
+}
+
+.brand-lockup-inverse .brand-logo,
+[data-theme='dark'] .brand-logo {
+  filter: brightness(0) invert(1);
 }
 
 .brand-wordmark {
@@ -149,14 +162,9 @@
   flex: none;
 }
 
-.workspace-meta {
+.workspace-name {
   min-width: 0;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.workspace-name {
   display: block;
   font-size: 13px;
   font-weight: 560;
@@ -167,12 +175,12 @@
   white-space: nowrap;
 }
 
-.workspace-kind {
-  display: block;
-  font-size: 13px;
+.workspace-kind-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   color: var(--sidebar-muted);
-  margin-top: 1px;
-  letter-spacing: 0.01em;
 }
 
 .workspace-chevron {
@@ -1595,7 +1603,8 @@ kbd {
 }
 
 .app-root.sidebar-collapsed .sidebar .brand-wordmark,
-.app-root.sidebar-collapsed .workspace-meta,
+.app-root.sidebar-collapsed .workspace-name,
+.app-root.sidebar-collapsed .workspace-kind-icon,
 .app-root.sidebar-collapsed .workspace-chevron,
 .app-root.sidebar-collapsed .nav-label,
 .app-root.sidebar-collapsed .nav-count,
@@ -1764,7 +1773,7 @@ kbd {
 }
 
 [data-theme='dark'] .note-check.checked {
-  color: #07101f;
+  color: #04130c;
 }
 
 

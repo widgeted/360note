@@ -5,7 +5,7 @@
 
 ## Context
 
-Real-time collaboration requires CRDT/OT, persistent op logs, presence, permissions and mobile sync. Reference projects show high complexity and edge cases (SilverBullet removed CRDT; Livebook uses OT only within sessions). NoteHack's core users need reliable capture and sharing more than simultaneous character-level editing.
+Real-time collaboration requires CRDT/OT, persistent op logs, presence, permissions and mobile sync. Reference projects show high complexity and edge cases (SilverBullet removed CRDT; Livebook uses OT only within sessions). 360note's core users need reliable capture and sharing more than simultaneous character-level editing.
 
 ## Decision
 

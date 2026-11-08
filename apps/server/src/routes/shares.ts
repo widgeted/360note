@@ -13,6 +13,7 @@ import { updateNote } from '../services/notes.js';
 import { notify } from '../services/sessions.js';
 import { audit } from '../lib/audit.js';
 import { readAttachment, sendFileHeaders } from '../lib/storage.js';
+import { originFromRequest } from '../lib/origin.js';
 
 interface ShareRow {
   id: string;
@@ -31,8 +32,8 @@ interface ShareRow {
 
 const SHARE_COOKIE = 'nh_share_access';
 
-function shareUrl(token: string): string {
-  return `${config.publicOrigin}/s/${token}`;
+function shareUrl(token: string, request: FastifyRequest): string {
+  return `${originFromRequest(request)}/s/${token}`;
 }
 
 function setShareCookie(reply: FastifyReply, token: string): void {
@@ -145,7 +146,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         id: shareId,
         noteId: id,
         token,
-        url: shareUrl(token),
+        url: shareUrl(token, request),
         permission: body.permission,
         hasPassword: Boolean(body.password),
         expiresAt: body.expiresAt ?? null,
@@ -168,7 +169,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         id: row.id,
         noteId: row.note_id,
         token: decryptString(row.token_cipher, `share:${row.id}`),
-        url: shareUrl(decryptString(row.token_cipher, `share:${row.id}`)),
+        url: shareUrl(decryptString(row.token_cipher, `share:${row.id}`), request),
         permission: row.permission,
         hasPassword: Boolean(row.password_hash),
         expiresAt: row.expires_at?.toISOString() ?? null,
@@ -332,11 +333,11 @@ export default async function shareRoutes(app: FastifyInstance) {
       permission: share.permission,
       requiresPassword: Boolean(share.password_hash),
       hasAccess: true,
-      workspaceName: workspace?.name ?? 'NoteHack',
+      workspaceName: workspace?.name ?? '360note',
       expiresAt: share.expires_at?.toISOString() ?? null,
       commentsEnabled: share.permission !== 'view',
       comments,
-      authorName: author?.display_name ?? 'NoteHack',
+      authorName: author?.display_name ?? '360note',
       publishedAt: share.created_at.toISOString(),
     });
   });
@@ -384,7 +385,9 @@ export default async function shareRoutes(app: FastifyInstance) {
       userId: note.created_by,
       type: 'share_edit',
       title: '共享笔记被编辑',
+      titleEn: 'Shared note edited',
       body: `${body.guestName || '一位访客'} 通过分享链接更新了《${result.note.title}》（v${result.note.version}）`,
+      bodyEn: `${body.guestName || 'A guest'} updated “${result.note.title}” through a share link (v${result.note.version})`,
       link: `/app/note/${note.id}?panel=history&version=${result.note.version}`,
     });
     return { note: { id: result.note.id, title: result.note.title, version: result.note.version, updatedAt: result.note.updatedAt } };
@@ -415,7 +418,9 @@ export default async function shareRoutes(app: FastifyInstance) {
       userId: note.created_by,
       type: 'comment',
       title: '新的分享评论',
+      titleEn: 'New share comment',
       body: `${body.guestName || '一位访客'} 评论了《${note.title}》：${body.body.length > 100 ? `${body.body.slice(0, 100)}…` : body.body}`,
+      bodyEn: `${body.guestName || 'A guest'} commented on “${note.title}”: ${body.body.length > 100 ? `${body.body.slice(0, 100)}…` : body.body}`,
       link: `/app/note/${note.id}?panel=comments&comment=${row!.id}`,
     });
     return {

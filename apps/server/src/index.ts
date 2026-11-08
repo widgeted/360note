@@ -10,6 +10,7 @@ import { config, ensureDataDirs } from './config.js';
 import { migrate } from './migrate.js';
 import { closePool, one } from './db.js';
 import { AppError, errorPayload } from './lib/errors.js';
+import { localizeMessage, requestLanguage } from './lib/i18n.js';
 import authPlugin from './auth.js';
 import authRoutes from './routes/auth.js';
 import workspaceRoutes from './routes/workspaces.js';
@@ -81,18 +82,22 @@ async function buildServer() {
   await app.register(authPlugin);
 
   app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, request, reply) => {
+    const language = requestLanguage(request.headers as Record<string, unknown>);
+    const localize = (message: string) => localizeMessage(message, language);
     if (error instanceof AppError) {
       if (error.statusCode >= 500) app.log.error({ error, url: request.url }, 'request failed');
-      return reply.status(error.statusCode).send(errorPayload(error));
+      const payload = errorPayload(error);
+      payload.error.message = localize(payload.error.message);
+      return reply.status(error.statusCode).send(payload);
     }
     if (error.statusCode === 429) {
-      return reply.status(429).send({ error: { code: 'TOO_MANY_REQUESTS', message: '请求过于频繁，请稍后再试' } });
+      return reply.status(429).send({ error: { code: 'TOO_MANY_REQUESTS', message: localize('请求过于频繁，请稍后再试') } });
     }
     if (error.statusCode === 413) {
-      return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: '上传内容过大' } });
+      return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: localize('上传内容过大') } });
     }
     app.log.error({ error, url: request.url }, 'unhandled error');
-    return reply.status(500).send({ error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } });
+    return reply.status(500).send({ error: { code: 'INTERNAL_ERROR', message: localize('服务器内部错误') } });
   });
 
 
@@ -103,7 +108,8 @@ async function buildServer() {
     ocrEnabled: config.ocrEnabled,
     maxUploadBytes: config.maxUploadBytes,
     publicOrigin: config.publicOrigin,
-    brand: 'NoteHack',
+    brand: '360note',
+    mailEnabled: Boolean(config.mail.host && config.mail.user && config.mail.pass),
   }));
 
   app.get('/health', async () => {
@@ -145,7 +151,7 @@ async function buildServer() {
     if (fs.existsSync(config.webDist)) {
       return reply.sendFile('index.html');
     }
-    return reply.status(503).send('NoteHack web build not found');
+    return reply.status(503).send('360note web build not found');
   });
 
   if (fs.existsSync(config.webDist)) {
@@ -174,7 +180,7 @@ async function start() {
   await migrate();
   const app = await buildServer();
   await app.listen({ port: config.port, host: config.host });
-  app.log.info(`NoteHack API listening on http://${config.host}:${config.port}`);
+  app.log.info(`360note API listening on http://${config.host}:${config.port}`);
   void resumePendingOcr(app.log);
   void cleanupImportUploads();
 

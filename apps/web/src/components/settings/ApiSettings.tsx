@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Bookmark, Check, Copy, KeyRound, Plus, Terminal, Trash2 } from 'lucide-react';
-import type { ApiToken } from '@notehack/shared';
+import type { ApiToken } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';
+import { useIsMobile } from '../../lib/useMediaQuery';
 import { copyText, formatRelativeShort } from '../../lib/utils';
 import { Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 
 export default function ApiSettings() {
   const t = useT();
+  const isMobile = useIsMobile();
   const instance = useAuthStore((state) => state.instance);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [name, setName] = useState('');
@@ -131,7 +133,11 @@ export default function ApiSettings() {
           <span className="settings-section-title">{t('网页剪藏')}</span>
           <span className="settings-section-desc">{t('浏览器书签')}</span>
         </div>
-        <p className="setting-note">{t('把下面的脚本拖到书签栏，或复制后新建一个书签。在任意网页点击它，就会打开 NoteHack 的剪藏页面，并预填标题、网址与选中的文字。')}</p>
+        <p className="setting-note">
+          {isMobile
+            ? t('移动端可以复制下面的脚本，在桌面浏览器中创建书签；也可以直接打开剪藏页面手动粘贴网址与文字。')
+            : t('把下面的脚本拖到书签栏，或复制后新建一个书签。在任意网页点击它，就会打开 360笔记的剪藏页面，并预填标题、网址与选中的文字。')}
+        </p>
         <div className="share-link-box" style={{ marginTop: 10 }}>
           <Bookmark size={13} style={{ color: 'var(--text-tertiary)', flex: 'none' }} />
           <input readOnly value={bookmarklet} onFocus={(event) => event.target.select()} />
@@ -139,7 +145,7 @@ export default function ApiSettings() {
             {copied === 'bookmarklet' ? <Check size={12} /> : <Copy size={12} />} {t('复制')}
           </button>
         </div>
-        <div className="setting-note" style={{ marginTop: 6 }}>{t('剪藏页面需要登录 NoteHack。脚本不会在第三方页面发送你的 Cookie。')}</div>
+        <div className="setting-note" style={{ marginTop: 6 }}>{t('剪藏页面需要登录 360note。脚本不会在第三方页面发送你的 Cookie。')}</div>
       </section>
 
       <section className="settings-section">

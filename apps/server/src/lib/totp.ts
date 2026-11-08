@@ -62,7 +62,7 @@ export function verifyTotp(secret: string, code: string, window = 1): { valid: b
   return { valid: false, step: null };
 }
 
-export function otpauthUrl(secret: string, email: string, issuer = 'NoteHack'): string {
+export function otpauthUrl(secret: string, email: string, issuer = '360note'): string {
   const label = encodeURIComponent(`${issuer}:${email}`);
   const params = new URLSearchParams({
     secret,

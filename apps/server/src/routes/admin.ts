@@ -266,7 +266,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const summary = data.choices?.[0]?.message?.content?.trim();
     if (!summary) throw new AppError(502, 'AI_EMPTY', 'AI 没有返回内容');
-    return { summary, provider: ai.providerLabel, model: ai.model, warning: '本次请求仅包含你主动选择的这篇笔记。NoteHack 不使用你的笔记训练模型。' };
+    return { summary, provider: ai.providerLabel, model: ai.model, warning: '本次请求仅包含你主动选择的这篇笔记。360note 不使用你的笔记训练模型。' };
   });
 
 }

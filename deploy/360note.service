@@ -1,16 +1,16 @@
 [Unit]
-Description=NoteHack API
-Documentation=https://notehack.com
+Description=360note API
+Documentation=https://360note.com
 After=network.target postgresql.service
 Wants=postgresql.service
 
 [Service]
 Type=simple
-User=notehack
-Group=notehack
-WorkingDirectory=/opt/notehack
-EnvironmentFile=/etc/notehack/notehack.env
-ExecStart=/usr/local/bin/node apps/server/dist/index.js
+User=note360
+Group=note360
+WorkingDirectory=/opt/360note
+EnvironmentFile=/etc/360note/360note.env
+ExecStart=/opt/node22/bin/node /opt/360note/apps/server/dist/index.js
 Restart=always
 RestartSec=3
 TimeoutStopSec=20
@@ -19,8 +19,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/notehack
-ReadOnlyPaths=/opt/notehack /etc/notehack
+ReadWritePaths=/var/lib/360note
+ReadOnlyPaths=/opt/360note /etc/360note
 LimitNOFILE=65535
 UMask=0077
 

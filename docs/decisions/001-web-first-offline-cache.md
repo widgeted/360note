@@ -5,7 +5,7 @@
 
 ## Context
 
-NoteHack must work on desktop, tablet, phone and be installable, while supporting teams, sharing, server-side search and backups. The reference projects split between full local-first SQLite (Trilium/Joplin/SilverBullet) and server-authoritative (Memos/Blinko). Full local-first on every client requires a complex sync protocol, permission model and migration story; a pure online app would fail the offline requirement.
+360note must work on desktop, tablet, phone and be installable, while supporting teams, sharing, server-side search and backups. The reference projects split between full local-first SQLite (Trilium/Joplin/SilverBullet) and server-authoritative (Memos/Blinko). Full local-first on every client requires a complex sync protocol, permission model and migration story; a pure online app would fail the offline requirement.
 
 ## Decision
 

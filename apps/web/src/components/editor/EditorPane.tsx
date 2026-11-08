@@ -93,14 +93,25 @@ export function EditorPane({
 
   const [title, setTitle] = useState(note?.title ?? '');
   const [content, setContent] = useState(note ? stripDuplicateTitle(note.contentMd, note.title) : '');
-  const [mode, setModeState] = useState<'rich' | 'markdown'>(() => {
-    const stored = localStorage.getItem('nh-editor-mode');
-    if (stored === 'rich' || stored === 'markdown') return stored;
-    return user?.prefs?.defaultNoteFormat === 'markdown' ? 'markdown' : 'rich';
-  });
+  const [mode, setModeState] = useState<'rich' | 'markdown'>(
+    user?.prefs?.defaultNoteFormat === 'markdown' ? 'markdown' : 'rich',
+  );
+
+  // The editing mode belongs to a single note. Switching Markdown/rich text in
+  // one note must not change how other notes open. The preference in Settings
+  // only supplies the default for notes that have never been opened before.
+  useEffect(() => {
+    if (!note?.id) return;
+    const stored = localStorage.getItem(`nh-editor-mode:${note.id}`);
+    if (stored === 'rich' || stored === 'markdown') setModeState(stored);
+    else setModeState(user?.prefs?.defaultNoteFormat === 'markdown' ? 'markdown' : 'rich');
+    // Only re-evaluate when the note changes; changing the default must not
+    // flip the mode of a note that is already open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.id]);
 
   function setMode(next: 'rich' | 'markdown') {
-    localStorage.setItem('nh-editor-mode', next);
+    if (note?.id) localStorage.setItem(`nh-editor-mode:${note.id}`, next);
     setModeState(next);
   }
   const [richSeed, setRichSeed] = useState(0);
@@ -180,9 +191,9 @@ export function EditorPane({
   }, [reloadTick, note?.id]);
 
   useEffect(() => {
-    if (note) document.title = `${title || t('未命名笔记')} — NoteHack`;
+    if (note) document.title = `${title || t('未命名笔记')} — 360note`;
     return () => {
-      document.title = 'NoteHack — 把想法留下';
+      document.title = getLocale() === 'zh-CN' ? '360笔记 — 把想法留下' : '360note — Keep ideas';
     };
   }, [title, note?.id, t]);
 
@@ -414,7 +425,7 @@ export function EditorPane({
       const response = await fetch(`/api/notes/${note.id}/attachments`, {
         method: 'POST',
         body: form,
-        headers: { 'X-NoteHack-CSRF': '1' },
+        headers: { 'X-360note-CSRF': '1' },
         credentials: 'same-origin',
       });
       if (!response.ok) {

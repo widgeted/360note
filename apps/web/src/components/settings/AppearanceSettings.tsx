@@ -6,7 +6,7 @@ import { applyTheme, storeTheme, type ThemePreference } from '../../lib/theme';
 import { api } from '../../lib/api';
 import { toast } from '../../stores/toast';
 import { cn } from '../../lib/utils';
-import type { User } from '@notehack/shared';
+import type { User } from '@360note/shared';
 
 export default function AppearanceSettings() {
   const t = useT();
@@ -34,7 +34,7 @@ export default function AppearanceSettings() {
   return (
     <>
       <h1 className="settings-title">{t('外观')}</h1>
-      <p className="settings-subtitle">{t('主题、语言与阅读宽度会同步到你的账户，在其他设备上也会生效。')}</p>
+      <p className="settings-subtitle">{t('主题与阅读宽度会同步到你的账户，在其他设备上也会生效。界面语言由访问域名决定。')}</p>
 
       <section className="settings-section">
         <div className="settings-section-head">

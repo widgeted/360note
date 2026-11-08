@@ -1,4 +1,4 @@
-# NoteHack 架构
+# 360note 架构
 
 > 版本 0.1 · 2026-11-07  
 > 面向开发者。用户文档见 README，设计与功能分别见 `DESIGN_SYSTEM.md`、`FEATURES.md`。
@@ -28,7 +28,7 @@ Fastify API (Node.js, TypeScript)
   └─ AI proxy (optional, OpenAI-compatible)
         │
         ├── PostgreSQL 15 (metadata, content, search, audit)
-        └── Filesystem /var/lib/notehack
+        └── Filesystem /var/lib/360note
               ├─ attachments/ (encrypted)
               ├─ backups/ (encrypted .nhbackup)
               ├─ imports/ (transient staging)
@@ -52,7 +52,7 @@ Fastify API (Node.js, TypeScript)
 ### 1.2 目录结构
 
 ```
-notehack/
+360note/
 ├─ apps/
 │  ├─ server/        Fastify API、迁移、服务、任务
 │  └─ web/           React PWA
@@ -86,7 +86,7 @@ notehack/
 |---|---|---|
 | `workspaces` | id, name, kind(personal/team), owner_id, deleted_at | 个人空间 / 团队空间 |
 | `workspace_members` | workspace_id, user_id, role(owner/admin/editor/viewer) | 成员与角色 |
-| `workspace_invitations` | workspace_id, email, role, token_hash, token_cipher, status | 邀请；无邮件，链接复制 |
+| `workspace_invitations` | workspace_id, email, role, token_hash, token_cipher, status | 邀请；发送邮件并保留复制链接 |
 | `audit_logs` | workspace_id, actor_id, action, target_type/id, meta, ip | 审计 |
 
 权限：
@@ -159,7 +159,7 @@ notehack/
 
 ### 3.3 CSRF / 限流 / 安全头
 
-- 所有非 GET 的 Cookie 请求必须带 `X-NoteHack-CSRF: 1`（前端 fetch 统一加）。Bearer API 请求豁免。
+- 所有非 GET 的 Cookie 请求必须带 `X-360note-CSRF: 1`（前端 fetch 统一加）。Bearer API 请求豁免。
 - SameSite=Lax + 自定义头 + Origin 由浏览器同源策略共同防护。
 - 全局 600 req/min/IP；登录 12/15min；注册 8/h；分享解锁 8/10min；AI 20/h；上传/导入限制由 multipart 控制。
 - Helmet：CSP（self + inline style + data/blob/https images）、HSTS（生产）、Referrer-Policy、Permissions-Policy、nosniff、frame-ancestors none。
@@ -258,7 +258,7 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 2. multipart 限制 25MB（可通过 `MAX_UPLOAD_BYTES` 调整）；
 3. MIME 嗅探（PNG/JPEG/GIF/WebP/PDF/ZIP 等）+ 文件名安全化；
 4. `image-size` 读取宽高；
-5. AES-256-GCM 加密后写入 `/var/lib/notehack/attachments/<workspace>/<attachment>.nh`；
+5. AES-256-GCM 加密后写入 `/var/lib/360note/attachments/<workspace>/<attachment>.nh`；
 6. DB 记录 SHA-256 / storage_key / 元数据；
 7. 若 `OCR_ENABLED=true`，异步队列调用 tesseract（图片）或 pdftotext（PDF），结果写入 `ocr_text`，失败标记 `failed`。
 
@@ -269,9 +269,9 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 
 ### 6.3 存储加密
 
-- 主密钥 `NOTEHACK_MASTER_KEY` 为 32 字节 base64；缺失时生产启动失败。
-- 文件格式：`[version=1][iv 12][tag 16][ciphertext]`，AAD=`notehack:attachment`。
-- 备份也用同一主密钥加密，AAD=`notehack:backup`。
+- 主密钥 `NOTE360_MASTER_KEY` 为 32 字节 base64；缺失时生产启动失败。
+- 文件格式：`[version=1][iv 12][tag 16][ciphertext]`，AAD=`360note:attachment`。
+- 备份也用同一主密钥加密，AAD=`360note:backup`。
 - 丢失主密钥 = 附件/备份不可读；运行手册要求离线保存密钥。
 
 ---
@@ -285,7 +285,7 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 - 生成 24 字节 token；
 - 存 SHA-256 哈希 + AES-GCM 加密 token（用于再次复制）；
 - 密码 scrypt；过期时间；权限 view/comment/edit；
-- 返回 `https://notehack.com/s/<token>`。
+- 返回 `https://360note.com/s/<token>`。
 
 ### 7.2 访问
 
@@ -371,8 +371,8 @@ attachments/<attachmentId>/<filename>
 - ENEX：fast-xml-parser + base64 resources + NodeHtmlMarkdown；
 - Notion zip：Markdown + CSV（CSV → Markdown 表格）；
 - CSV：解析引号/换行，生成 Markdown 表格（最多 2000 行）；
-- JSON：NoteHack workspace 导出格式（data.json）；其他 JSON 作为纯文本笔记。
-- 附件先暂存到 job 目录，执行时加密写入 storage，并把 `notehack-attachment://<key>` 替换为正式 URL。
+- JSON：360note workspace 导出格式（data.json）；其他 JSON 作为纯文本笔记。
+- 附件先暂存到 job 目录，执行时加密写入 storage，并把 `360note-attachment://<key>` 替换为正式 URL。
 - 限制：3000 篇笔记 / 250MB / 40 文件；超限截断并警告。
 
 ### 9.2 导出
@@ -425,12 +425,12 @@ attachments/<attachmentId>/<filename>
 
 详细步骤见 `docs/OPERATIONS.md`。生产结构：
 
-- systemd `notehack.service` 运行 Node（127.0.0.1:8787）；
+- systemd `360note.service` 运行 Node（127.0.0.1:8787）；
 - Nginx 终止 TLS，代理 `/` 到 Fastify；HTTP 重定向 HTTPS；
-- Let's Encrypt（certbot）为 `notehack.com` / `www.notehack.com` 签发；
+- Let's Encrypt（certbot）为 `360note.com` / `www.360note.com` 签发；
 - PostgreSQL 本地；
-- 数据目录 `/var/lib/notehack`，权限 0700；
-- 环境文件 `/etc/notehack/notehack.env`（0600），包含 `DATABASE_URL`、`SESSION_SECRET`、`NOTEHACK_MASTER_KEY`、`PUBLIC_ORIGIN=https://notehack.com`；
+- 数据目录 `/var/lib/360note`，权限 0700；
+- 环境文件 `/etc/360note/360note.env`（0600），包含 `DATABASE_URL`、`SESSION_SECRET`、`NOTE360_MASTER_KEY`、`PUBLIC_ORIGIN=https://360note.com`；
 - 日志 journald；每日自动备份；部署前 `npm run build` 后重启；
 - 健康检查 `GET /health`。
 
@@ -456,7 +456,7 @@ attachments/<attachmentId>/<filename>
 4. **没有异地备份**：备份在同一服务器；建议定期下载。
 5. **搜索中文依赖 ILIKE/trigram**：未接中文分词；超大规模库可能变慢。
 6. **OCR 需服务器安装 tesseract/pdftotext**；默认关闭，按环境开启。
-7. **无邮件**：无法邮件找回/验证；恢复密钥是唯一自助找回方式。
+7. **账户邮件**：注册/找回依赖邮箱验证码；恢复密钥可作为离线备用方式。
 8. **导入不保证复杂格式 100% 保真**（如 Notion 数据库关系、Evernote 复杂样式）；导入前预览警告。
 9. **PDF 导出依赖 Chromium**；未安装时返回明确错误，可改用 HTML 打印。
 

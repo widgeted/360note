@@ -6,7 +6,7 @@ import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
 import { LogoLockup } from '../components/Logo';
 import { Avatar } from '../components/Avatar';
-import type { Invitation } from '@notehack/shared';
+import type { Invitation } from '@360note/shared';
 
 export default function InvitePage() {
   const t = useT();
@@ -79,7 +79,7 @@ export default function InvitePage() {
 
         {status !== 'authenticated' ? (
           <>
-            <h1>{t('你被邀请加入')} NoteHack</h1>
+            <h1>{t('你被邀请加入')} 360note</h1>
             <p>{t('登录或创建账户后即可接受邀请。')}</p>
             <Link to={`/login?next=${next}`} className="btn btn-primary btn-block">
               <LogIn size={14} /> {t('登录以继续')}
@@ -110,7 +110,7 @@ export default function InvitePage() {
                 marginTop: 18,
               }}
             >
-              <Avatar name={invitation.workspaceName ?? 'N'} color="#2f6feb" size="lg" />
+              <Avatar name={invitation.workspaceName ?? 'N'} color="#17865b" size="lg" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 620, fontSize: 13, color: 'var(--text)' }}>{invitation.workspaceName}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>
@@ -135,7 +135,7 @@ export default function InvitePage() {
           </>
         )}
         <div className="public-share-brand" style={{ marginTop: 24 }}>
-          <span style={{ fontWeight: 650, color: 'var(--text)' }}>NoteHack.</span> {t('驱动')}
+          <span style={{ fontWeight: 650, color: 'var(--text)' }}>360note.</span> {t('驱动')}
         </div>
       </div>
     </div>

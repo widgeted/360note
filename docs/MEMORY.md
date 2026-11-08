@@ -1,4 +1,4 @@
-# NoteHack 记忆文档
+# 360note 记忆文档
 
 > 用途：保存重要决策、debug 结论、功能变更、测试结果与待办。  
 > 规则：当天发生的事当天记录；不写密码/密钥/令牌；事实优先，包含日期、文件、命令与结果。  
@@ -10,8 +10,8 @@
 
 ### 背景
 
-- 域名：`notehack.com` / `www.notehack.com`，DNS 指向本机。
-- 仓库：`https://github.com/soulizer/notehack.git`。
+- 域名：`360note.com` / `www.360note.com`，DNS 指向本机。
+- 仓库：`https://github.com/widgeted/360note.git`。
 - 服务器：Debian 12，4 vCPU / 8GB RAM / 40GB，PostgreSQL 15、Nginx、Node 26、Docker；无其他生产项目。
 - 要求：以九个开源笔记项目为强制参考；先文档化设计/功能/质量/记忆；统一设计；功能分 P0/P1/P2；不能发邮件；不能污染域名信誉。
 
@@ -31,7 +31,7 @@
 - **Markdown 为唯一真源**；TipTap 只是编辑器；标题独立；重复 H1 自动剥离。
 - **冲突**：`version` 乐观并发 + 客户端 `node-diff3` 行级三向合并 + 冲突副本；不做 CRDT。
 - **E2EE 不提供**：不假装；附件/备份 AES-256-GCM 只是静态加密。恢复密钥只保存哈希。
-- **无邮件**：邀请链接 + 应用内通知 + 恢复密钥；不引入 SMTP。
+- **账户邮件**：注册/找回验证码、密码与邮箱变更通知、团队邀请；SMTP 仅用于账户与安全邮件。
 - **备份**：独立 `.nhbackup`（ZIP 加密存储）；自动/手动/pre-restore；合并/替换恢复；预览。
 - **团队**：workspace + 角色（owner/admin/editor/viewer）+ 邀请 + 审计。
 - **AI**：默认关闭；实例管理员配置 OpenAI 兼容接口；用户主动点击；不训练；加密笔记不发送。
@@ -76,7 +76,7 @@ apps/web/src/styles/tokens.css        设计 token
 
 1. **dotenv 找不到根 `.env`**：npm workspace 的 cwd 是 `apps/server`，`import 'dotenv/config'` 读不到根目录。改为显式 `dotenv.config({ path: repoRoot/.env })`。
 2. **静态资源返回 text/html**：Fastify `@fastify/static` 在启动时注册文件路由；重新 build 后新 hash 文件未被注册，SPA fallback 把 `/assets/*.css` 返回 index.html。修复：`notFound` 对 `/assets/*` 和常见静态扩展直接 404；生产 build 后重启服务。开发用 Vite。
-3. **分享链接指向 localhost:5173**：`PUBLIC_ORIGIN` 是 dev Vite 地址。改为实际访问 origin；生产为 `https://notehack.com`。
+3. **分享链接指向 localhost:5173**：`PUBLIC_ORIGIN` 是 dev Vite 地址。改为实际访问 origin；生产为 `https://360note.com`。
 4. **标题重复 H1**：笔记标题字段 + 正文 H1 显示两次。服务端 `stripTitleHeading` + 客户端 `stripDuplicateTitle`；保存/加载/分享/HTML/PDF 均处理。此变更会规范化旧笔记。
 5. **TOTP 立即重登失败**：启用时记录了 `totp_last_step`，同一 30 秒 code 再用于登录被重放保护拒绝。真实用户不会立即重登；测试时使用下一窗口 code 或备用码。不要关闭重放保护。
 6. **2FA 关闭只接受 TOTP**：UI 写“验证码或备用码”；已修复后端 disable 接受备用码并标记已用。
@@ -107,7 +107,7 @@ apps/web/src/styles/tokens.css        设计 token
 
 ### 待办（按优先级）
 
-- [ ] 生产部署：systemd、Nginx、TLS（notehack.com/www）、环境密钥、管理员账户。
+- [ ] 生产部署：systemd、Nginx、TLS（360note.com/www）、环境密钥、管理员账户。
 - [ ] 重置生产数据库为干净状态（当前为测试数据）；重新注册管理员并妥善保存恢复密钥。
 - [ ] 将 deploy key 加入 GitHub 并 push 全仓；若未加，需用户操作。
 - [x] 明确 v0.1 中文优先；语言切换暂时隐藏，避免中英混排；英文完整翻译为 P1。
@@ -120,12 +120,12 @@ apps/web/src/styles/tokens.css        设计 token
 - [ ] 2FA/备份/恢复/导入导出 E2E 自动化固化。
 - [ ] 生产监控/日志/告警、备份定时器验证。
 - [ ] 清理测试用户/测试笔记/测试分享/测试备份；保留干净初始状态。
-- [ ] 替换内存中的 `notehack.com` OG 图/社交预览（可选）。
+- [ ] 替换内存中的 `360note.com` OG 图/社交预览（可选）。
 - [ ] 完整审查英文/隐私/条款与实际行为一致性。
 
 ### 环境/凭据（不入库）
 
-- 生产密钥只放 `/etc/notehack/notehack.env`，权限 0600；不写入仓库/文档。
+- 生产密钥只放 `/etc/360note/360note.env`，权限 0600；不写入仓库/文档。
 - 测试账户仅用于开发，部署前删除。
 
 ### 决策链接
@@ -144,14 +144,14 @@ apps/web/src/styles/tokens.css        设计 token
 
 ### 部署结果
 
-- 域名：`https://notehack.com`（`www` 301 到 apex）；HTTP 301 到 HTTPS。
+- 域名：`https://360note.com`（`www` 301 到 apex）；HTTP 301 到 HTTPS。
 - TLS：Let's Encrypt，证书到期 2027-02-05；`certbot.timer` 已启用；无邮箱注册。
-- 服务：systemd `notehack.service` 运行 `/opt/notehack/apps/server/dist/index.js`，`127.0.0.1:8787`；Nginx 终止 TLS。
+- 服务：systemd `360note.service` 运行 `/opt/360note/apps/server/dist/index.js`，`127.0.0.1:8787`；Nginx 终止 TLS。
 - 数据库：PostgreSQL 本地；生产库已重置为干净状态。
-- 数据目录：`/var/lib/notehack`（0700）；env：`/etc/notehack/notehack.env`（0600）。
-- 最终状态：1 个管理员、3 篇种子笔记、0 会话、0 分享、0 备份、0 附件、0 团队空间；管理员与恢复密钥保存在 `/root/notehack-admin-initial.txt`（0600），生产密钥备份在 `/root/notehack-secrets-backup.txt`（0600，应复制到离线后删除）。
+- 数据目录：`/var/lib/360note`（0700）；env：`/etc/360note/360note.env`（0600）。
+- 最终状态：1 个管理员、3 篇种子笔记、0 会话、0 分享、0 备份、0 附件、0 团队空间；管理员与恢复密钥保存在 `/root/360note-admin-initial.txt`（0600），生产密钥备份在 `/root/360note-secrets-backup.txt`（0600，应复制到离线后删除）。
 - 未配置 AI、未配置 S3 异地；注册模式 `open`。
-- Git：`main` 已推送到 `github.com:soulizer/notehack`（deploy key 已添加）；最终提交 `cf29d55`。
+- Git：`main` 已推送到 `github.com:widgeted/360note`（deploy key 已添加）；最终提交 `cf29d55`。
 
 ### 最终验证
 
@@ -200,15 +200,15 @@ apps/web/src/styles/tokens.css        设计 token
 3. **字号下限 13px**：全站 CSS/内联字号扫描并提升；`--text-xs` 改为 13px；隐私/条款/忘记密码/时间戳/错误说明不小于 13px；登录输入 44px、按钮 44px。
 4. **去掉廉价的 hover/active 效果**：删除全局 `a:hover { text-decoration: underline }`、按钮 `translateY/scale`、列表快捷操作上移、主题卡选中 ring、脑内链接下划线；hover 仅改颜色/背景。弹窗/抽屉/Toast 的进入动效保留。
 5. **边框纪律**：选中态不再叠加 `box-shadow: 0 0 0 1px`；菜单/列表/输入只保留一层 1px 边框；搜索行加 `min-width: 0`，修复新建按钮溢出；按钮统一 36px 标准/30px 小号/44px 大号，圆角 8/7px。
-6. **品牌重做**：放弃“圆角方块 + N 字形”的 AI 感图标，改为文字标识 **NoteHack.**（蓝色句点）；PWA/favicon 为同源 “N.”；折叠侧栏显示 “N.”。删除分享页/邀请页/剪藏页中的旧图形 mark。
-7. **错误体验**：Nginx 静态直出 SPA，API 反代；502/503/504 统一返回 `/var/www/notehack-errors/maintenance.html` 品牌 503 页；前端 `api.ts` 把网关错误转为可读中文，不再渲染 Nginx HTML。
+6. **品牌重做**：放弃“圆角方块 + N 字形”的 AI 感图标，改为文字标识 **360note.**（蓝色句点）；PWA/favicon 为同源 “N.”；折叠侧栏显示 “N.”。删除分享页/邀请页/剪藏页中的旧图形 mark。
+7. **错误体验**：Nginx 静态直出 SPA，API 反代；502/503/504 统一返回 `/var/www/360note-errors/maintenance.html` 品牌 503 页；前端 `api.ts` 把网关错误转为可读中文，不再渲染 Nginx HTML。
 8. **502 根因与修复**：尝试 `archiver@8` 消除 moderate audit，但其 ESM 无 default export 导致 API 启动失败。回滚 `archiver@7.0.1`，重建部署，健康恢复。依赖 major 升级必须先 staging 启动验证，已写入运维教训。
-9. **注册验证**：临时账号 `temp-reg-check@notehack.com` 注册成功（HTTP 200），验证后删除；生产恢复为 1 管理员 + 3 篇种子笔记。
+9. **注册验证**：临时账号 `temp-reg-check@360note.com` 注册成功（HTTP 200），验证后删除；生产恢复为 1 管理员 + 3 篇种子笔记。
 10. **清理 AI 痕迹**：移除种子笔记中的 👋 emoji（避免无 emoji 字体环境出现豆腐块）；空状态改用书写图标 `PenLine`，不用 Sparkles/机器人；移除玻璃拟态/backdrop-filter（侧栏、顶栏、弹窗遮罩只保留实色）。
 
 ### 铁律（后续必须遵守）
 
-- **每次代码/文档/部署变更完成后，立即 `git add -A && git commit && git push` 到 `github.com:soulizer/notehack`。** 不允许在本机积累多轮未推送改动；推送失败视为任务未完成。
+- **每次代码/文档/部署变更完成后，立即 `git add -A && git commit && git push` 到 `github.com:widgeted/360note`。** 不允许在本机积累多轮未推送改动；推送失败视为任务未完成。
 - 任何视觉改动必须先对照 `docs/DESIGN_SYSTEM.md`；新增字体、字号、按钮变体、图标风格都先更新规范。
 - 禁止：衬线/宋体、<13px 文字、hover 下划线/上浮/缩放、双边框/边框重叠、营销首页、AI 味 logo、服务器原始错误页。
 
@@ -358,7 +358,7 @@ apps/web/src/styles/tokens.css        设计 token
 14. **菜单宽度再收敛**：普通菜单从 220px 降到 **180px**（通知中心 320 面板例外）；Dropdown 用真实触发按钮定位，工作区/用户菜单 x=10。（第六轮改为内容自适应，见下方。）
 15. **Banner/Toast 对齐**：统一为 16px 图标列 + 文本列 + 固定关闭列的网格；图标与首行文字顶部对齐，文本 `min-width:0`。安全页提示与“端到端加密”标题间距通过 `.banner + .settings-section` 统一为 30px。
 16. **账户排版**：显示名称、邮箱、保存按钮放入同一个 `profile-fields` 列；输入与保存按钮均 36px，头像圆形。
-17. **头像/logo/浏览器图标**：头像改圆形白字；Logo 改为几何 `N.` 标记 + `NoteHack` 文字；favicon/PWA/apple-touch 由同一 SVG 源生成；favicon URL 添加 `?v=5` 缓存失效。（第六轮改为默认文字标识，折叠时才显示 `N.`。）
+17. **头像/logo/浏览器图标**：头像改圆形白字；Logo 改为几何 `N.` 标记 + `360note` 文字；favicon/PWA/apple-touch 由同一 SVG 源生成；favicon URL 添加 `?v=5` 缓存失效。（第六轮改为默认文字标识，折叠时才显示 `N.`。）
 18. **深色表面**：`--ink-900/950` 由深蓝海军色改为暖炭色，toast/代码块不再与淡黄纸面形成冷暖冲突。
 19. **Modal 焦点与闪烁**：`Modal` 的焦点管理 effect 依赖每次父组件渲染都会变化的 `onClose`，导致空间命名弹窗等每输入一个字符就重新聚焦关闭按钮；分享/上传父组件重渲染时也会闪烁。改为 `onCloseRef` + 只依赖 `open`，优先聚焦输入/文本域。
 20. **个人空间创建**：后端 `POST /api/workspaces` 接受 `kind=personal|team`；设置页创建弹窗可选择类型；个人空间可创建多个，删除时账户至少保留一个空间。
@@ -366,7 +366,7 @@ apps/web/src/styles/tokens.css        设计 token
 22. **移动端底部栏**：快速栏改为四等分 grid（笔记/搜索/收藏/设置），移除底部重复新建；顶部新建按钮与桌面共用 `.new-note-btn` 样式。（第七轮已移除底部快速栏。）
 23. **移动端去重**：底部快速栏移除 `.mobile-quick-new`；新建只保留顶部 `.new-note-btn`，与桌面同一套白底细边框/蓝图标样式。快速栏为四等分，第一项改用 FileText 图标，避免与新建图标相同。（第七轮已移除底部快速栏。）
 24. **分享页增强**：公开页增加复制链接按钮；打印样式与元信息已在 0.1.5 前完成。
-25. **Demo 账号**：`demo@notehack.com`（显示名 `demonotehack.com`）已创建，包含中英文、Markdown/富文本、表格、图片、附件、标签、文件夹、评论、版本、分享、回收站、第二个人空间、团队空间和一份备份；密码保存在 `/root/notehack-demo-credentials.txt`，不写入仓库。
+25. **Demo 账号**：`demo@360note.com`（显示名 `demo360note.com`）已创建，包含中英文、Markdown/富文本、表格、图片、附件、标签、文件夹、评论、版本、分享、回收站、第二个人空间、团队空间和一份备份；密码保存在 `/root/360note-demo-credentials.txt`，不写入仓库。
 26. **打印**：分享页新增专用 `@media print`，隐藏评论、目录、按钮、分享品牌；打印元信息包含发布、更新、打印时间，格式 `yyyy年MM月dd日 HH:mm`；正文/代码/表格使用浅色打印样式。（第六轮改为“更新相对时间 + 发布/打印完整时间”。）
 
 ### 验证
@@ -395,7 +395,7 @@ apps/web/src/styles/tokens.css        设计 token
 3. **“我的空间”点击无效（关键 bug）**：空间切换菜单能打开，但被移动端侧栏盖住。`--z-dropdown` 原为 40，移动端侧栏为 60，Playwright 报“回收站拦截点击”。把 `--z-dropdown` 提升到 70（Modal 80、Toast 100），菜单即可点击；实测切换到“产品团队”成功后侧栏关闭，重新打开切换回“演示空间”。
 4. **文件夹/标签间距过大**：侧栏树使用 `flex:1` 吃掉剩余高度。改为 `flex:0 1 auto; max-height:38vh`，标签区紧跟在文件夹后，同时保留滚动能力。
 5. **账户菜单**：整行用户信息不再是触发器；只有右侧“…”按钮打开“退出登录”。菜单宽度由固定 180/210px 改为内容自适应（140–360px），退出菜单实测 140px；笔记更多菜单 161.6px。全宽空间触发器左对齐，“…”触发器右对齐。
-6. **Logo**：默认为 `NoteHack.`（深色文字 + 蓝色句点），不再默认显示几何 N 标记；折叠侧栏 56px 时才显示 `N.`。修复登录/注册/分享顶栏链接继承全局蓝色导致整词变蓝的问题；这些顶栏现在显式继承深色文字。（第七轮改为便签 mark + wordmark。）
+6. **Logo**：默认为 `360note.`（深色文字 + 蓝色句点），不再默认显示几何 N 标记；折叠侧栏 56px 时才显示 `N.`。修复登录/注册/分享顶栏链接继承全局蓝色导致整词变蓝的问题；这些顶栏现在显式继承深色文字。（第七轮改为便签 mark + wordmark。）
 7. **Wiki 链接**：
    - 旧 demo 内容被 Turndown 转义成 `\[\[...\]\]`，导致只显示字面量、不能点击；已迁移为 `[[...]]`。
    - 编辑器 decoration 现在隐藏 `[[`、`]]` 与别名前缀，只显示标题；默认普通单击跳转（不再要求 ⌘/Ctrl）。
@@ -405,7 +405,7 @@ apps/web/src/styles/tokens.css        设计 token
 9. **冲突副本进入历史**：新增 `addConflictVersion` 服务与 `POST /api/notes/:id/conflicts`；客户端冲突时把本地内容写入 `note_versions(reason='conflict')`，编辑器打开历史面板。原来 11 条 `标题（冲突副本 时间）` 笔记已迁移到 `note_versions`，`notes` 中冲突副本为 0；新增幂等迁移 `002_conflict_history.sql` 供其他实例升级。历史 UI 标签改为“冲突副本”，不显示版本号。
 10. **打印时间**：分享页更新信息改为 `formatRelative`（如“大约 1 小时前”）；打印元信息保留完整发布/打印时间。
 11. **注册页排版**：根因是 `.auth-form` 只有 `gap` 却没有 `display:flex`，字段实际没有间距。补 `display:flex; flex-direction:column; gap:17px`；注册页使用 560px 卡片与 2×2 字段网格，移动端单列；首次聚焦/错误/按钮间距恢复。
-12. **分享页排版**：元数据分“作者/发布/更新 + 右侧操作”两组；评论表单卡片化；附件使用图标列表；页脚去掉“由 NoteHack 发布”重复品牌；顶栏 CTA 使用次级按钮；移动端 390px 无横向溢出。
+12. **分享页排版**：元数据分“作者/发布/更新 + 右侧操作”两组；评论表单卡片化；附件使用图标列表；页脚去掉“由 360note 发布”重复品牌；顶栏 CTA 使用次级按钮；移动端 390px 无横向溢出。
 13. **HTML 表格与摘要清理**：5 篇 demo 笔记的 HTML 表格转为 GFM Markdown；`excerpt()` 先移除 HTML 再走 Markdown 清理，避免 `<table style=` 泄漏；`markdownToPlainText` 移除表格分隔行和任务复选框；回填全部 27 篇笔记摘要。
 14. **样式审计**：Playwright 扫描 1440×960 与 390×844 的登录、注册、分享、应用首页、账户、外观、移动首页/分享页，无 <13px 可见文字、无横向溢出；`font-size` 的 em 写法加 `max(13px, …)` 下限。
 15. **安全修复与审计**：
@@ -423,7 +423,7 @@ apps/web/src/styles/tokens.css        设计 token
 ### 验证
 
 - `npm run typecheck` 通过；`npm test` server 14 + web 3 通过；`npm run build` 通过。
-- 部署：rsync `apps/web/dist` 与 `apps/server/dist` 到 `/opt/notehack`，更新 Nginx 配置，`systemctl restart notehack`；`/health` 0.1.5。
+- 部署：rsync `apps/web/dist` 与 `apps/server/dist` 到 `/opt/360note`，更新 Nginx 配置，`systemctl restart 360note`；`/health` 0.1.5。
 - Playwright 关键结果：Wiki 5 个链接、普通单击跳转成功；冲突历史含 v3 `conflict`；笔记列表无“冲突副本”；更多菜单无“生成摘要”；移动端无阴影、四项快速栏、空间切换成功、账户菜单仅“…”可开；打印元信息含“打印于”和相对更新；注册 560px/2×2；样式扫描 0 个 <13px。（第七轮移除底部快速栏。）
 - 清理：测试临时笔记/附件/分享/token 已删除；15 个 HeadlessChrome 会话与 2 条未读测试安全通知已删除；admin/demo 未读均为 0。
 
@@ -451,7 +451,7 @@ apps/web/src/styles/tokens.css        设计 token
 
 ### 实现
 
-1. **新品牌 mark**：`Logo.tsx` 改为暖墨色圆角底 + 米色便签（三条手写墨迹）+ 金色钢笔。默认完整显示 mark + `NoteHack.` wordmark；折叠侧栏只显示 mark。favicon.svg、favicon.png/.ico、PWA 192/512、maskable、apple-touch 全部由同一 SVG 重新生成；`index.html` 缓存版本更新为 `?v=6`。之前“纯文字标识/N. 标记”的决定被本轮取代。
+1. **新品牌 mark**：`Logo.tsx` 改为暖墨色圆角底 + 米色便签（三条手写墨迹）+ 金色钢笔。默认完整显示 mark + `360note.` wordmark；折叠侧栏只显示 mark。favicon.svg、favicon.png/.ico、PWA 192/512、maskable、apple-touch 全部由同一 SVG 重新生成；`index.html` 缓存版本更新为 `?v=6`。之前“纯文字标识/N. 标记”的决定被本轮取代。
 2. **空间菜单对齐**：`Dropdown` 新增 `width="trigger"`；空间切换菜单使用触发器实际宽度。桌面菜单 229px、移动端 237px，左右边缘与空间切换器完全对齐；其他普通菜单仍为内容自适应 140–360px，账户菜单 140px。
 3. **移除移动端底部快速栏**：删除 `.mobile-quickbar` JSX、CSS 与 print 选择器；列表底部 padding 从 86px 降为 `20px + safe-area`。移动端搜索在列表顶部，收藏/设置/空间在侧栏抽屉；新建只在搜索框右侧出现一次。
 4. **移动设置访问深度**：
@@ -478,3 +478,14 @@ apps/web/src/styles/tokens.css        设计 token
 ### 版本
 
 - v0.1.5（第七轮补丁）；DESIGN_SYSTEM 1.0、QUALITY、CHANGELOG、DEMO、FEATURES 同步；新增 ADR-010（移动端抽屉与设置扁平导航）。
+
+## 2026-11-08 生产上线状态
+
+- 生产路径 `/opt/360note`，服务 `360note.service`，环境 `/etc/360note/360note.env`，数据 `/var/lib/360note`。
+- Node 22 位于 `/opt/node22/bin/node`；Nginx 两个 vhost 共用 `127.0.0.1:8787`。
+- 管理员与演示账户凭据保存在服务器 `/root/360note-credentials.txt`（0600），不进入 Git。
+- 演示数据由 `scripts/provision-accounts.mjs` 通过真实 API 创建，覆盖中英文、附件、分享、评论、版本与团队空间。
+- 安全回归：`tests/manual/security-audit.mjs`，当前 54/54 通过。
+- SMTP 使用 `eu1.workspace.org:465`（noreply@360note.com）；测试邮件只发送到 access@126.com。
+- 域名语言由 `domainLocale()` 固定，不依赖 localStorage 或用户偏好。
+- 空间图标/颜色存储在 `workspaces.icon` / `workspaces.color`；编辑模式存储在 `nh-editor-mode:<noteId>`。

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Copy, LockKeyhole, Sparkles, Wand2 } from 'lucide-react';
-import type { Note } from '@notehack/shared';
+import type { Note } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';

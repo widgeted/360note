@@ -5,7 +5,7 @@
 
 ## Context
 
-Offline and multi-device editing creates conflicts. Reference projects: Trilium uses LWW (silent data loss risk); Joplin uses conflict copies + bounded 3-way merge; SilverBullet uses conflict copies; Standard Notes uses server detection and per-type strategies. NoteHack needs no silent overwrite, low complexity, and understandable UX.
+Offline and multi-device editing creates conflicts. Reference projects: Trilium uses LWW (silent data loss risk); Joplin uses conflict copies + bounded 3-way merge; SilverBullet uses conflict copies; Standard Notes uses server detection and per-type strategies. 360note needs no silent overwrite, low complexity, and understandable UX.
 
 ## Decision
 

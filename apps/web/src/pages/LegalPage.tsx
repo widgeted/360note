@@ -9,7 +9,7 @@ export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
   return (
     <div className="legal-page">
       <div className="legal-nav">
-        <Link to="/" aria-label="NoteHack"><LogoLockup /></Link>
+        <Link to="/" aria-label="360note"><LogoLockup /></Link>
         <Link to="/" className="btn btn-ghost btn-sm"><ArrowLeft size={13} /> {t('返回首页')}</Link>
       </div>
       <div className="legal-body">
@@ -25,13 +25,13 @@ function PrivacyZh() {
   return (
     <>
       <h1>隐私政策</h1>
-      <div className="legal-date">生效日期：2026 年 11 月 7 日 · 适用于 notehack.com 与 www.notehack.com</div>
+      <div className="legal-date">生效日期：2026 年 11 月 8 日 · 适用于 360note.com、360biji.com 及其 www 子域名</div>
       <div className="prose">
-        <p>NoteHack 的设计原则是：只收集让服务正常工作所必需的数据，并且让你随时能够带走或删除它。这份政策用直白的语言说明我们做什么、不做什么。</p>
+        <p>360note（中文名“360笔记”）的设计原则是：只收集让服务正常工作所必需的数据，并且让你随时能够带走或删除它。这份政策用直白的语言说明我们做什么、不做什么。360biji.com 是中文版，360note.com 是英文版，两者使用同一套账户与内容。</p>
 
         <h2>1. 我们收集什么</h2>
         <ul>
-          <li><strong>账户数据：</strong>邮箱地址、昵称、密码哈希（使用 scrypt 派生，服务器不保存明文密码）、创建时间。</li>
+          <li><strong>账户数据：</strong>邮箱地址、昵称、密码哈希（使用 scrypt 派生，服务器不保存明文密码）、邮箱验证记录、创建时间。</li>
           <li><strong>内容数据：</strong>你的笔记、文件夹、标签、评论、附件、历史版本与分享链接。</li>
           <li><strong>安全数据：</strong>登录会话、设备信息（浏览器 User-Agent）、IP 地址、登录尝试、审计日志。它们用于保护账户、排查滥用和满足安全审计需要。</li>
           <li><strong>偏好数据：</strong>主题、语言、编辑器设置等。</li>
@@ -40,7 +40,7 @@ function PrivacyZh() {
 
         <h2>2. 我们不会做什么</h2>
         <ul>
-          <li>不发送营销邮件，也不会向你发送任何邮件。注册、邀请、评论、异常登录等通知都在应用内显示。</li>
+          <li>不发送营销邮件。我们只发送账户必需的邮件：注册与找回密码验证码、密码重置通知、空间邀请，以及你主动请求的安全提醒。评论、异常登录等日常通知仍然在应用内显示。</li>
           <li>不把笔记内容出售、出租或用于训练 AI 模型。</li>
           <li>不在未经你主动触发的情况下把笔记发送给 AI 服务。AI 摘要默认关闭，且每次调用都由你点击触发。</li>
           <li>不在分享页面加载第三方广告或跟踪代码。</li>
@@ -79,10 +79,10 @@ function PrivacyZh() {
         </ul>
 
         <h2>8. 安全事件</h2>
-        <p>如果发生影响你数据的安全事件，我们会在应用内通知受影响的账户，并说明影响范围、已采取的措施与建议操作。由于本服务不发送邮件，请定期登录查看通知。</p>
+        <p>如果发生影响你数据的安全事件，我们会在应用内通知受影响的账户，必要时也会通过账户邮箱联系你，并说明影响范围、已采取的措施与建议操作。</p>
 
         <h2>9. 联系我们</h2>
-        <p>本实例由域名所有者运营。你可以通过实例内的管理员联系方式或应用内反馈渠道提出隐私问题。我们不会通过电子邮件主动联系你。</p>
+        <p>本实例由域名所有者运营。你可以通过 noreply@360note.com 提出隐私问题。我们只会发送账户与安全相关的邮件，不会发送营销邮件。</p>
 
         <h2>10. 变更</h2>
         <p>当这份政策发生重大变化时，我们会在应用内提示，并更新生效日期。继续使用即表示你接受更新后的政策。</p>
@@ -95,19 +95,19 @@ function PrivacyEn() {
   return (
     <>
       <h1>Privacy policy</h1>
-      <div className="legal-date">Effective November 7, 2026 · Applies to notehack.com and www.notehack.com</div>
+      <div className="legal-date">Effective November 8, 2026 · Applies to 360note.com, 360biji.com and their www subdomains</div>
       <div className="prose">
-        <p>NoteHack collects only what is necessary to run the service, and makes it easy for you to take your data out or delete it.</p>
+        <p>360note (360笔记 in Chinese) collects only what is necessary to run the service, and makes it easy for you to take your data out or delete it. 360note.com is the English edition and 360biji.com is the Chinese edition; both share one account system and one content store.</p>
         <h2>What we collect</h2>
         <ul>
-          <li><strong>Account data:</strong> email, display name, scrypt password hash, timestamps.</li>
+          <li><strong>Account data:</strong> email, display name, scrypt password hash, email verification records, timestamps.</li>
           <li><strong>Content:</strong> notes, folders, tags, comments, attachments, versions and share links.</li>
           <li><strong>Security data:</strong> sessions, browser user agent, IP address, login attempts and audit logs.</li>
           <li><strong>Preferences:</strong> theme, language and editor settings.</li>
         </ul>
         <h2>What we never do</h2>
         <ul>
-          <li>No marketing email, no email at all. All notices are in-app.</li>
+          <li>No marketing email. We only send account-essential email: sign-up and password-reset codes, password-change notices, workspace invitations, and security alerts you request. Routine notices such as comments and unusual sign-ins stay in-app.</li>
           <li>No selling or renting your content; no training AI on your notes.</li>
           <li>No sending notes to an AI service unless you explicitly trigger it. AI summaries are off by default.</li>
           <li>No third-party ads or behavioral analytics on shared pages.</li>
@@ -122,7 +122,7 @@ function PrivacyEn() {
         <h2>Retention and your rights</h2>
         <p>Trash keeps notes for 30 days. Automatic backups run daily with 14 copies retained for up to 30 days. You can export a single note or the whole workspace, correct your data, delete notes, empty trash, or delete your account. Team workspaces must transfer ownership first so other members are not affected.</p>
         <h2>Security incidents and changes</h2>
-        <p>If an incident affects your data, we will notify affected accounts in-app with scope, mitigation and recommended actions. Material policy changes will be announced in-app with a new effective date.</p>
+        <p>If an incident affects your data, we will notify affected accounts in-app and, when necessary, by account email, with scope, mitigation and recommended actions. Material policy changes will be announced in-app with a new effective date.</p>
       </div>
     </>
   );
@@ -132,15 +132,15 @@ function TermsZh() {
   return (
     <>
       <h1>服务条款</h1>
-      <div className="legal-date">生效日期：2026 年 11 月 7 日 · 适用于 notehack.com 与 www.notehack.com</div>
+      <div className="legal-date">生效日期：2026 年 11 月 8 日 · 适用于 360note.com、360biji.com 及其 www 子域名</div>
       <div className="prose">
-        <p>欢迎使用 NoteHack。使用本服务即表示你同意以下条款。如果你不同意，请不要创建账户或继续使用。</p>
+        <p>欢迎使用 360note（中文名“360笔记”）。使用本服务即表示你同意以下条款。如果你不同意，请不要创建账户或继续使用。</p>
         <h2>1. 服务内容</h2>
-        <p>NoteHack 是一个笔记、知识整理与发布服务，提供编辑、组织、搜索、同步、分享、导出与备份等能力。服务可能随版本迭代增加、调整或移除功能；重要变化会在应用内说明。</p>
+        <p>360note 是一个笔记、知识整理与发布服务，提供编辑、组织、搜索、同步、分享、导出与备份等能力。360biji.com 提供中文界面，360note.com 提供英文界面，两者共享账户与内容。服务可能随版本迭代增加、调整或移除功能；重要变化会在应用内说明。</p>
         <h2>2. 账户</h2>
         <ul>
-          <li>你需要提供有效的邮箱地址与足够强的密码，并对账户下的活动负责。</li>
-          <li>请妥善保管恢复密钥。恢复密钥只显示一次，丢失后无法找回，实例管理员也可能无法恢复你的账户。</li>
+          <li>你需要提供有效的邮箱地址与足够强的密码，并通过邮箱验证码完成注册，对账户下的活动负责。</li>
+          <li>忘记密码时，你可以使用邮箱验证码或恢复密钥重置。请妥善保管恢复密钥。恢复密钥只显示一次，丢失后无法找回，实例管理员也可能无法恢复你的账户。</li>
           <li>你可以开启两步验证并管理登录设备。发现异常登录时，应立即撤销会话并修改密码。</li>
           <li>首个注册账户会成为实例管理员，拥有管理实例设置与用户的能力。</li>
         </ul>
@@ -175,15 +175,15 @@ function TermsEn() {
   return (
     <>
       <h1>Terms of service</h1>
-      <div className="legal-date">Effective November 7, 2026 · Applies to notehack.com and www.notehack.com</div>
+      <div className="legal-date">Effective November 8, 2026 · Applies to 360note.com, 360biji.com and their www subdomains</div>
       <div className="prose">
-        <p>By using NoteHack you agree to these terms. If you do not agree, do not create an account.</p>
+        <p>By using 360note you agree to these terms. If you do not agree, do not create an account.</p>
         <h2>The service</h2>
-        <p>NoteHack provides note-taking, organization, search, sync, sharing, export and backup. Features may change over time; material changes will be announced in-app.</p>
+        <p>360note provides note-taking, organization, search, sync, sharing, export and backup. 360note.com is the English edition and 360biji.com is the Chinese edition; both share accounts and content. Features may change over time; material changes will be announced in-app.</p>
         <h2>Accounts</h2>
         <ul>
-          <li>Provide a valid email and a strong password. You are responsible for activity in your account.</li>
-          <li>Store your recovery key safely. It is shown once and cannot be recovered.</li>
+          <li>Provide a valid email and a strong password, and verify the email with a one-time code when you register. You are responsible for activity in your account.</li>
+          <li>You can reset your password with an email code or your recovery key. Store the recovery key safely: it is shown once and cannot be recovered.</li>
           <li>Enable two-factor authentication and review devices. If you notice unusual activity, revoke sessions and change your password.</li>
         </ul>
         <h2>Your content</h2>

@@ -8,7 +8,7 @@ import { parseImport } from './import-parser.js';
 const tempDirs: string[] = [];
 
 async function jobDir(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'notehack-import-test-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-import-test-'));
   tempDirs.push(dir);
   return dir;
 }
@@ -39,7 +39,7 @@ describe('import parser', () => {
     expect(parsed.notes).toHaveLength(1);
     expect(parsed.notes[0].folderPath).toContain('项目');
     expect(parsed.notes[0].attachments).toHaveLength(1);
-    expect(parsed.notes[0].contentMd).toContain('notehack-attachment://');
+    expect(parsed.notes[0].contentMd).toContain('360note-attachment://');
   });
 
   it('strips Evernote XML prolog and parses tags', async () => {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, FileText, Keyboard, Sparkles } from 'lucide-react';
-import type { User } from '@notehack/shared';
+import type { User } from '@360note/shared';
 import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';
 import { api } from '../../lib/api';
@@ -37,7 +37,7 @@ export default function EditorSettings() {
   return (
     <>
       <h1 className="settings-title">{t('编辑器')}</h1>
-      <p className="settings-subtitle">{t('NoteHack 以 Markdown 为底层格式，同时提供所见即所得编辑。所有设置只影响界面，不影响内容。')}</p>
+      <p className="settings-subtitle">{t('360笔记以 Markdown 为底层格式，同时提供所见即所得编辑。所有设置只影响界面，不影响内容。')}</p>
 
       <section className="settings-section">
         <div className="settings-section-head">
@@ -46,7 +46,7 @@ export default function EditorSettings() {
         <div className="setting-row">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('默认笔记格式')}</div>
-            <div className="setting-row-desc">{t('打开笔记时使用的编辑模式。你可以随时在编辑器底部切换。')}</div>
+            <div className="setting-row-desc">{t('对之后新建的笔记生效。已有笔记会记住各自上次使用的模式，你也可以在编辑器底部随时切换。')}</div>
           </div>
           <div className="setting-row-control">
             <div className="segmented">

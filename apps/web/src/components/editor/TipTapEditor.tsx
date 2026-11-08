@@ -30,7 +30,7 @@ import {
   Table2,
 } from 'lucide-react';
 import { htmlToMarkdown, markdownToEditorHtml } from '../../lib/markdown';
-import { useT } from '../../lib/i18n';
+import { translate, useT } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 
 const lowlight = createLowlight(common);
@@ -68,7 +68,7 @@ const WikiLinkDecoration = Extension.create<{ onOpen?: (title: string) => void }
                   Decoration.inline(start + labelStart, start + labelEnd, {
                     class: 'nh-wikilink',
                     'data-note-title': match[1].trim(),
-                    title: '点击打开笔记',
+                    title: translate('点击打开笔记'),
                     nodeName: 'span',
                   }),
                 );
@@ -172,7 +172,7 @@ export function TipTapEditor({
         },
       }),
       Placeholder.configure({
-        placeholder: t('开始写…输入 / 插入内容，或直接把图片拖进来'),
+        placeholder: t('开始写…输入 / 插入内容，或从工具栏上传图片'),
         includeChildren: true,
       }),
       Image.configure({ allowBase64: false, inline: false }),

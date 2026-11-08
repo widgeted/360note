@@ -1,10 +1,10 @@
 # Contributing
 
-NoteHack is a production note app. Before changing code, read `AGENTS.md` and the docs it references.
+360note is a production note app. Before changing code, read `AGENTS.md` and the docs it references.
 
 ## Ground rules
 
-- No email sending, no third-party analytics, no tracking.
+- Email is only for account and security messages (verification codes, password/email change notices, invitations). No marketing, third-party analytics or tracking.
 - Do not silently overwrite notes or weaken authentication/security.
 - Use the design system; do not introduce a second visual language.
 - Add features to `docs/FEATURES.md` (priority, placement, frequency) before implementing.

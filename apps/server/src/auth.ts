@@ -77,7 +77,7 @@ export default fp(async function authPlugin(app: FastifyInstance) {
     // CSRF: cookie-authenticated mutations require the custom header. Bearer API calls are exempt.
     const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
     const bearer = request.headers.authorization?.startsWith('Bearer ');
-    if (isMutation && !bearer && request.headers['x-notehack-csrf'] !== '1') {
+    if (isMutation && !bearer && request.headers['x-360note-csrf'] !== '1') {
       return reply.status(403).send({ error: { code: 'CSRF_REQUIRED', message: '缺少安全请求头' } });
     }
 

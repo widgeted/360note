@@ -13,7 +13,7 @@ import { escapeHtml, stripTitleHeading, wordCount } from '../lib/text.js';
 import { readAttachment, safeFilename } from '../lib/storage.js';
 import { requireWorkspace } from './workspaces.js';
 import { audit } from '../lib/audit.js';
-import type { Note } from '@notehack/shared';
+import type { Note } from '@360note/shared';
 
 const exec = promisify(execFile);
 
@@ -81,7 +81,7 @@ function frontmatter(input: {
 }
 
 async function pdfFromHtml(html: string, title: string): Promise<Buffer> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'notehack-pdf-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-pdf-'));
   const htmlPath = path.join(dir, 'note.html');
   const pdfPath = path.join(dir, 'note.pdf');
   const home = path.join(dir, 'home');
@@ -300,7 +300,7 @@ export async function exportWorkspace(input: {
     notePaths.set(note.id, ['notes', ...folderParts, fileName].join('/'));
   }
 
-  const exportName = `notehack-${safeFilename(workspace.name)}-${yyyyMMdd()}`;
+  const exportName = `360note-${safeFilename(workspace.name)}-${yyyyMMdd()}`;
   const archive = archiver('zip', { zlib: { level: 6 } });
   archive.on('warning', (error) => input.app.log.warn({ error }, 'export archive warning'));
   archive.on('error', (error) => input.app.log.error({ error }, 'export archive error'));
@@ -310,7 +310,7 @@ export async function exportWorkspace(input: {
     .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${exportName}.zip`)}`);
   const counts = { notes: notes.length, folders: folders.length, attachments: allAttachments.length };
   const manifest = {
-    format: 'notehack-export',
+    format: '360note-export',
     version: 1,
     exportedAt: new Date().toISOString(),
     workspace: { id: input.workspaceId, name: workspace.name },
@@ -399,7 +399,7 @@ export async function exportWorkspace(input: {
     archive.append(
       JSON.stringify(
         {
-          format: 'notehack-workspace',
+          format: '360note-workspace',
           version: 1,
           exportedAt: new Date().toISOString(),
           workspace,
@@ -433,7 +433,7 @@ export async function exportWorkspace(input: {
   if (input.format === 'md') {
     archive.append(csvRows.join('\n'), { name: `${exportName}/notes.csv` });
     archive.append(
-      `# ${workspace.name}\n\n由 NoteHack 导出于 ${new Date().toISOString()}。\n\n- ${counts.notes} 篇笔记\n- ${counts.folders} 个文件夹\n- ${counts.attachments} 个附件\n\n笔记位于 \`notes/\`，保留文件夹层级；附件位于 \`attachments/\`；正文为 Markdown，论文元数据在 YAML frontmatter 中。\n`,
+      `# ${workspace.name}\n\n由 360note 导出于 ${new Date().toISOString()}。\n\n- ${counts.notes} 篇笔记\n- ${counts.folders} 个文件夹\n- ${counts.attachments} 个附件\n\n笔记位于 \`notes/\`，保留文件夹层级；附件位于 \`attachments/\`；正文为 Markdown，论文元数据在 YAML frontmatter 中。\n`,
       { name: `${exportName}/README.md` },
     );
   }
@@ -444,8 +444,8 @@ export async function exportWorkspace(input: {
         return `<li><a href="${url}">${escapeHtml(note.title || '未命名笔记')}</a><span>${note.updated_at.toISOString().slice(0, 10)}</span></li>`;
       })
       .join('\n');
-    const index = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(workspace.name)} — NoteHack</title>
-    <style>body{background:#f6f4ef;color:#16181d;font-family:Inter,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:760px;margin:0 auto;padding:70px 28px}h1{font-weight:650;font-size:38px;letter-spacing:-.04em;line-height:1.14;margin:0 0 8px}p{color:#6b6a66}ul{list-style:none;padding:0;margin:36px 0}li{display:flex;justify-content:space-between;border-bottom:1px solid #e4e1da;padding:14px 0}a{color:#14161b;text-decoration:none;font-weight:550}a:hover{color:#2f6feb;text-decoration:none}span{color:#8a8882;font-size:13px}</style></head><body><h1>${escapeHtml(workspace.name)}</h1><p>${counts.notes} 篇笔记 · 导出于 ${new Date().toLocaleDateString('zh-CN')}</p><ul>${listItems}</ul></body></html>`;
+    const index = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(workspace.name)} — 360note</title>
+    <style>body{background:#f6f4ef;color:#16181d;font-family:Inter,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:760px;margin:0 auto;padding:70px 28px}h1{font-weight:650;font-size:38px;letter-spacing:-.04em;line-height:1.14;margin:0 0 8px}p{color:#6b6a66}ul{list-style:none;padding:0;margin:36px 0}li{display:flex;justify-content:space-between;border-bottom:1px solid #e4e1da;padding:14px 0}a{color:#14161b;text-decoration:none;font-weight:550}a:hover{color:#17865b;text-decoration:none}span{color:#8a8882;font-size:13px}</style></head><body><h1>${escapeHtml(workspace.name)}</h1><p>${counts.notes} 篇笔记 · 导出于 ${new Date().toLocaleDateString('zh-CN')}</p><ul>${listItems}</ul></body></html>`;
     archive.append(index, { name: `${exportName}/index.html` });
     archive.append(csvRows.join('\n'), { name: `${exportName}/notes.csv` });
   }

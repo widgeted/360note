@@ -86,7 +86,7 @@ export default function AiSettings() {
         <div className="setting-row">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('可随时关闭')}</div>
-            <div className="setting-row-desc">{t('关闭后，AI 摘要入口会隐藏；NoteHack 不会生成或保存摘要。')}</div>
+            <div className="setting-row-desc">{t('关闭后，AI 摘要入口会隐藏；360note 不会生成或保存摘要。')}</div>
           </div>
           <div className="setting-row-control">
             <span className={`badge ${instance?.aiEnabled ? 'badge-green' : ''}`}>{instance?.aiEnabled ? t('实例已启用') : t('实例未启用')}</span>

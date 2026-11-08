@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Check, Save, Trash2 } from 'lucide-react';
+import { AlertCircle, Check, Mail, Save, Trash2, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useAppStore } from '../../stores/app';
-import { useT } from '../../lib/i18n';
+import { getLocale, useT } from '../../lib/i18n';
 import { formatBytes, formatFullDate } from '../../lib/utils';
 import { Avatar } from '../Avatar';
 import { Modal } from '../Modal';
@@ -34,6 +34,21 @@ export default function AccountSettings() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailEditing, setEmailEditing] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [emailCountdown, setEmailCountdown] = useState(0);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (emailCountdown <= 0) return;
+    const timer = window.setInterval(() => setEmailCountdown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [emailCountdown]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -55,6 +70,61 @@ export default function AccountSettings() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function sendEmailCode() {
+    setEmailError(null);
+    if (!newEmail.trim()) {
+      setEmailError(t('请输入新邮箱'));
+      return;
+    }
+    setSendingCode(true);
+    try {
+      await api.post('/api/auth/email-code', {
+        email: newEmail.trim(),
+        purpose: 'change_email',
+        locale: getLocale(),
+      });
+      setCodeSent(true);
+      setEmailCountdown(60);
+    } catch (error) {
+      setEmailError((error as Error).message);
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
+  async function saveEmail() {
+    setEmailSaving(true);
+    setEmailError(null);
+    try {
+      const response = await api.patch<{ user: typeof user }>('/api/me/email', {
+        email: newEmail.trim(),
+        emailCode: emailCode.trim(),
+        password: emailPassword,
+      });
+      if (response.user) setUser(response.user);
+      setEmail(response.user?.email ?? newEmail.trim());
+      setEmailEditing(false);
+      setNewEmail('');
+      setEmailCode('');
+      setEmailPassword('');
+      setCodeSent(false);
+      toast('success', t('邮箱已更新'));
+    } catch (error) {
+      setEmailError((error as Error).message);
+    } finally {
+      setEmailSaving(false);
+    }
+  }
+
+  function cancelEmailEdit() {
+    setEmailEditing(false);
+    setEmailError(null);
+    setNewEmail('');
+    setEmailCode('');
+    setEmailPassword('');
+    setCodeSent(false);
   }
 
   async function deleteAccount() {
@@ -89,8 +159,70 @@ export default function AccountSettings() {
             </div>
             <div className="field">
               <label>{t('邮箱')}</label>
-              <input className="input" value={email} readOnly disabled />
-              <span className="field-hint">{t('邮箱用于登录与账户识别。NoteHack 不会向它发送邮件。')}</span>
+              {!emailEditing ? (
+                <div className="email-edit-row">
+                  <input className="input" value={email} readOnly disabled style={{ flex: 1 }} />
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEmailEditing(true); setNewEmail(email); }}>
+                    <Mail size={13} /> {t('修改邮箱')}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  <input
+                    className="input"
+                    type="email"
+                    value={newEmail}
+                    onChange={(event) => setNewEmail(event.target.value)}
+                    placeholder={t('新邮箱地址')}
+                    autoComplete="email"
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      className="input"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={emailCode}
+                      onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder={t('6 位验证码')}
+                      autoComplete="one-time-code"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={sendingCode || emailCountdown > 0 || !newEmail.trim()}
+                      onClick={sendEmailCode}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      {sendingCode ? <span className="spinner" /> : null}
+                      {emailCountdown > 0 ? t('重新发送（{n}s）', { n: emailCountdown }) : codeSent ? t('重新发送') : t('发送验证码')}
+                    </button>
+                  </div>
+                  <input
+                    className="input"
+                    type="password"
+                    value={emailPassword}
+                    onChange={(event) => setEmailPassword(event.target.value)}
+                    placeholder={t('输入当前密码以确认')}
+                    autoComplete="current-password"
+                  />
+                  {emailError && <div className="form-error"><AlertCircle size={14} /> {emailError}</div>}
+                  <div style={{ display: 'flex', gap: 7 }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={saveEmail}
+                      disabled={emailSaving || !newEmail.trim() || emailCode.length !== 6 || !emailPassword}
+                    >
+                      {emailSaving ? <span className="spinner" /> : <Check size={13} />} {t('确认修改')}
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEmailEdit}>
+                      <X size={13} /> {t('取消')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <span className="field-hint">{t('邮箱用于登录、账户识别与验证码。修改邮箱需要验证新地址和当前密码。')}</span>
             </div>
             {error && <div className="form-error"><AlertCircle size={14} /> {error}</div>}
             <div className="form-actions">
@@ -109,7 +241,16 @@ export default function AccountSettings() {
         </div>
         <div className="setting-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="workspace-mark" style={{ background: 'var(--blue-soft)', color: 'var(--blue)', border: 0 }}>{workspace?.name.slice(0, 1)}</span>
+            <span
+              className="workspace-mark"
+              style={{
+                background: `${workspace?.color ?? '#17865b'}24`,
+                borderColor: `${workspace?.color ?? '#17865b'}40`,
+                color: workspace?.color ?? 'var(--blue)',
+              }}
+            >
+              {workspace?.icon ?? '📔'}
+            </span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{workspace?.name}</div>
               <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>{t('角色：{role}', { role: roleLabel(t, workspace?.role ?? 'owner') })}</div>

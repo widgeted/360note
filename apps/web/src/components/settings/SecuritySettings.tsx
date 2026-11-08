@@ -12,7 +12,7 @@ import {
   ShieldOff,
   X,
 } from 'lucide-react';
-import type { SessionInfo, User } from '@notehack/shared';
+import type { SessionInfo, User } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';
@@ -189,7 +189,7 @@ export default function SecuritySettings() {
         <div className="setting-row">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('登录通知')}</div>
-            <div className="setting-row-desc">{t('检测到新的登录设备或 IP 时，会在应用内提醒。NoteHack 不发送邮件。')}</div>
+            <div className="setting-row-desc">{t('检测到新的登录设备或 IP 时，会在应用内提醒；必要时也会发送账户安全邮件。')}</div>
           </div>
           <div className="setting-row-control"><span className="badge badge-green"><Check size={9} /> {t('已启用')}</span></div>
         </div>
@@ -317,11 +317,11 @@ export default function SecuritySettings() {
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => {
-                  const blob = new Blob([`NoteHack 两步验证备用码\n\n${backupCodes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
+                  const blob = new Blob([`360note 两步验证备用码\n\n${backupCodes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = url;
-                  link.download = 'notehack-backup-codes.txt';
+                  link.download = '360note-backup-codes.txt';
                   link.click();
                   setTimeout(() => URL.revokeObjectURL(url), 2000);
                 }}

@@ -17,9 +17,11 @@ import {
   Settings,
   Star,
   Trash2,
+  UserRound,
+  UsersRound,
   X,
 } from 'lucide-react';
-import type { Folder, Tag } from '@notehack/shared';
+import type { Folder, Tag } from '@360note/shared';
 import { useAppStore, type NoteFilter } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
@@ -332,7 +334,7 @@ export function Sidebar() {
       {mobileOpen && <div className="sidebar-scrim" onClick={closeMobile} />}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <Link to="/app" aria-label="NoteHack" onClick={closeMobile}>
+          <Link to="/app" aria-label="360note" onClick={closeMobile}>
             <LogoLockup />
           </Link>
           <div className="sidebar-brand-actions">
@@ -363,12 +365,23 @@ export function Sidebar() {
           width="trigger"
           trigger={
             <button type="button" className="workspace-switcher">
-              <span className="workspace-mark">{currentWorkspace?.name?.slice(0, 1).toUpperCase() ?? 'N'}</span>
-              <span className="workspace-meta">
-                <span className="workspace-name">{currentWorkspace?.name ?? 'NoteHack'}</span>
-                <span className="workspace-kind">
-                  {currentWorkspace?.kind === 'team' ? t('团队空间') : t('个人空间')}
-                </span>
+              <span
+                className="workspace-mark"
+                style={{
+                  background: `${currentWorkspace?.color ?? '#17865b'}24`,
+                  borderColor: `${currentWorkspace?.color ?? '#17865b'}40`,
+                  color: currentWorkspace?.color ?? 'var(--sidebar-accent)',
+                }}
+              >
+                {currentWorkspace?.icon ?? '📔'}
+              </span>
+              <span className="workspace-name">{currentWorkspace?.name ?? '360note'}</span>
+              <span
+                className="workspace-kind-icon"
+                title={currentWorkspace?.kind === 'team' ? t('团队空间') : t('个人空间')}
+                aria-label={currentWorkspace?.kind === 'team' ? t('团队空间') : t('个人空间')}
+              >
+                {currentWorkspace?.kind === 'team' ? <UsersRound size={13} /> : <UserRound size={13} />}
               </span>
               <ChevronDown size={13} className="workspace-chevron" />
             </button>
@@ -380,7 +393,22 @@ export function Sidebar() {
               {workspaces.map((workspace) => (
                 <MenuItem
                   key={workspace.id}
-                  icon={<span className="workspace-mark" style={{ width: 20, height: 20, borderRadius: 6, fontSize: 13 }}>{workspace.name.slice(0, 1)}</span>}
+                  icon={
+                    <span
+                      className="workspace-mark"
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 6,
+                        fontSize: 13,
+                        background: `${workspace.color ?? '#17865b'}24`,
+                        borderColor: `${workspace.color ?? '#17865b'}40`,
+                        color: workspace.color ?? 'var(--sidebar-accent)',
+                      }}
+                    >
+                      {workspace.icon ?? '📔'}
+                    </span>
+                  }
                   detail={workspace.id === workspaceId ? '✓' : undefined}
                   onClick={() => {
                     close();

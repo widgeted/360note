@@ -1,5 +1,5 @@
 {
-  "name": "@notehack/web",
+  "name": "@360note/web",
   "version": "0.1.5",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
-    "@notehack/shared": "*",
+    "@360note/shared": "*",
     "@tiptap/extension-character-count": "^3.33.0",
     "@tiptap/extension-code-block-lowlight": "^3.33.0",
     "@tiptap/extension-highlight": "^3.33.0",

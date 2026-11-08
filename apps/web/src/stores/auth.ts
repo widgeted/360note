@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { User, Workspace } from '@notehack/shared';
+import type { User, Workspace } from '@360note/shared';
 import { api, ApiError } from '../lib/api';
-import { setLocale } from '../lib/i18n';
+import { getLocale } from '../lib/i18n';
 
 export interface InstanceInfo {
   version: string;
@@ -32,7 +32,7 @@ interface AuthState {
   bootstrap: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
   verifyTwoFactor: (challengeToken: string, code: string) => Promise<void>;
-  register: (input: { email: string; displayName: string; password: string; inviteCode?: string }) => Promise<RegisterResponse>;
+  register: (input: { email: string; displayName: string; password: string; inviteCode?: string; emailCode: string }) => Promise<RegisterResponse>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   setUser: (user: User) => void;
@@ -72,9 +72,6 @@ function clearCachedAuth(): void {
 
 function applyAuth(response: AuthResponse): void {
   cacheAuth(response);
-  const locale = response.user.prefs?.locale;
-  // v0.1 is Chinese-first; do not activate a partially translated locale.
-  if (locale === 'zh-CN') setLocale(locale);
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -139,7 +136,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (input) => {
     const response = await api.post<RegisterResponse>('/api/auth/register', {
       ...input,
-      locale: localStorage.getItem('nh-locale') ?? navigator.language,
+      locale: getLocale(),
     });
     applyAuth(response);
     set({ user: response.user, workspaces: response.workspaces, instance: response.instance, status: 'authenticated', error: null });
@@ -167,8 +164,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   setUser: (user) => {
-    const locale = user.prefs?.locale;
-    if (locale === 'zh-CN') setLocale(locale);
     set({ user });
   },
 

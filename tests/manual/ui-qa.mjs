@@ -6,14 +6,14 @@ const browser=await chromium.launch({headless:true});
 const ctx=await browser.newContext({viewport:{width:1440,height:980},locale:'zh-CN'});
 await ctx.addInitScript(()=>localStorage.setItem('nh-locale','zh-CN'));
 const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push('PAGE:'+e.message)); page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('401'))errs.push('CONSOLE:'+m.text())});
-await page.goto('https://notehack.com/login',{waitUntil:'networkidle'});
+await page.goto('https://360note.com/login',{waitUntil:'networkidle'});
 await page.fill('#login-email',email); await page.fill('#login-password',password); await page.click('button[type=submit]'); await page.waitForTimeout(2000);
 // create two temp notes via API
 const ws = await page.evaluate(async()=>JSON.parse(localStorage.getItem('nh-auth-cache')).workspaces[0].id);
 const ids = await page.evaluate(async(ws)=>{
   const out=[];
   for(const [i,title] of ['QA 批量一','QA 批量二'].entries()){
-    const r=await fetch('/api/notes',{method:'POST',headers:{'Content-Type':'application/json','X-NoteHack-CSRF':'1'},credentials:'same-origin',body:JSON.stringify({workspaceId:ws,title,contentMd:`# ${title}\n\n批量测试 ${i}`})});
+    const r=await fetch('/api/notes',{method:'POST',headers:{'Content-Type':'application/json','X-360note-CSRF':'1'},credentials:'same-origin',body:JSON.stringify({workspaceId:ws,title,contentMd:`# ${title}\n\n批量测试 ${i}`})});
     out.push((await r.json()).note.id);
   }
   return out;
@@ -43,15 +43,15 @@ const pos = await page.locator('.context-panel').evaluate(el=>{const r=el.getBou
 console.log('context pos',pos);
 await page.screenshot({path:'/tmp/qa-context1440.png',fullPage:true});
 // settings admin
-await page.goto('https://notehack.com/app/settings/admin',{waitUntil:'networkidle'}); await page.waitForTimeout(1000);
+await page.goto('https://360note.com/app/settings/admin',{waitUntil:'networkidle'}); await page.waitForTimeout(1000);
 console.log('admin settings', (await page.locator('.settings-inner').innerText()).slice(0,300));
 await page.screenshot({path:'/tmp/qa-admin.png',fullPage:true});
 // settings data offsite visible
-await page.goto('https://notehack.com/app/settings/data',{waitUntil:'networkidle'}); await page.waitForTimeout(900);
+await page.goto('https://360note.com/app/settings/data',{waitUntil:'networkidle'}); await page.waitForTimeout(900);
 console.log('offsite text', (await page.locator('.settings-inner').innerText()).includes('异地备份（S3 兼容）'));
 // cleanup temp notes
 await page.evaluate(async(ids)=>{
-  for(const id of ids){ await fetch(`/api/notes/${id}`,{method:'DELETE',headers:{'X-NoteHack-CSRF':'1'},credentials:'same-origin'}); await fetch(`/api/notes/${id}/permanent`,{method:'DELETE',headers:{'X-NoteHack-CSRF':'1'},credentials:'same-origin'}); }
+  for(const id of ids){ await fetch(`/api/notes/${id}`,{method:'DELETE',headers:{'X-360note-CSRF':'1'},credentials:'same-origin'}); await fetch(`/api/notes/${id}/permanent`,{method:'DELETE',headers:{'X-360note-CSRF':'1'},credentials:'same-origin'}); }
 },ids);
 console.log('errors',errs.slice(0,20));
 await browser.close();

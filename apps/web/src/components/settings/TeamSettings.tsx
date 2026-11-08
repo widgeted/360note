@@ -13,11 +13,11 @@ import {
   UserRound,
   Users,
 } from 'lucide-react';
-import type { AuditEntry, Invitation, User, WorkspaceMember } from '@notehack/shared';
+import type { AuditEntry, Invitation, User, WorkspaceMember } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useAppStore } from '../../stores/app';
-import { useT } from '../../lib/i18n';
+import { getLocale, useT } from '../../lib/i18n';
 import { copyText, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { Avatar } from '../Avatar';
 import { Modal } from '../Modal';
@@ -42,6 +42,8 @@ export default function TeamSettings() {
   const [invitations, setInvitations] = useState<Array<Invitation & { url?: string }>>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [name, setName] = useState(workspace?.name ?? '');
+  const [icon, setIcon] = useState(workspace?.icon ?? '📔');
+  const [color, setColor] = useState(workspace?.color ?? '#17865b');
   const [savingName, setSavingName] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'editor' | 'viewer'>('editor');
@@ -51,6 +53,8 @@ export default function TeamSettings() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createKind, setCreateKind] = useState<'personal' | 'team'>('team');
+  const [createIcon, setCreateIcon] = useState('👥');
+  const [createColor, setCreateColor] = useState('#17865b');
   const [createOpen, setCreateOpen] = useState(searchParams.get('create') === '1');
   const [creating, setCreating] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -63,6 +67,8 @@ export default function TeamSettings() {
 
   useEffect(() => {
     setName(workspace?.name ?? '');
+    setIcon(workspace?.icon ?? (workspace?.kind === 'team' ? '👥' : '📔'));
+    setColor(workspace?.color ?? '#17865b');
     if (!workspaceId) return;
     void loadMembers();
     if (canManage) {
@@ -70,7 +76,7 @@ export default function TeamSettings() {
       void loadAudit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, canManage, workspace?.name]);
+  }, [workspaceId, canManage, workspace?.name, workspace?.icon, workspace?.color]);
 
   async function loadMembers() {
     try {
@@ -103,7 +109,7 @@ export default function TeamSettings() {
     if (!workspaceId || !name.trim()) return;
     setSavingName(true);
     try {
-      await api.patch(`/api/workspaces/${workspaceId}`, { name: name.trim() });
+      await api.patch(`/api/workspaces/${workspaceId}`, { name: name.trim(), icon, color });
       await refreshAuth();
       toast('success', t('设置已保存'));
     } catch (error) {
@@ -125,7 +131,11 @@ export default function TeamSettings() {
       setInvitations((current) => [response.invitation, ...current]);
       setInviteLink(response.invitation.url ?? null);
       setInviteEmail('');
-      toast('success', t('邀请已创建'), t('我们不会发送邮件。请复制邀请链接发给对方。'));
+      toast(
+        'success',
+        t('邀请已创建'),
+        response.emailSent ? t('邀请邮件已发送。你也可以复制链接发给对方。') : t('邮件未发送。请复制邀请链接发给对方。'),
+      );
     } catch (error) {
       setError((error as Error).message);
     } finally {
@@ -173,7 +183,12 @@ export default function TeamSettings() {
     if (!createName.trim()) return;
     setCreating(true);
     try {
-      const response = await api.post<{ workspace: { id: string; name: string } }>('/api/workspaces', { name: createName.trim(), kind: createKind });
+      const response = await api.post<{ workspace: { id: string; name: string } }>('/api/workspaces', {
+        name: createName.trim(),
+        kind: createKind,
+        icon: createIcon || (createKind === 'team' ? '👥' : '📔'),
+        color: createColor,
+      });
       await refreshAuth();
       localStorage.setItem('nh-workspace', response.workspace.id);
       await initialize(response.workspace.id);
@@ -191,6 +206,8 @@ export default function TeamSettings() {
     setCreateOpen(false);
     setCreateName('');
     setCreateKind('team');
+    setCreateIcon('👥');
+    setCreateColor('#17865b');
     if (searchParams.get('create') === '1') {
       const next = new URLSearchParams(searchParams);
       next.delete('create');
@@ -250,14 +267,23 @@ export default function TeamSettings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {workspaces.map((entry) => (
             <div key={entry.id} className="setting-card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10 }}>
-              <span className="workspace-mark" style={{ background: 'var(--blue-soft)', color: 'var(--blue)', border: 0 }}>
-                {entry.name.slice(0, 1).toUpperCase()}
+              <span
+                className="workspace-mark"
+                style={{
+                  background: `${entry.color ?? '#17865b'}24`,
+                  borderColor: `${entry.color ?? '#17865b'}40`,
+                  color: entry.color ?? 'var(--blue)',
+                }}
+              >
+                {entry.icon ?? '📔'}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{entry.name}</span>
-                  <span className="badge">{entry.kind === 'team' ? t('团队空间') : t('个人空间')}</span>
-                  {entry.id === workspaceId && <span className="badge badge-blue">{t('当前')}</span>}
+                  <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : t('个人空间')}>
+                    {entry.kind === 'team' ? <Users size={12} /> : <UserRound size={12} />}
+                  </span>
+                  {entry.id === workspaceId && <span className="badge badge-green">{t('当前')}</span>}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>
                   {entry.kind === 'team' ? t('成员 {n} 人', { n: entry.memberCount ?? 1 }) : t('只有你可以访问')} · {roleLabel(t, entry.role)}
@@ -283,18 +309,36 @@ export default function TeamSettings() {
         </div>
         <div className="setting-card">
           <div className="setting-inline-form">
+            <div className="field" style={{ flex: '0 0 64px' }}>
+              <label>{t('图标')}</label>
+              <input
+                className="input"
+                value={icon}
+                onChange={(event) => setIcon(event.target.value.slice(0, 4))}
+                disabled={!canManage}
+                maxLength={4}
+                style={{ textAlign: 'center', fontSize: 18 }}
+                aria-label={t('空间图标')}
+              />
+            </div>
             <div className="field">
               <label>{t('空间名称')}</label>
               <input className="input" value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage} maxLength={80} />
             </div>
             {canManage && (
-              <button type="button" className="btn btn-primary btn-sm" onClick={saveName} disabled={savingName || name.trim() === workspace?.name}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={saveName} disabled={savingName || (name.trim() === workspace?.name && icon === workspace?.icon && color === workspace?.color)}>
                 {savingName && <span className="spinner" />} {t('保存')}
               </button>
             )}
           </div>
+          {canManage && (
+            <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 13, color: 'var(--text-tertiary)' }}>
-            <Users size={12} /> {t('{n} 位成员', { n: workspace?.memberCount ?? members.length })}
+            <Users size={12} />{' '}
+            {getLocale() === 'en'
+              ? `${workspace?.memberCount ?? members.length} member${(workspace?.memberCount ?? members.length) === 1 ? '' : 's'}`
+              : t('{n} 位成员', { n: workspace?.memberCount ?? members.length })}
             <span className="dot" />
             {t('你的角色：{role}', { role: roleLabel(t, workspace?.role ?? '') })}
             {workspace?.kind === 'personal' ? <><span className="dot" />{t('只有你可以访问')}</> : <><span className="dot" />{t('可邀请成员协作')}</>}
@@ -361,7 +405,7 @@ export default function TeamSettings() {
             <section className="settings-section">
               <div className="settings-section-head">
                 <span className="settings-section-title">{t('邀请成员')}</span>
-                <span className="settings-section-desc">{t('不会发送邮件，请复制链接')}</span>
+                <span className="settings-section-desc">{t('会发送邀请邮件，也可复制链接')}</span>
               </div>
               <div className="setting-inline-form">
                 <div className="field"><label>{t('邮箱')}</label><input className="input" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="teammate@example.com" /></div>
@@ -477,7 +521,10 @@ export default function TeamSettings() {
               key={option.value}
               type="button"
               className={`share-permission-option ${createKind === option.value ? 'selected' : ''}`}
-              onClick={() => setCreateKind(option.value)}
+              onClick={() => {
+                setCreateKind(option.value);
+                setCreateIcon(option.value === 'team' ? '👥' : '📔');
+              }}
             >
               <span className="share-permission-radio" />
               <span style={{ color: 'var(--text-tertiary)', marginTop: 1 }}>{option.icon}</span>
@@ -488,7 +535,8 @@ export default function TeamSettings() {
             </button>
           ))}
         </div>
-        <div className="field">
+        <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} />
+        <div className="field" style={{ marginTop: 14 }}>
           <label>{createKind === 'personal' ? t('个人空间名称') : t('团队空间名称')}</label>
           <input
             className="input"
@@ -558,6 +606,65 @@ export default function TeamSettings() {
         <p style={{ fontSize: 13 }}>{workspace?.name}</p>
       </Modal>
     </>
+  );
+}
+
+const WORKSPACE_ICONS = ['📔', '📚', '💡', '🧭', '🌿', '🚀', '🎯', '🗂️', '👥', '🧪', '🏠', '✍️'];
+const WORKSPACE_COLORS = ['#17865b', '#0f766e', '#4d7c0f', '#b45309', '#be123c', '#7c3aed', '#0e7490', '#475569'];
+
+function IdentityPicker({
+  icon,
+  color,
+  onIcon,
+  onColor,
+}: {
+  icon: string;
+  color: string;
+  onIcon: (value: string) => void;
+  onColor: (value: string) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="identity-picker">
+      <div>
+        <div className="setting-note" style={{ marginBottom: 6 }}>{t('图标')}</div>
+        <div className="identity-options">
+          {WORKSPACE_ICONS.map((symbol) => (
+            <button
+              key={symbol}
+              type="button"
+              className={`identity-symbol ${icon === symbol ? 'selected' : ''}`}
+              onClick={() => onIcon(symbol)}
+              aria-label={symbol}
+            >
+              {symbol}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="setting-note" style={{ marginBottom: 6 }}>{t('背景颜色')}</div>
+        <div className="identity-options">
+          {WORKSPACE_COLORS.map((entry) => (
+            <button
+              key={entry}
+              type="button"
+              className={`identity-color ${color.toLowerCase() === entry.toLowerCase() ? 'selected' : ''}`}
+              style={{ background: entry }}
+              onClick={() => onColor(entry)}
+              aria-label={entry}
+            />
+          ))}
+          <input
+            type="color"
+            value={color}
+            onChange={(event) => onColor(event.target.value)}
+            aria-label={t('自定义颜色')}
+            className="identity-color-input"
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 

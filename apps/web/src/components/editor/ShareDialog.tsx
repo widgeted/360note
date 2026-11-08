@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   Trash2,
 } from 'lucide-react';
-import type { Note, ShareLink, SharePermission } from '@notehack/shared';
+import type { Note, ShareLink, SharePermission } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { copyText, formatFullDate } from '../../lib/utils';

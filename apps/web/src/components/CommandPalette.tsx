@@ -27,7 +27,7 @@ import {
   Users,
   Wand2,
 } from 'lucide-react';
-import type { NoteSummary } from '@notehack/shared';
+import type { NoteSummary } from '@360note/shared';
 import { useAppStore } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';

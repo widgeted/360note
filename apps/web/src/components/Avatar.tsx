@@ -14,7 +14,7 @@ export function Avatar({
   return (
     <span
       className={cn('avatar', size !== 'md' && `avatar-${size}`, className)}
-      style={{ ['--avatar-color' as string]: color || '#2f6feb' }}
+      style={{ ['--avatar-color' as string]: color || '#17865b' }}
       aria-hidden="true"
     >
       {initials(name)}

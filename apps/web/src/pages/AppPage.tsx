@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FileText, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
-import { useT } from '../lib/i18n';
+import { getLocale, useT } from '../lib/i18n';
 import { Sidebar } from '../components/Sidebar';
 import { NoteListPane } from '../components/NoteListPane';
 import { ContextPanel } from '../components/ContextPanel';
@@ -183,7 +183,7 @@ export default function AppPage() {
   }, []);
 
   async function useTemplate(template: 'meeting' | 'daily' | 'project') {
-    const zh = (localStorage.getItem('nh-locale') ?? 'zh-CN').startsWith('zh');
+    const zh = getLocale() === 'zh-CN';
     const content =
       template === 'meeting'
         ? zh

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to NoteHack are documented here.  
+All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
 ## [0.1.5] — 2026-11-08
@@ -26,7 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - 新建笔记按钮改为白底细边框、蓝色图标，降低视觉重量。
 - 删除侧栏“已同步”和移动端同步点，只保留编辑器右上保存状态；底部只保留字符数。
 - 历史“保存版本”按钮由虚线改为实线。
-- 头像改为圆形白字；品牌默认改为 `NoteHack.` 文字标识（蓝色句点），折叠侧栏才显示 `N.`；favicon/PWA/apple-touch 同源。
+- 头像改为圆形白字；品牌默认改为 `360note.` 文字标识（蓝色句点），折叠侧栏才显示 `N.`；favicon/PWA/apple-touch 同源。
 - 账户页显示名称/邮箱/保存按钮同列，控件统一 36px。
 - 切换板块立即清空旧列表并显示 loading skeleton，避免延迟显示不匹配内容。
 
@@ -63,7 +63,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - 移动端侧栏阴影移除；导航按钮移到搜索框左侧并使用 `PanelLeftOpen`，与设置图标区分。
 - 侧栏文件夹树不再 `flex:1` 占满剩余高度，文件夹/标签间距收紧。
-- 默认 Logo 为 `NoteHack.` 文字标识；仅折叠侧栏显示 `N.`；登录/注册/分享顶栏改为深色文字 + 蓝句点。（第七轮改为手写便签 mark + wordmark。）
+- 默认 Logo 为 `360note.` 文字标识；仅折叠侧栏显示 `N.`；登录/注册/分享顶栏改为深色文字 + 蓝句点。（第七轮改为手写便签 mark + wordmark。）
 - 账户菜单只允许右侧“…”触发；所有普通菜单内容自适应宽度。
 - 分享页更新时间显示相对时间；打印时间仍完整显示。
 - 本地摘要（local summary）功能、路由、菜单与设置文案全部移除；只保留管理员启用后的 AI 摘要。
@@ -207,12 +207,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **入口即产品**：`/` 直接进入 `/app`；未登录显示登录页。删除营销首页及其样式。
 - **全站无衬线**：移除 Newsreader、宋体/衬线 token 与编辑器衬线偏好；登录、笔记标题、分享页、导出、错误页统一 Inter/系统无衬线。
 - **字号下限 13px**：隐私政策、服务条款、忘记密码、时间戳、错误说明等全部提升；“任何文字不得小于 13px”写入设计规范与验收清单。
-- **品牌改为文字标识**：`NoteHack.`（蓝色句点），PWA/favicon 为同源 `N.`；删除旧图形 logo。
+- **品牌改为文字标识**：`360note.`（蓝色句点），PWA/favicon 为同源 `N.`；删除旧图形 logo。
 - **按钮统一**：标准 36px / 小号 30px / 大号 44px；圆角 8/7px；同一层级的边框、内边距、字体一致。
 - **去掉廉价交互**：删除 hover 下划线、按钮上浮/缩放、active 位移、选中态额外 ring；hover 只改变颜色或背景。
 - **边框纪律**：修复搜索/新建按钮溢出、选中态双边框、共享权限卡与设置导航的阴影描边；相邻元素保持单层 1px 边框。
 - **空状态与文案**：去掉 emoji 与 Sparkles 图标，改用书写类图标；种子笔记去掉 👋；降低“AI 生成”语气。
-- **错误体验**：Nginx 静态直出 SPA；502/503/504 显示 NoteHack 品牌 503 页；前端把网关错误转为可读中文，不再渲染 Nginx HTML。
+- **错误体验**：Nginx 静态直出 SPA；502/503/504 显示 360note 品牌 503 页；前端把网关错误转为可读中文，不再渲染 Nginx HTML。
 
 ### Fixed
 
@@ -269,7 +269,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - TOTP 2FA + 10 个备用码 + 重放保护；登录设备列表/撤销；异常登录应用内通知。
 - 恢复密钥（注册生成、哈希存储、重置密码、轮换）。
 - 附件/备份 AES-256-GCM；分享 token 哈希 + 加密副本；CSP/HSTS/nosniff。
-- 无邮件；无第三方分析；AI 默认关闭且需主动触发；隐私政策与条款（中/英）。
+- 仅账户与安全邮件；无第三方分析；AI 默认关闭且需主动触发；隐私政策与条款（中/英）。
 - 账号注销、空间删除、附件/备份清理。
 
 **数据**
@@ -289,7 +289,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Security
 
-- 生产缺少 `SESSION_SECRET` / `NOTEHACK_MASTER_KEY` 会启动失败。
+- 生产缺少 `SESSION_SECRET` / `NOTE360_MASTER_KEY` 会启动失败。
 - 分享列表要求分享权限；分享编辑归一化公开附件 URL；路径穿越/MIME/大小校验。
 - 恢复密钥重置会撤销全部会话并关闭 2FA。
 
@@ -318,3 +318,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - TypeScript/typecheck + Vite build 通过。
 - 登录/注册/自动保存/刷新持久化、分享公开页、备份创下载预览合并替换、导入、单篇 MD/HTML/PDF、全库 MD/HTML、2FA 开启/登录/关闭、暗色/移动端截图均通过。
 - 备份替换生成 pre-restore 安全备份；0 错误。
+
+## 2026-11-08 — 公开上线
+
+- 品牌统一为 360note / 360笔记，移除原项目名称与理念性研究文档。
+- 新增公开落地页；登录用户仍直接进入笔记应用。
+- 主色从蓝色切换为绿色，暗色主题去除海军蓝。
+- 双域名上线：360biji.com 中文、360note.com 英文，共享账户与内容。
+- 新增 SMTP 发信：注册/找回验证码、密码与邮箱变更通知、团队邀请邮件。
+- 新增修改登录邮箱（新邮箱验证码 + 当前密码）。
+- 空间支持自定义 emoji/字符与背景色；侧栏改为一行显示名称与类型图标。
+- Markdown/富文本切换改为按笔记独立记忆；设置默认格式只影响新笔记。
+- 修复移动端“拖入文件”等不适用的文案。
+- 新增管理员与演示账户、演示数据，以及 54 项生产安全回归检查。

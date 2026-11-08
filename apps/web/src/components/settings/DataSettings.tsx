@@ -27,7 +27,7 @@ export default function DataSettings() {
     if (!workspaceId) return;
     setExporting(format);
     try {
-      await downloadBlob(`/api/export?workspaceId=${workspaceId}&format=${format}`, `notehack-${workspace?.name ?? 'export'}.zip`);
+      await downloadBlob(`/api/export?workspaceId=${workspaceId}&format=${format}`, `360note-${workspace?.name ?? 'export'}.zip`);
     } catch (error) {
       toast('error', t('导出失败'), (error as Error).message);
     } finally {

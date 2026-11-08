@@ -38,7 +38,7 @@ export async function getOffsiteConfig(): Promise<OffsiteConfig> {
     endpoint: stored?.endpoint ?? '',
     region: stored?.region ?? 'auto',
     bucket: stored?.bucket ?? '',
-    prefix: stored?.prefix ?? 'notehack/',
+    prefix: stored?.prefix ?? '360note/',
     accessKeyId: stored?.accessKeyId ?? '',
     secretAccessKey: stored?.secretAccessKeyEnc ? decryptString(stored.secretAccessKeyEnc, 'instance:offsite') : '',
     forcePathStyle: stored?.forcePathStyle ?? true,
@@ -56,7 +56,7 @@ export async function saveOffsiteConfig(input: Partial<OffsiteConfig> & { secret
     endpoint: input.endpoint ?? existing?.endpoint ?? '',
     region: input.region ?? existing?.region ?? 'auto',
     bucket: input.bucket ?? existing?.bucket ?? '',
-    prefix: input.prefix ?? existing?.prefix ?? 'notehack/',
+    prefix: input.prefix ?? existing?.prefix ?? '360note/',
     accessKeyId: input.accessKeyId ?? existing?.accessKeyId ?? '',
     secretAccessKeyEnc: secret,
     forcePathStyle: input.forcePathStyle ?? existing?.forcePathStyle ?? true,
@@ -116,7 +116,7 @@ export async function uploadOffsiteBackup(filename: string): Promise<'uploaded' 
         Key: keyFor(config, filename),
         Body: data,
         ContentType: 'application/octet-stream',
-        Metadata: { app: 'notehack', encryption: 'aes-256-gcm' },
+        Metadata: { app: '360note', encryption: 'aes-256-gcm' },
       }),
     );
     await setSetting('offsite', {

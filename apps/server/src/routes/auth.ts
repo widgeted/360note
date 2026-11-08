@@ -15,6 +15,8 @@ import { publicUser, type DbUser } from '../lib/users.js';
 import { avatarColor, welcomeSeed } from '../lib/seed.js';
 import { createSession, listSessions, notify, revokeAllSessions, revokeSession } from '../services/sessions.js';
 import { createNote } from '../services/notes.js';
+import { consumeEmailCode, issueEmailCode } from '../services/email-codes.js';
+import { normalizeLocale, sendEmailChangedEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../lib/mailer.js';
 
 const loginSchema = z.object({ email: emailSchema, password: z.string().min(1).max(200) });
 const DUMMY_HASH = 'scrypt$32768$8$1$gRxMaJTRQkB0QqlmAreJig==$4AG/OI/xhWzP1TphsbW8eyTGejxShutVOdeL7HTTnOoXnnmiP3rNeyD8ww7J6QPn1bkbUvNFkkKv66iTEmSxpQ==';
@@ -24,6 +26,7 @@ const registerSchema = z.object({
   password: passwordSchema,
   inviteCode: z.string().max(200).optional(),
   locale: z.string().max(20).optional(),
+  emailCode: z.string().trim().regex(/^\d{6}$/, '请输入 6 位邮箱验证码'),
 });
 
 async function userCount(): Promise<number> {
@@ -37,6 +40,8 @@ async function workspacesFor(userId: string) {
     id: workspace.id,
     name: workspace.name,
     kind: workspace.kind as 'personal' | 'team',
+    icon: workspace.icon,
+    color: workspace.color,
     ownerId: workspace.owner_id,
     role: workspace.role as 'owner' | 'admin' | 'editor' | 'viewer',
     memberCount: Number(workspace.member_count),
@@ -61,6 +66,48 @@ function authPayload(user: DbUser, workspaces: Awaited<ReturnType<typeof workspa
 }
 
 export default async function authRoutes(app: FastifyInstance) {
+  app.post('/api/auth/email-code', {
+    config: { rateLimit: { max: 12, timeWindow: '1 hour' } },
+  }, async (request) => {
+    const body = parse(
+      z.object({
+        email: emailSchema,
+        purpose: z.enum(['register', 'recover', 'change_email']),
+        locale: z.string().max(20).optional(),
+      }),
+      request.body,
+    );
+    const existing = await one<{ id: string }>(
+      'SELECT id FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL',
+      [body.email],
+    );
+    if (body.purpose === 'change_email') {
+      const auth = requireAuth(request);
+      if (existing?.id === auth.user.id) throw errors.conflict('这是你当前使用的邮箱');
+      if (existing) throw errors.conflict('这个邮箱已注册');
+      await issueEmailCode({
+        email: body.email,
+        purpose: body.purpose,
+        locale: normalizeLocale(body.locale ?? request.headers['accept-language']),
+        ip: clientIp(request),
+      });
+      return { ok: true, expiresIn: 600, resendAfter: 60 };
+    }
+    if (body.purpose === 'register' && existing) {
+      throw errors.conflict('这个邮箱已注册');
+    }
+    // Do not reveal whether an account exists during password recovery.
+    if (body.purpose === 'register' || existing) {
+      await issueEmailCode({
+        email: body.email,
+        purpose: body.purpose,
+        locale: normalizeLocale(body.locale ?? request.headers['accept-language']),
+        ip: clientIp(request),
+      });
+    }
+    return { ok: true, expiresIn: 600, resendAfter: 60 };
+  });
+
   app.post('/api/auth/register', {
     config: { rateLimit: { max: 8, timeWindow: '1 hour' } },
   }, async (request, reply) => {
@@ -75,6 +122,8 @@ export default async function authRoutes(app: FastifyInstance) {
     if (issues.length) throw errors.badRequest(issues[0]);
     const exists = await one('SELECT id FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL', [body.email]);
     if (exists) throw errors.conflict('这个邮箱已注册');
+    const codeOk = await consumeEmailCode(body.email, 'register', body.emailCode);
+    if (!codeOk) throw errors.badRequest('验证码不正确或已过期');
 
     const recoveryKey = generateRecoveryKey();
     const passwordHash = await hashPassword(body.password);
@@ -85,9 +134,17 @@ export default async function authRoutes(app: FastifyInstance) {
     try {
       user = await transaction(async (client) => {
         const row = await client.query<DbUser>(
-          `INSERT INTO users (email, display_name, password_hash, role, avatar_color, recovery_key_hash)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-          [body.email, displayName, passwordHash, firstUser ? 'admin' : 'user', avatarColor(body.email), hashRecoveryKey(recoveryKey)],
+          `INSERT INTO users (email, display_name, password_hash, role, avatar_color, recovery_key_hash, email_verified_at, prefs)
+           VALUES ($1, $2, $3, $4, $5, $6, now(), $7::jsonb) RETURNING *`,
+          [
+            body.email,
+            displayName,
+            passwordHash,
+            firstUser ? 'admin' : 'user',
+            avatarColor(body.email),
+            hashRecoveryKey(recoveryKey),
+            JSON.stringify({ locale: body.locale?.toLowerCase().startsWith('en') ? 'en' : 'zh-CN' }),
+          ],
         );
         const created = row.rows[0];
         const workspaceName = body.locale?.startsWith('zh') ? '我的空间' : 'My space';
@@ -137,6 +194,9 @@ export default async function authRoutes(app: FastifyInstance) {
     const session = await createSession(user.id, request);
     setSessionCookie(reply, session.token);
     await audit({ actorId: user.id, action: 'auth.register', ip: clientIp(request), meta: { firstUser } });
+    void sendWelcomeEmail(user.email, displayName, normalizeLocale(body.locale)).catch((error) => {
+      app.log.warn({ error, userId: user.id }, 'failed to send welcome email');
+    });
     const workspaces = await workspacesFor(user.id);
     return reply.send({
       ...authPayload(user, workspaces),
@@ -193,7 +253,9 @@ export default async function authRoutes(app: FastifyInstance) {
         userId: user.id,
         type: 'security',
         title: '新的登录设备',
+        titleEn: 'New sign-in device',
         body: `检测到来自 ${ip || '未知地址'} 的登录。如不是你本人，请立即在设置中退出该设备并修改密码。`,
+        bodyEn: `A sign-in from ${ip || 'an unknown location'} was detected. If this was not you, revoke the device in Settings and change your password immediately.`,
         link: '/settings/security',
       });
     }
@@ -271,6 +333,56 @@ export default async function authRoutes(app: FastifyInstance) {
     return { user: publicUser(row!) };
   });
 
+  app.patch('/api/me/email', {
+    config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+  }, async (request) => {
+    const auth = requireAuth(request);
+    const body = parse(
+      z.object({
+        email: emailSchema,
+        emailCode: z.string().trim().regex(/^\d{6}$/, '请输入 6 位邮箱验证码'),
+        password: z.string().min(1).max(200),
+      }),
+      request.body,
+    );
+    if (!(await verifyPassword(body.password, auth.user.password_hash))) {
+      throw errors.badRequest('密码不正确');
+    }
+    if (body.email.toLowerCase() === auth.user.email.toLowerCase()) {
+      throw errors.badRequest('新邮箱与当前邮箱相同');
+    }
+    const existing = await one<{ id: string }>(
+      'SELECT id FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL',
+      [body.email],
+    );
+    if (existing) throw errors.conflict('这个邮箱已注册');
+    if (!(await consumeEmailCode(body.email, 'change_email', body.emailCode))) {
+      throw errors.badRequest('验证码不正确或已过期');
+    }
+    const oldEmail = auth.user.email;
+    let row: DbUser | null;
+    try {
+      row = await one<DbUser>(
+        'UPDATE users SET email = $2, email_verified_at = now(), updated_at = now() WHERE id = $1 RETURNING *',
+        [auth.user.id, body.email],
+      );
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') throw errors.conflict('这个邮箱已注册');
+      throw error;
+    }
+    await audit({
+      actorId: auth.user.id,
+      action: 'account.email.update',
+      targetType: 'email',
+      targetId: body.email,
+      ip: clientIp(request),
+    });
+    void sendEmailChangedEmail(oldEmail, body.email, normalizeLocale(request.headers['accept-language'])).catch((error) => {
+      app.log.warn({ error, userId: auth.user.id }, 'failed to send email change notice');
+    });
+    return { user: publicUser(row!) };
+  });
+
   app.patch('/api/me/prefs', async (request) => {
     const auth = requireAuth(request);
     const body = parse(z.record(z.string(), z.unknown()), request.body);
@@ -328,12 +440,25 @@ export default async function authRoutes(app: FastifyInstance) {
     config: { rateLimit: { max: 8, timeWindow: '1 hour' } },
   }, async (request, reply) => {
     const body = parse(
-      z.object({ email: emailSchema, recoveryKey: z.string().min(10), newPassword: passwordSchema }),
+      z.object({
+        email: emailSchema,
+        recoveryKey: z.string().min(10).optional(),
+        emailCode: z.string().trim().min(6).max(12).optional(),
+        newPassword: passwordSchema,
+        locale: z.string().max(20).optional(),
+      }),
       request.body,
     );
+    if (!body.recoveryKey && !body.emailCode) throw errors.badRequest('未知的恢复方式');
     const user = await one<DbUser>('SELECT * FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL', [body.email]);
-    if (!user || !user.recovery_key_hash || !safeEqual(user.recovery_key_hash, hashRecoveryKey(body.recoveryKey))) {
-      throw errors.badRequest('邮箱或恢复密钥不正确');
+    let allowed = false;
+    if (body.emailCode) {
+      allowed = await consumeEmailCode(body.email, 'recover', body.emailCode);
+    } else if (user?.recovery_key_hash && body.recoveryKey) {
+      allowed = safeEqual(user.recovery_key_hash, hashRecoveryKey(body.recoveryKey));
+    }
+    if (!user || !allowed) {
+      throw errors.badRequest(body.emailCode ? '验证码不正确或已过期' : '邮箱或恢复密钥不正确');
     }
     const issues = passwordIssues(body.newPassword, user.email);
     if (issues.length) throw errors.badRequest(issues[0]);
@@ -341,13 +466,16 @@ export default async function authRoutes(app: FastifyInstance) {
     const newRecoveryKey = generateRecoveryKey();
     await one(
       `UPDATE users SET password_hash = $2, recovery_key_hash = $3, failed_logins = 0, locked_until = NULL,
-         totp_enabled = false, totp_secret_enc = NULL, totp_last_step = NULL, updated_at = now()
+         totp_enabled = false, totp_secret_enc = NULL, totp_last_step = NULL, email_verified_at = now(), updated_at = now()
        WHERE id = $1 RETURNING id`,
       [user.id, hash, hashRecoveryKey(newRecoveryKey)],
     );
     await query('DELETE FROM totp_backup_codes WHERE user_id = $1', [user.id]);
     await revokeAllSessions(user.id);
     await audit({ actorId: user.id, action: 'auth.recover', ip: clientIp(request), meta: { twoFactorReset: true } });
+    void sendPasswordChangedEmail(user.email, normalizeLocale(body.locale)).catch((error) => {
+      app.log.warn({ error, userId: user.id }, 'failed to send password reset email');
+    });
     return reply.send({ ok: true, recoveryKey: newRecoveryKey });
   });
 

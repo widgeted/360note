@@ -7,7 +7,7 @@ const ctx=await browser.newContext({viewport:{width:1440,height:980},locale:'zh-
 await ctx.addInitScript(()=>localStorage.setItem('nh-locale','zh-CN'));
 const page=await ctx.newPage();
 const errs=[]; page.on('pageerror',e=>errs.push('PAGE:'+e.message));
-await page.goto('https://notehack.com/login',{waitUntil:'networkidle'});
+await page.goto('https://360note.com/login',{waitUntil:'networkidle'});
 await page.fill('#login-email',email); await page.fill('#login-password',password); await page.click('button[type=submit]'); await page.waitForTimeout(2000);
 // wait for SW + prefetch, then reload to ensure SW control
 await page.waitForTimeout(4000);

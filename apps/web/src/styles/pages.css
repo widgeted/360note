@@ -67,7 +67,7 @@
   z-index: 10;
 }
 
-.public-header-inner > a[aria-label='NoteHack'] {
+.public-header-inner > a[aria-label='360note'] {
   color: var(--text);
 }
 
@@ -583,8 +583,8 @@
   text-decoration: none;
 }
 
-.auth-screen-brand .brand-wordmark {
-  font-size: 20px;
+.auth-screen-brand .brand-logo {
+  height: 24px;
 }
 
 .auth-screen-main {

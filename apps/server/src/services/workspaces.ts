@@ -1,6 +1,6 @@
 import { one } from '../db.js';
 import { errors } from '../lib/errors.js';
-import { PERMISSIONS, type Role } from '@notehack/shared';
+import { PERMISSIONS, type Role } from '@360note/shared';
 
 export async function requireWorkspace(
   userId: string,

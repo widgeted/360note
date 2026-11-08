@@ -1,4 +1,4 @@
--- NoteHack initial schema
+-- 360note initial schema
 -- PostgreSQL 15+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

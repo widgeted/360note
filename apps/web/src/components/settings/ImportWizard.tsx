@@ -10,8 +10,9 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
-import type { ImportPreview, JobInfo } from '@notehack/shared';
+import type { ImportPreview, JobInfo } from '@360note/shared';
 import { api } from '../../lib/api';
+import { useIsMobile } from '../../lib/useMediaQuery';
 import { useAppStore } from '../../stores/app';
 import { useT } from '../../lib/i18n';
 import { formatBytes, sleep } from '../../lib/utils';
@@ -31,6 +32,7 @@ export function ImportWizard({ open, onClose, workspaceId }: { open: boolean; on
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const isMobile = useIsMobile();
   const fileRef = useRef<HTMLInputElement>(null);
   const pollId = useRef(0);
 
@@ -166,7 +168,7 @@ export function ImportWizard({ open, onClose, workspaceId }: { open: boolean; on
             onClick={() => fileRef.current?.click()}
           >
             <UploadCloud size={24} style={{ color: 'var(--text-tertiary)', margin: '0 auto 10px' }} />
-            <div style={{ fontSize: 13, fontWeight: 570 }}>{t('拖入文件或点击选择')}</div>
+            <div style={{ fontSize: 13, fontWeight: 570 }}>{isMobile ? t('点击选择文件') : t('拖入文件或点击选择')}</div>
             <div className="setting-note" style={{ marginTop: 4 }}>{t('支持 Markdown、HTML、Evernote、Notion、CSV、JSON 和 ZIP')}</div>
             <input
               ref={fileRef}

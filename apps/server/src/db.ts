@@ -8,7 +8,7 @@ export const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
-  application_name: 'notehack',
+  application_name: '360note',
 });
 
 pool.on('error', (error) => {

@@ -40,7 +40,7 @@ const MAX_ZIP_BYTES = 400 * 1024 * 1024;
 const MAX_ENTRIES = 6000;
 
 function attachmentMarker(key: string): string {
-  return `notehack-attachment://${key}`;
+  return `360note-attachment://${key}`;
 }
 
 function mimeFor(filename: string): string {
@@ -330,7 +330,7 @@ async function parseJsonExport(input: { jobDir: string; jsonPath: string; files:
     notes?: Array<{ id?: string; title?: string; contentMd?: string; folderPath?: string[]; tags?: string[] }>;
     attachments?: Array<{ id: string; noteId: string; filename: string; path: string; mime?: string }>;
   };
-  if (data.format !== 'notehack-workspace' || !Array.isArray(data.notes)) throw errors.badRequest('无法识别的 JSON 导出格式');
+  if (data.format !== '360note-workspace' || !Array.isArray(data.notes)) throw errors.badRequest('无法识别的 JSON 导出格式');
   const notes: ParsedNote[] = [];
   for (const note of data.notes.slice(0, MAX_NOTES)) {
     const attachments: ParsedAttachment[] = [];
@@ -386,7 +386,7 @@ export async function parseImport(input: {
       } else if (manifest) {
         source = 'json';
         const raw = JSON.parse(await fs.readFile(files.get(manifest)!, 'utf8')) as { format?: string };
-        if (raw.format === 'notehack-backup') {
+        if (raw.format === '360note-backup') {
           throw errors.badRequest('这是完整备份文件，请在“备份与恢复”中恢复，而不是导入');
         }
         notes = await parseNotionOrMarkdown({ jobDir: input.jobDir, files, warnings, isNotion: false });
@@ -419,7 +419,7 @@ export async function parseImport(input: {
     try {
       notes = await parseJsonExport({ jobDir: input.jobDir, jsonPath: primary.storedPath, files, warnings });
     } catch {
-      warnings.push('JSON 不是 NoteHack 导出格式，已作为纯文本笔记导入');
+      warnings.push('JSON 不是 360note 导出格式，已作为纯文本笔记导入');
       notes = [{
         title: cleanTitle(path.basename(primary.originalName, extension)),
         contentMd: '```json\n' + (await fs.readFile(primary.storedPath, 'utf8')).slice(0, 500_000) + '\n```',

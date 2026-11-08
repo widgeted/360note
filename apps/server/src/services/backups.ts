@@ -87,7 +87,7 @@ interface BackupComment {
 }
 
 interface BackupDocument {
-  format: 'notehack-backup';
+  format: '360note-backup';
   version: 1;
   createdAt: string;
   workspace: { id: string; name: string };
@@ -102,7 +102,7 @@ interface BackupDocument {
 }
 
 export interface BackupPreview {
-  format: 'notehack-backup';
+  format: '360note-backup';
   version: number;
   createdAt: string;
   workspace: { id: string; name: string };
@@ -200,7 +200,7 @@ export async function createBackupDocument(workspaceId: string): Promise<{ buffe
     : [];
 
   const document: BackupDocument = {
-    format: 'notehack-backup',
+    format: '360note-backup',
     version: 1,
     createdAt: new Date().toISOString(),
     workspace,
@@ -262,7 +262,7 @@ export async function createBackupDocument(workspaceId: string): Promise<{ buffe
 
   const zip = new AdmZip();
   zip.addFile('manifest.json', Buffer.from(JSON.stringify({
-    format: 'notehack-backup',
+    format: '360note-backup',
     version: 1,
     createdAt: document.createdAt,
     workspace: document.workspace,
@@ -386,7 +386,7 @@ function readBackupZip(buffer: Buffer): { zip: AdmZip; manifest: Record<string, 
   }
   const manifestEntry = zip.getEntry('manifest.json');
   const documentEntry = zip.getEntry('workspace.json');
-  if (!manifestEntry || !documentEntry) throw errors.badRequest('不是有效的 NoteHack 备份文件');
+  if (!manifestEntry || !documentEntry) throw errors.badRequest('不是有效的 360note 备份文件');
   let manifest: Record<string, unknown>;
   let document: BackupDocument;
   try {
@@ -395,7 +395,7 @@ function readBackupZip(buffer: Buffer): { zip: AdmZip; manifest: Record<string, 
   } catch {
     throw errors.badRequest('备份文件内容无法解析');
   }
-  if (manifest.format !== 'notehack-backup' || document.format !== 'notehack-backup') {
+  if (manifest.format !== '360note-backup' || document.format !== '360note-backup') {
     throw errors.badRequest('备份格式不受支持');
   }
   return { zip, manifest, document };
@@ -409,7 +409,7 @@ export function previewBackup(buffer: Buffer, targetWorkspaceId: string): Backup
   }
   if (!document.notes.length) warnings.push('备份中没有笔记。');
   return {
-    format: 'notehack-backup',
+    format: '360note-backup',
     version: document.version,
     createdAt: document.createdAt,
     workspace: document.workspace,
@@ -597,7 +597,7 @@ async function backupToParsedImport(input: {
         mime: attachment.mime,
         storedPath: path.relative(input.jobDir, storedPath),
       });
-      content = content.replaceAll(`/api/attachments/${attachment.id}/content`, `notehack-attachment://${key}`);
+      content = content.replaceAll(`/api/attachments/${attachment.id}/content`, `360note-attachment://${key}`);
     }
     parsed.notes.push({
       title: note.title,

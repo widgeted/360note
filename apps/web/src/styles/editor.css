@@ -216,7 +216,7 @@
 
 .prose pre {
   margin: 1.5em 0;
-  background: #0e1322;
+  background: #0b120e;
   color: #d9dce7;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 11px;
@@ -238,7 +238,7 @@
 
 .prose pre .hljs-comment,
 .prose pre .hljs-quote {
-  color: #6f7690;
+  color: #6f7d74;
   font-style: italic;
 }
 
@@ -257,7 +257,7 @@
 .prose pre .hljs-title,
 .prose pre .hljs-section,
 .prose pre .hljs-selector-id {
-  color: #8db4ff;
+  color: #86e3ba;
   font-weight: 600;
 }
 
@@ -280,7 +280,7 @@
 }
 
 .prose pre .hljs-meta {
-  color: #7d849c;
+  color: #7d8b82;
 }
 
 .prose pre .hljs-attr,

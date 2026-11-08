@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, Database, HardDrive, Save, Server, ShieldCheck, Users } from 'lucide-react';
-import type { AuditEntry } from '@notehack/shared';
+import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';

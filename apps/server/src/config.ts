@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
-dotenv.config({ path: process.env.NOTEHACK_ENV_FILE || path.join(repoRoot, '.env') });
+dotenv.config({ path: process.env.NOTE360_ENV_FILE || path.join(repoRoot, '.env') });
 
 function bool(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
@@ -28,7 +28,7 @@ try {
   // Version is only informational; a missing package.json must not block startup.
 }
 
-const dataDir = process.env.NOTEHACK_DATA_DIR || path.join(repoRoot, 'storage');
+const dataDir = process.env.NOTE360_DATA_DIR || path.join(repoRoot, 'storage');
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 8787),
@@ -36,9 +36,9 @@ export const config = {
   publicOrigin: (process.env.PUBLIC_ORIGIN || 'http://localhost:5173').replace(/\/$/, ''),
   databaseUrl:
     process.env.DATABASE_URL ||
-    'postgres://notehack:notehack@127.0.0.1:5432/notehack',
+    'postgres://360note:360note@127.0.0.1:5432/360note',
   sessionSecret: requiredInProduction('SESSION_SECRET') || 'dev-session-secret-change-me-please',
-  masterKeyB64: requiredInProduction('NOTEHACK_MASTER_KEY') || '',
+  masterKeyB64: requiredInProduction('NOTE360_MASTER_KEY') || '',
   dataDir,
   webDist: process.env.WEB_DIST || path.join(repoRoot, 'apps/web/dist'),
   registrationMode: (process.env.REGISTRATION_MODE || 'open') as 'open' | 'invite',
@@ -51,6 +51,15 @@ export const config = {
     baseUrl: process.env.AI_BASE_URL || '',
     apiKey: process.env.AI_API_KEY || '',
     model: process.env.AI_MODEL || '',
+  },
+  mail: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: bool(process.env.SMTP_SECURE, Number(process.env.SMTP_PORT || 465) === 465),
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.MAIL_FROM || process.env.SMTP_USER || '',
+    fromName: process.env.MAIL_FROM_NAME || '360note',
   },
   ocrEnabled: bool(process.env.OCR_ENABLED, false),
   backupRetentionDays: Number(process.env.BACKUP_RETENTION_DAYS || 30),

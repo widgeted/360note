@@ -53,11 +53,22 @@ export async function notify(input: {
   userId: string;
   type: string;
   title: string;
+  titleEn?: string;
   body?: string | null;
+  bodyEn?: string | null;
   link?: string | null;
 }): Promise<void> {
+  let title = input.title;
+  let body = input.body ?? null;
+  if (input.titleEn) {
+    const recipient = await one<{ prefs: Record<string, unknown> | null }>('SELECT prefs FROM users WHERE id = $1', [input.userId]);
+    if (String(recipient?.prefs?.locale ?? '').toLowerCase().startsWith('en')) {
+      title = input.titleEn;
+      body = input.bodyEn ?? body;
+    }
+  }
   await one(
     `INSERT INTO notifications (user_id, type, title, body, link) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [input.userId, input.type, input.title, input.body ?? null, input.link ?? null],
+    [input.userId, input.type, title, body, input.link ?? null],
   );
 }

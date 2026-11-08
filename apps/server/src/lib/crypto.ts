@@ -4,17 +4,17 @@ import { config } from '../config.js';
 function masterKey(): Buffer {
   if (config.masterKeyB64) {
     const key = Buffer.from(config.masterKeyB64, 'base64');
-    if (key.length !== 32) throw new Error('NOTEHACK_MASTER_KEY must be 32 bytes base64');
+    if (key.length !== 32) throw new Error('NOTE360_MASTER_KEY must be 32 bytes base64');
     return key;
   }
-  if (config.env === 'production') throw new Error('NOTEHACK_MASTER_KEY is required in production');
-  return crypto.createHash('sha256').update('notehack-development-master-key').digest();
+  if (config.env === 'production') throw new Error('NOTE360_MASTER_KEY is required in production');
+  return crypto.createHash('sha256').update('360note-development-master-key').digest();
 }
 
 const KEY = () => masterKey();
 
 /** AES-256-GCM. Format: [version=1][iv 12][tag 16][ciphertext]. */
-export function encryptBuffer(plain: Buffer, aad = 'notehack'): Buffer {
+export function encryptBuffer(plain: Buffer, aad = '360note'): Buffer {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', KEY(), iv);
   cipher.setAAD(Buffer.from(aad));
@@ -23,7 +23,7 @@ export function encryptBuffer(plain: Buffer, aad = 'notehack'): Buffer {
   return Buffer.concat([Buffer.from([1]), iv, tag, encrypted]);
 }
 
-export function decryptBuffer(payload: Buffer, aad = 'notehack'): Buffer {
+export function decryptBuffer(payload: Buffer, aad = '360note'): Buffer {
   if (payload.length < 30) throw new Error('Invalid encrypted payload');
   const version = payload[0];
   if (version !== 1) throw new Error('Unsupported encrypted payload version');
@@ -36,11 +36,11 @@ export function decryptBuffer(payload: Buffer, aad = 'notehack'): Buffer {
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }
 
-export function encryptString(plain: string, aad = 'notehack'): string {
+export function encryptString(plain: string, aad = '360note'): string {
   return encryptBuffer(Buffer.from(plain, 'utf8'), aad).toString('base64');
 }
 
-export function decryptString(payload: string, aad = 'notehack'): string {
+export function decryptString(payload: string, aad = '360note'): string {
   return decryptBuffer(Buffer.from(payload, 'base64'), aad).toString('utf8');
 }
 

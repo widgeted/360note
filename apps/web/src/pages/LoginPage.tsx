@@ -177,7 +177,7 @@ export default function LoginPage() {
         {t('还没有账户？')} <Link to={`/register${next !== '/app' ? `?next=${encodeURIComponent(next)}` : ''}`}>{t('创建一个')}</Link>
       </p>
       <p className="auth-legal">
-        {t('我们不会发送邮件，也不会使用第三方分析。继续即表示你同意')}{' '}
+        {t('我们只发送账户与安全相关邮件，不使用第三方分析。继续即表示你同意')}{' '}
         <Link to="/terms">{t('服务条款')}</Link> {t('和')} <Link to="/privacy">{t('隐私政策')}</Link>。
       </p>
     </AuthLayout>

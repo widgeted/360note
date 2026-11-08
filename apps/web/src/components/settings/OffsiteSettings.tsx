@@ -76,7 +76,7 @@ export function OffsiteSettings() {
       </div>
       <div className="banner banner-info" style={{ marginBottom: 12 }}>
         <ShieldCheck size={15} />
-        <div>{t('开启后，每次备份都会把已加密的 .nhbackup 复制到你的 S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）。备份使用 NoteHack 主密钥加密，S3 提供方无法读取内容。')}</div>
+        <div>{t('开启后，每次备份都会把已加密的 .nhbackup 复制到你的 S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）。备份使用 360note 主密钥加密，S3 提供方无法读取内容。')}</div>
       </div>
       <div className="setting-card">
         <div className="setting-row" style={{ paddingTop: 0 }}>
@@ -99,11 +99,11 @@ export function OffsiteSettings() {
           </div>
           <div className="field">
             <label>Bucket</label>
-            <input className="input mono" value={config.bucket} onChange={(event) => setConfig({ ...config, bucket: event.target.value })} placeholder="notehack-backups" />
+            <input className="input mono" value={config.bucket} onChange={(event) => setConfig({ ...config, bucket: event.target.value })} placeholder="360note-backups" />
           </div>
           <div className="field">
             <label>Prefix</label>
-            <input className="input mono" value={config.prefix} onChange={(event) => setConfig({ ...config, prefix: event.target.value })} placeholder="notehack/" />
+            <input className="input mono" value={config.prefix} onChange={(event) => setConfig({ ...config, prefix: event.target.value })} placeholder="360note/" />
           </div>
           <div className="field">
             <label>Access Key ID</label>

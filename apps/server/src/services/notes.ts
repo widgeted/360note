@@ -1,4 +1,4 @@
-import type { Attachment, FolderPathItem, Note, NoteSummary, Role, TagRef } from '@notehack/shared';
+import type { Attachment, FolderPathItem, Note, NoteSummary, Role, TagRef } from '@360note/shared';
 import { many, one, transaction, type Queryable } from '../db.js';
 import { errors } from '../lib/errors.js';
 import { excerpt as makeExcerpt, extractWikiLinks, stripTitleHeading, wordCount } from '../lib/text.js';

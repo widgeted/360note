@@ -4,10 +4,12 @@ import { ArrowLeft, Check, Link2, Scissors } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
+import { useIsMobile } from '../lib/useMediaQuery';
 import { LogoLockup } from '../components/Logo';
 
 export default function ClipPage() {
   const t = useT();
+  const isMobile = useIsMobile();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
@@ -93,7 +95,9 @@ export default function ClipPage() {
           </div>
         </form>
         <p className="auth-legal" style={{ textAlign: 'left', marginTop: 18 }}>
-          {t('提示：把浏览器书签栏中的“保存到 NoteHack”拖到书签栏，即可在任意网页一键剪藏。可在 设置 → API 与集成 中获取。')}
+          {isMobile
+            ? t('提示：在桌面浏览器中把“保存到 360笔记”拖到书签栏，即可一键剪藏；移动端请直接粘贴网址与选中的文字。')
+            : t('提示：把浏览器书签栏中的“保存到 360笔记”拖到书签栏，即可在任意网页一键剪藏。可在 设置 → API 与集成 中获取。')}
         </p>
       </div>
     </div>

@@ -65,7 +65,7 @@ export async function executeImport(input: {
         workspaceId: input.workspaceId,
         userId: input.userId,
         title: parsedNote.title,
-        contentMd: parsedNote.contentMd.replace(/notehack-attachment:\/\/[0-9a-f-]{36}/g, ''),
+        contentMd: parsedNote.contentMd.replace(/360note-attachment:\/\/[0-9a-f-]{36}/g, ''),
         folderId,
         tagNames: parsedNote.tags,
       });
@@ -92,7 +92,7 @@ export async function executeImport(input: {
               input.userId,
             ],
           );
-          content = content.replaceAll(`notehack-attachment://${attachment.key}`, `/api/attachments/${attachmentId}/content`);
+          content = content.replaceAll(`360note-attachment://${attachment.key}`, `/api/attachments/${attachmentId}/content`);
           stats.attachments++;
         } catch (error) {
           input.parsed.warnings.push(`附件 ${attachment.filename} 导入失败`);

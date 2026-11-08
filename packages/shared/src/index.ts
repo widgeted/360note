@@ -1,5 +1,5 @@
 /**
- * NoteHack shared contracts.
+ * 360note shared contracts.
  * These types are the single source of truth shared by the API and the web client.
  */
 
@@ -48,6 +48,8 @@ export interface Workspace {
   id: string;
   name: string;
   kind: WorkspaceKind;
+  icon: string;
+  color: string;
   ownerId: string;
   role: Role;
   memberCount?: number;
@@ -325,7 +327,7 @@ export interface HealthResponse {
   database: boolean;
 }
 
-export const APP_NAME = 'NoteHack';
+export const APP_NAME = '360note';
 export const APP_VERSION = '0.1.0';
 export const SUPPORTED_LOCALES = ['zh-CN', 'en'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];

@@ -1,6 +1,5 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { config } from '../config.js';
 import { many, one, query, transaction } from '../db.js';
 import { clientIp, requireAuth } from '../auth.js';
 import { audit } from '../lib/audit.js';
@@ -12,12 +11,14 @@ import { requireWorkspace, workspaceMemberCount } from '../services/workspaces.j
 import { notify } from '../services/sessions.js';
 import { deleteAttachment, deleteBackupFile } from '../lib/storage.js';
 import type { DbUser } from '../lib/users.js';
+import { originFromRequest } from '../lib/origin.js';
+import { mailEnabled, normalizeLocale, sendWorkspaceInviteEmail } from '../lib/mailer.js';
 
 const roleSchema = z.enum(['admin', 'editor', 'viewer']);
 const memberRoleSchema = z.enum(['owner', 'admin', 'editor', 'viewer']);
 
-function inviteUrl(token: string): string {
-  return `${config.publicOrigin}/invite/${token}`;
+function inviteUrl(token: string, request: FastifyRequest): string {
+  return `${originFromRequest(request)}/invite/${token}`;
 }
 
 export default async function workspaceRoutes(app: FastifyInstance) {
@@ -27,13 +28,15 @@ export default async function workspaceRoutes(app: FastifyInstance) {
       id: string;
       name: string;
       kind: string;
+      icon: string;
+      color: string;
       owner_id: string;
       role: string;
       created_at: Date;
       updated_at: Date;
       member_count: string;
     }>(
-      `SELECT w.id, w.name, w.kind, w.owner_id, m.role, w.created_at, w.updated_at,
+      `SELECT w.id, w.name, w.kind, w.icon, w.color, w.owner_id, m.role, w.created_at, w.updated_at,
               (SELECT count(*)::text FROM workspace_members wm WHERE wm.workspace_id = w.id) AS member_count
        FROM workspaces w JOIN workspace_members m ON m.workspace_id = w.id AND m.user_id = $1
        WHERE w.deleted_at IS NULL ORDER BY w.kind = 'personal' DESC, w.created_at ASC`,
@@ -44,6 +47,8 @@ export default async function workspaceRoutes(app: FastifyInstance) {
         id: row.id,
         name: row.name,
         kind: row.kind,
+        icon: row.icon,
+        color: row.color,
         ownerId: row.owner_id,
         role: row.role,
         memberCount: Number(row.member_count),
@@ -55,11 +60,21 @@ export default async function workspaceRoutes(app: FastifyInstance) {
 
   app.post('/api/workspaces', async (request) => {
     const auth = requireAuth(request);
-    const body = parse(z.object({ name: z.string().trim().min(1).max(80), kind: z.enum(['personal', 'team']).default('team') }), request.body);
+    const body = parse(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        kind: z.enum(['personal', 'team']).default('team'),
+        icon: z.string().trim().min(1).max(16).optional(),
+        color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      }),
+      request.body,
+    );
+    const icon = body.icon ?? (body.kind === 'team' ? '👥' : '📔');
+    const color = body.color ?? '#17865b';
     const workspace = await transaction(async (client) => {
       const row = await client.query<{ id: string; created_at: Date }>(
-        `INSERT INTO workspaces (name, kind, owner_id) VALUES ($1, $2, $3) RETURNING id, created_at`,
-        [body.name, body.kind, auth.user.id],
+        `INSERT INTO workspaces (name, kind, icon, color, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+        [body.name, body.kind, icon, color, auth.user.id],
       );
       await client.query(`INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [
         row.rows[0].id,
@@ -73,6 +88,8 @@ export default async function workspaceRoutes(app: FastifyInstance) {
         id: workspace.id,
         name: body.name,
         kind: body.kind,
+        icon,
+        color,
         ownerId: auth.user.id,
         role: 'owner',
         memberCount: 1,
@@ -86,13 +103,36 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     await requireWorkspace(auth.user.id, id, 'manage');
-    const body = parse(z.object({ name: z.string().trim().min(1).max(80) }), request.body);
-    const row = await one<{ id: string; name: string; updated_at: Date }>(
-      'UPDATE workspaces SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, updated_at',
-      [id, body.name],
+    const body = parse(
+      z.object({
+        name: z.string().trim().min(1).max(80).optional(),
+        icon: z.string().trim().min(1).max(16).optional(),
+        color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      }),
+      request.body,
     );
-    await audit({ workspaceId: id, actorId: auth.user.id, action: 'workspace.rename', targetType: 'workspace', targetId: id, meta: { name: body.name }, ip: clientIp(request) });
-    return { workspace: { id: row!.id, name: row!.name, updatedAt: row!.updated_at.toISOString() } };
+    const current = await one<{ name: string; icon: string; color: string }>(
+      'SELECT name, icon, color FROM workspaces WHERE id = $1',
+      [id],
+    );
+    if (!current) throw errors.notFound('工作区不存在');
+    const name = body.name ?? current.name;
+    const icon = body.icon ?? current.icon;
+    const color = body.color ?? current.color;
+    const row = await one<{ id: string; name: string; icon: string; color: string; updated_at: Date }>(
+      'UPDATE workspaces SET name = $2, icon = $3, color = $4, updated_at = now() WHERE id = $1 RETURNING id, name, icon, color, updated_at',
+      [id, name, icon, color],
+    );
+    await audit({ workspaceId: id, actorId: auth.user.id, action: 'workspace.rename', targetType: 'workspace', targetId: id, meta: { name, icon, color }, ip: clientIp(request) });
+    return {
+      workspace: {
+        id: row!.id,
+        name: row!.name,
+        icon: row!.icon,
+        color: row!.color,
+        updatedAt: row!.updated_at.toISOString(),
+      },
+    };
   });
 
   app.delete('/api/workspaces/:id', async (request) => {
@@ -222,7 +262,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
         inviterName: row.inviter_name ?? undefined,
         createdAt: row.created_at.toISOString(),
         expiresAt: row.expires_at.toISOString(),
-        url: inviteUrl(decryptString(row.token_cipher, `invite:${row.id}`)),
+        url: inviteUrl(decryptString(row.token_cipher, `invite:${row.id}`), request),
       })),
     };
   });
@@ -264,11 +304,29 @@ export default async function workspaceRoutes(app: FastifyInstance) {
         userId: invitee.id,
         type: 'invitation',
         title: `${inviter?.display_name ?? '有人'} 邀请你加入「${workspace?.name ?? '工作区'}」`,
+        titleEn: `${inviter?.display_name ?? 'Someone'} invited you to “${workspace?.name ?? 'Workspace'}”`,
         body: `角色：${body.role}`,
+        bodyEn: `Role: ${body.role}`,
         link: `/invite/${token}`,
       });
     }
     await audit({ workspaceId: id, actorId: auth.user.id, action: 'member.invite', targetType: 'email', targetId: body.email, meta: { role: body.role }, ip: clientIp(request) });
+    let emailSent = false;
+    if (mailEnabled()) {
+      try {
+        await sendWorkspaceInviteEmail({
+          to: body.email,
+          inviterName: inviter?.display_name ?? (request.headers['accept-language']?.startsWith('en') ? 'Someone' : '有人'),
+          workspaceName: workspace?.name ?? 'Workspace',
+          role: body.role,
+          url: inviteUrl(token, request),
+          locale: normalizeLocale(request.headers['accept-language']),
+        });
+        emailSent = true;
+      } catch (error) {
+        app.log.warn({ error, workspaceId: id }, 'failed to send workspace invitation email');
+      }
+    }
     return {
       invitation: {
         id: invitation!.id,
@@ -278,9 +336,9 @@ export default async function workspaceRoutes(app: FastifyInstance) {
         status: 'pending',
         createdAt: invitation!.created_at.toISOString(),
         expiresAt: invitation!.expires_at.toISOString(),
-        url: inviteUrl(token),
+        url: inviteUrl(token, request),
       },
-      emailSent: false,
+      emailSent,
     };
   });
 

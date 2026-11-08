@@ -5,8 +5,8 @@ import crypto from 'node:crypto';
 import { config, paths } from '../config.js';
 import { encryptBuffer, decryptBuffer } from './crypto.js';
 
-const ATTACHMENT_AAD = 'notehack:attachment';
-const BACKUP_AAD = 'notehack:backup';
+const ATTACHMENT_AAD = '360note:attachment';
+const BACKUP_AAD = '360note:backup';
 
 export function safeFilename(name: string): string {
   const base = path.basename(name || 'file').replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, '_');

@@ -65,13 +65,15 @@ export async function userWorkspaces(userId: string) {
     id: string;
     name: string;
     kind: string;
+    icon: string;
+    color: string;
     owner_id: string;
     role: string;
     created_at: Date;
     updated_at: Date;
     member_count: string;
   }>(
-    `SELECT w.id, w.name, w.kind, w.owner_id, m.role, w.created_at, w.updated_at,
+    `SELECT w.id, w.name, w.kind, w.icon, w.color, w.owner_id, m.role, w.created_at, w.updated_at,
             (SELECT count(*)::text FROM workspace_members wm WHERE wm.workspace_id = w.id) AS member_count
      FROM workspaces w
      JOIN workspace_members m ON m.workspace_id = w.id AND m.user_id = $1

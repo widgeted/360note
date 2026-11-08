@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { translate, useT } from '../lib/i18n';
 
 export function Modal({
   open,
@@ -95,7 +96,7 @@ export function Modal({
               {title && <div className="modal-title">{title}</div>}
               {description && <div className="modal-desc">{description}</div>}
             </div>
-            <button type="button" className="modal-close" onClick={onClose} aria-label="关闭">
+            <button type="button" className="modal-close" onClick={onClose} aria-label={translate('关闭')}>
               <X size={16} />
             </button>
           </div>
@@ -129,6 +130,7 @@ export function ConfirmDialog({
   loading?: boolean;
   children?: ReactNode;
 }) {
+  const t = useT();
   return (
     <Modal
       open={open}
@@ -139,7 +141,7 @@ export function ConfirmDialog({
       footer={
         <>
           <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} disabled={loading}>
-            取消
+            {t('取消')}
           </button>
           <button
             type="button"
@@ -148,7 +150,7 @@ export function ConfirmDialog({
             disabled={loading}
           >
             {loading && <span className="spinner" />}
-            {confirmLabel}
+            {t(confirmLabel)}
           </button>
         </>
       }

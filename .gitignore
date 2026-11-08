@@ -13,7 +13,8 @@ packages/shared/dist/
 apps/server/dist/
 storage/
 tmp/
-scripts/
+scripts/*
+!scripts/provision-accounts.mjs
 .s3rver/
 s3-data/
 *.nhbackup

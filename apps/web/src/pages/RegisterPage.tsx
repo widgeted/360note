@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Check, Copy, Download, Eye, EyeOff, KeyRound, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
-import { useT } from '../lib/i18n';
+import { getLocale, useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { copyText, emailValid, passwordStrength } from '../lib/utils';
 import { AuthLayout } from './AuthLayout';
@@ -21,6 +21,10 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [inviteMode, setInviteMode] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [terms, setTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +41,35 @@ export default function RegisterPage() {
   }, []);
 
   const strength = passwordStrength(password);
+  const brand = getLocale() === 'zh-CN' ? '360笔记' : '360note';
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = window.setInterval(() => setCountdown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [countdown]);
+
+  async function sendEmailCode() {
+    setError(null);
+    if (!emailValid(email)) {
+      setError(t('请输入有效的邮箱地址'));
+      return;
+    }
+    setSendingCode(true);
+    try {
+      await api.post('/api/auth/email-code', {
+        email,
+        purpose: 'register',
+        locale: getLocale(),
+      });
+      setCodeSent(true);
+      setCountdown(60);
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setSendingCode(false);
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,6 +90,10 @@ export default function RegisterPage() {
       setError(t('两次输入的密码不一致'));
       return;
     }
+    if (!/^\d{6}$/.test(emailCode.trim())) {
+      setError(t('请输入 6 位邮箱验证码'));
+      return;
+    }
     if (!terms) {
       setError(t('请先同意服务条款与隐私政策'));
       return;
@@ -68,6 +105,7 @@ export default function RegisterPage() {
         displayName: displayName.trim(),
         password,
         inviteCode: inviteCode.trim() || undefined,
+        emailCode: emailCode.trim(),
       });
       setRecoveryKey(response.recoveryKey);
       setFirstUser(response.firstUser);
@@ -88,14 +126,14 @@ export default function RegisterPage() {
     if (!recoveryKey) return;
     const blob = new Blob(
       [
-        `NoteHack 恢复密钥\n\n账户：${email}\n密钥：${recoveryKey}\n\n生成时间：${new Date().toISOString()}\n\n请离线保存。此密钥只在本次显示，无法找回。\n`,
+        `${brand} 恢复密钥 / Recovery key\n\n账户 / Account：${email}\n密钥 / Key：${recoveryKey}\n\n生成时间 / Generated：${new Date().toISOString()}\n\n请离线保存。此密钥只在本次显示，无法找回。\nKeep it offline. It is shown only once and cannot be recovered.\n`,
       ],
       { type: 'text/plain;charset=utf-8' },
     );
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'notehack-recovery-key.txt';
+    link.download = '360note-recovery-key.txt';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
@@ -160,7 +198,7 @@ export default function RegisterPage() {
             disabled={!savedKey}
             onClick={() => navigate(next, { replace: true })}
           >
-            {t('开始使用 NoteHack')}
+            {getLocale() === 'zh-CN' ? '开始使用 360笔记' : 'Start using 360note'}
             <ArrowRight size={14} />
           </button>
         </div>
@@ -265,6 +303,43 @@ export default function RegisterPage() {
             />
           </div>
         </div>
+        <div className="field auth-form-full">
+          <label htmlFor="reg-code">{t('邮箱验证码')}</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              id="reg-code"
+              className="input input-lg"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder={t('请输入 6 位邮箱验证码')}
+              value={emailCode}
+              onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              autoComplete="one-time-code"
+              required
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-secondary btn-lg"
+              disabled={sendingCode || countdown > 0}
+              onClick={sendEmailCode}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {sendingCode ? <span className="spinner" /> : null}
+              {countdown > 0
+                ? t('重新发送（{n}s）', { n: countdown })
+                : codeSent
+                  ? t('重新发送')
+                  : t('获取验证码')}
+            </button>
+          </div>
+          {codeSent && (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-tertiary)' }}>
+              {t('验证码已发送，请查收邮箱（也请检查垃圾邮件）。')}
+            </p>
+          )}
+        </div>
         {inviteMode && (
           <div className="field auth-form-full">
             <label htmlFor="reg-invite">{t('邀请码')}</label>
@@ -281,7 +356,8 @@ export default function RegisterPage() {
           <input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} />
           <span>
             {t('我同意')} <Link to="/terms">{t('服务条款')}</Link> {t('与')}{' '}
-            <Link to="/privacy">{t('隐私政策')}</Link>，并理解 NoteHack 不发送营销邮件。
+            <Link to="/privacy">{t('隐私政策')}</Link>
+            {t('，并理解 360note 只发送账户相关邮件，不发送营销邮件。')}
           </span>
         </label>
         {error && (

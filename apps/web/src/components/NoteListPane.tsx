@@ -18,7 +18,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { NoteSummary } from '@notehack/shared';
+import type { NoteSummary } from '@360note/shared';
 import { useAppStore } from '../stores/app';
 import { useT } from '../lib/i18n';
 import { cn, formatNoteDate, shortcutLabel } from '../lib/utils';
