@@ -162,7 +162,7 @@ export default function AccountSettings() {
               {!emailEditing ? (
                 <div className="email-edit-row">
                   <input className="input" value={email} readOnly disabled style={{ flex: 1 }} />
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEmailEditing(true); setNewEmail(email); }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setEmailEditing(true); setNewEmail(email); }}>
                     <Mail size={13} /> {t('修改邮箱')}
                   </button>
                 </div>
@@ -189,7 +189,7 @@ export default function AccountSettings() {
                     />
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-secondary"
                       disabled={sendingCode || emailCountdown > 0 || !newEmail.trim()}
                       onClick={sendEmailCode}
                       style={{ whiteSpace: 'nowrap' }}
