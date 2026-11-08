@@ -468,7 +468,7 @@ curl -I https://360note.com
 - 生产使用 `eu1.workspace.org:465`（SMTPS）和 `noreply@360note.com`。
 - 修改 SMTP 后重启服务并检查日志；不要在日志中输出密码。
 - 验证码：10 分钟有效、同邮箱 60 秒冷却、每小时最多 6 次、最多 5 次尝试。
-- 测试邮件只能发送到 `access@126.com` 或操作者明确提供的地址。
+- 测试邮件只能发送到操作者明确提供的地址（记录在 `/root/360note-credentials.txt`）。
 
 ### 账户
 

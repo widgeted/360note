@@ -366,7 +366,7 @@ apps/web/src/styles/tokens.css        设计 token
 22. **移动端底部栏**：快速栏改为四等分 grid（笔记/搜索/收藏/设置），移除底部重复新建；顶部新建按钮与桌面共用 `.new-note-btn` 样式。（第七轮已移除底部快速栏。）
 23. **移动端去重**：底部快速栏移除 `.mobile-quick-new`；新建只保留顶部 `.new-note-btn`，与桌面同一套白底细边框/蓝图标样式。快速栏为四等分，第一项改用 FileText 图标，避免与新建图标相同。（第七轮已移除底部快速栏。）
 24. **分享页增强**：公开页增加复制链接按钮；打印样式与元信息已在 0.1.5 前完成。
-25. **Demo 账号**：`demo@360note.com`（显示名 `demo360note.com`）已创建，包含中英文、Markdown/富文本、表格、图片、附件、标签、文件夹、评论、版本、分享、回收站、第二个人空间、团队空间和一份备份；密码保存在 `/root/360note-demo-credentials.txt`，不写入仓库。
+25. **Demo 账号**：当前演示账户由 `scripts/provision-accounts.mjs` 创建，包含中英文、Markdown/富文本、表格、图片、附件、标签、文件夹、评论、版本、分享、回收站、第二个人空间、团队空间和一份备份；密码与恢复密钥保存在服务器 `/root/360note-credentials.txt`，不写入仓库。
 26. **打印**：分享页新增专用 `@media print`，隐藏评论、目录、按钮、分享品牌；打印元信息包含发布、更新、打印时间，格式 `yyyy年MM月dd日 HH:mm`；正文/代码/表格使用浅色打印样式。（第六轮改为“更新相对时间 + 发布/打印完整时间”。）
 
 ### 验证
@@ -486,6 +486,6 @@ apps/web/src/styles/tokens.css        设计 token
 - 管理员与演示账户凭据保存在服务器 `/root/360note-credentials.txt`（0600），不进入 Git。
 - 演示数据由 `scripts/provision-accounts.mjs` 通过真实 API 创建，覆盖中英文、附件、分享、评论、版本与团队空间。
 - 安全回归：`tests/manual/security-audit.mjs`，当前 54/54 通过。
-- SMTP 使用 `eu1.workspace.org:465`（noreply@360note.com）；测试邮件只发送到 access@126.com。
+- SMTP 使用 `eu1.workspace.org:465`（noreply@360note.com）；测试邮件只发送到操作者明确提供的地址。
 - 域名语言由 `domainLocale()` 固定，不依赖 localStorage 或用户偏好。
 - 空间图标/颜色存储在 `workspaces.icon` / `workspaces.color`；编辑模式存储在 `nh-editor-mode:<noteId>`。

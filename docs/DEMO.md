@@ -2,7 +2,7 @@
 
 演示账户用于检查排版、编辑器、组织、分享、权限与打印体验。
 
-- 管理员：`access@126.com`
+- 管理员：邮箱与密码见服务器 `/root/360note-credentials.txt`（0600）
 - 演示账户：`demo@360note.com`（普通用户角色）
 - 密码、恢复密钥与演示分享链接：见服务器 `/root/360note-credentials.txt`（0600，不提交到仓库）
 - 演示空间：`示例空间 / Demo`（个人）、`阅读与写作 / Reading`（个人）、`产品团队 / Product team`（团队，管理员为 admin 成员）

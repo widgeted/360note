@@ -28,7 +28,7 @@ temporary data. It never sends email.
 ```bash
 sudo env NOTE360_ENV_FILE=/etc/360note/360note.env \
   BASE_URL=http://127.0.0.1:8787 \
-  ADMIN_EMAIL=access@126.com ADMIN_PASSWORD='...' \
+  ADMIN_EMAIL='...' ADMIN_PASSWORD='...' \
   /opt/node22/bin/node tests/manual/security-audit.mjs
 ```
 

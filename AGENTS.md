@@ -20,7 +20,7 @@ You are working on 360note / 360笔记, a production note application.
 ## Hard constraints
 
 - **Email is allowed only for account and security mail**: registration codes, password reset codes, password/email change notices, workspace invitations, and security alerts. Never send marketing mail, never buy lists, never email users who did not request it.
-- **Never test email against random or non-existent addresses.** Use `access@126.com` or an address the operator explicitly provides.
+- **Never test email against random or non-existent addresses.** Use only an address the operator explicitly provides (recorded in the server credentials file).
 - **Do not pollute the domain.** No spam, no public test pages, no third-party analytics/ads.
 - **Do not lose user data.** Before destructive changes: backup, preview, preserve a copy. Never silently overwrite notes.
 - **Do not weaken auth/security** (CSRF, rate limits, password hashing, email-code attempts/cooldowns, 2FA replay protection, share token hashing, path traversal checks, CSP, workspace permissions).

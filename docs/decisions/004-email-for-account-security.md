@@ -27,8 +27,8 @@ manually issuing recovery keys.
 5. Changing the login email requires the new address's verification code plus
    the current password; a notice is sent to the old address.
 6. SMTP credentials live only in `/etc/360note/360note.env` and never in Git.
-7. Test mail may only be sent to `access@126.com` or addresses explicitly
-   supplied by the operator. This protects the domain's sending reputation.
+7. Test mail may only be sent to addresses explicitly supplied by the
+   operator. This protects the domain's sending reputation.
 
 ## Consequences
 
