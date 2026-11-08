@@ -24,7 +24,7 @@ import {
 import type { Folder, Tag } from '@360note/shared';
 import { useAppStore, type NoteFilter } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
-import { useT } from '../lib/i18n';
+import { getLocale, useT } from '../lib/i18n';
 import { cn } from '../lib/utils';
 import { Avatar } from './Avatar';
 import { LogoLockup } from './Logo';
@@ -334,7 +334,7 @@ export function Sidebar() {
       {mobileOpen && <div className="sidebar-scrim" onClick={closeMobile} />}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <Link to="/app" aria-label="360note" onClick={closeMobile}>
+          <Link to="/app" aria-label={getLocale() === 'zh-CN' ? '360笔记' : '360note'} onClick={closeMobile}>
             <LogoLockup />
           </Link>
           <div className="sidebar-brand-actions">
@@ -487,7 +487,7 @@ export function Sidebar() {
           {folders.length ? (
             renderFolders(null)
           ) : !editingFolder ? (
-            <div className="sidebar-empty">{t('用文件夹给笔记一个结构。')}</div>
+            <div className="sidebar-empty">{t('还没有文件夹')}</div>
           ) : null}
         </div>
 
@@ -575,7 +575,7 @@ export function Sidebar() {
               )}
             </div>
           ) : (
-            <div className="sidebar-empty">{t('用标签连接不同文件夹中的想法。')}</div>
+            <div className="sidebar-empty">{t('还没有标签')}</div>
           )}
         </div>
 

@@ -106,7 +106,7 @@ export function downloadUrl(path: string): void {
 export async function downloadBlob(path: string, fallbackName: string): Promise<void> {
   const response = await fetch(path, { credentials: 'same-origin' });
   if (!response.ok) {
-    let message = '下载失败';
+    let message = translate('下载失败');
     try {
       const data = await response.json();
       message = data?.error?.message ?? message;

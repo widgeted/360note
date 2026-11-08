@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getLocale } from '../lib/i18n';
 import { LogoLockup } from '../components/Logo';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const copy = {
   zh: {
@@ -38,7 +39,7 @@ const copy = {
     mockTags: ['开始', '产品', '灵感'],
     mockFolder: '开始使用',
     mockNotes: ['欢迎来到 360笔记', 'Markdown 与排版速查', '本周产品会议'],
-    featuresTitle: '把一条笔记，变成一套可靠的工作方式。',
+    featuresTitle: '把一条笔记，变成可靠的工作方式。',
     featuresLead: '高频功能留在主路径，低频功能收进设置与命令面板。界面安静，能力完整。',
     features: [
       { title: '随手记录', body: '自动保存、草稿恢复、版本历史。Markdown 与富文本随时切换，内容始终是 Markdown。' },
@@ -108,7 +109,7 @@ const copy = {
       { host: '360biji.com', label: '中文版', body: '中文界面、中文邮件与提示，适合中文写作与阅读。' },
       { host: '360note.com', label: 'English', body: 'An English interface with the same account, notes and workspaces.' },
     ],
-    securityTitle: 'Security is a default, not an add-on.',
+    securityTitle: 'Security is a default, not an afterthought.',
     securityLead: 'We are explicit about the boundary: this release does not provide end-to-end encryption. The server can read note bodies to provide search, sharing and backups.',
     security: [
       'HTTPS/TLS everywhere',
@@ -134,6 +135,7 @@ const mockIcons = [FolderTree, Tags, BookOpen, Link2, ShieldCheck, Check];
 
 export default function LandingPage() {
   const zh = getLocale() === 'zh-CN';
+  useDocumentTitle();
   const c = zh ? copy.zh : copy.en;
   return (
     <div className="landing">

@@ -83,7 +83,7 @@ function sanitize(html: string): string {
   });
 }
 
-function enhanceTaskLists(html: string): string {
+function enhanceTaskLists(html: string, keepInputs = false): string {
   if (!html.includes('type="checkbox"')) return html;
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('ul').forEach((ul) => {
@@ -95,10 +95,10 @@ function enhanceTaskLists(html: string): string {
     items.forEach((item) => {
       const input = item.querySelector<HTMLInputElement>('input[type="checkbox"]');
       const checked = Boolean(input?.checked);
-      input?.remove();
+      if (!keepInputs) input?.remove();
       item.setAttribute('data-type', 'taskItem');
       item.setAttribute('data-checked', String(checked));
-      if (!item.querySelector('p')) {
+      if (!keepInputs && !item.querySelector('p')) {
         const p = doc.createElement('p');
         p.innerHTML = item.innerHTML.trim() || '<br>';
         item.innerHTML = '';
@@ -165,7 +165,7 @@ export interface RenderedMarkdown {
 
 export function renderMarkdown(markdown: string, options: { toc?: boolean; wikiLinks?: boolean } = {}): RenderedMarkdown {
   const raw = marked.parse(markdown, { gfm: true, breaks: false, async: false }) as string;
-  const clean = sanitize(raw);
+  const clean = enhanceTaskLists(sanitize(raw), true);
   const doc = new DOMParser().parseFromString(`<div id="__root">${clean}</div>`, 'text/html');
   const root = doc.getElementById('__root')!;
   if (options.wikiLinks !== false) wikiLinkify(root);

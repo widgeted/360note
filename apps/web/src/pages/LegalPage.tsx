@@ -2,14 +2,16 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { getLocale, useT } from '../lib/i18n';
 import { LogoLockup } from '../components/Logo';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
   const t = useT();
   const en = getLocale() === 'en';
+  useDocumentTitle(t(kind === 'privacy' ? '隐私政策' : '服务条款'));
   return (
     <div className="legal-page">
       <div className="legal-nav">
-        <Link to="/" aria-label="360note"><LogoLockup /></Link>
+        <Link to="/" aria-label={en ? '360note' : '360笔记'}><LogoLockup /></Link>
         <Link to="/" className="btn btn-ghost btn-sm"><ArrowLeft size={13} /> {t('返回首页')}</Link>
       </div>
       <div className="legal-body">
@@ -103,7 +105,7 @@ function PrivacyEn() {
           <li><strong>Account data:</strong> email, display name, scrypt password hash, email verification records, timestamps.</li>
           <li><strong>Content:</strong> notes, folders, tags, comments, attachments, versions and share links.</li>
           <li><strong>Security data:</strong> sessions, browser user agent, IP address, login attempts and audit logs.</li>
-          <li><strong>Preferences:</strong> theme, language and editor settings.</li>
+          <li><strong>Preferences:</strong> theme and editor settings.</li>
         </ul>
         <h2>What we never do</h2>
         <ul>
@@ -118,7 +120,7 @@ function PrivacyEn() {
         <h2>Sharing</h2>
         <p>Share links are capabilities: anyone with the link can access it according to its permission. You can require a password, set an expiry and revoke it. Public pages may be indexed by search engines; do not share sensitive material.</p>
         <h2>Cookies and local storage</h2>
-        <p>We use only necessary cookies for sessions and password-protected share access. Browser storage is used for theme, language and offline cache.</p>
+        <p>We use only necessary cookies for sessions and password-protected share access. Browser storage is used for theme, editor preferences and offline cache.</p>
         <h2>Retention and your rights</h2>
         <p>Trash keeps notes for 30 days. Automatic backups run daily with 14 copies retained for up to 30 days. You can export a single note or the whole workspace, correct your data, delete notes, empty trash, or delete your account. Team workspaces must transfer ownership first so other members are not affected.</p>
         <h2>Security incidents and changes</h2>

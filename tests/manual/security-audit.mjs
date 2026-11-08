@@ -160,6 +160,32 @@ async function main() {
   check('owner can create a note', note.status === 200 && Boolean(note.json?.note?.id));
   const noteId = note.json.note.id;
 
+  // PATCH/RETURNING rows do not include aggregated tag JSON unless the service
+  // re-reads the canonical row. Keep this regression check explicit.
+  const tagged = await request(`/api/notes/${noteId}`, {
+    method: 'PATCH',
+    cookie: cookieA,
+    body: { tagNames: ['audit-keep-tag'] },
+  });
+  const updatedKeepTags = await request(`/api/notes/${noteId}`, {
+    method: 'PATCH',
+    cookie: cookieA,
+    body: { contentMd: '# Audit private note\n\nsecret-body-marker updated' },
+  });
+  check(
+    'note updates return their tags',
+    tagged.status === 200 &&
+      updatedKeepTags.status === 200 &&
+      updatedKeepTags.json?.note?.tags?.some((tag) => tag.name === 'audit-keep-tag'),
+    `tags=${JSON.stringify(updatedKeepTags.json?.note?.tags ?? [])}`,
+  );
+  await request(`/api/notes/${noteId}`, { method: 'DELETE', cookie: cookieA });
+  const restored = await request(`/api/notes/${noteId}/restore`, { method: 'POST', cookie: cookieA });
+  check(
+    'restored notes keep their tags',
+    restored.status === 200 && restored.json?.note?.tags?.some((tag) => tag.name === 'audit-keep-tag'),
+  );
+
   const teamNote = await request('/api/notes', {
     method: 'POST',
     cookie: cookieA,

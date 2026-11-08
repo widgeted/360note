@@ -266,7 +266,30 @@
   }
 
   .editor-toolbar {
-    padding: 0 8px;
+    height: auto;
+    min-height: var(--toolbar-height);
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding: 5px 8px;
+    row-gap: 2px;
+  }
+
+  .editor-toolbar .toolbar-divider {
+    display: none;
+  }
+
+  .editor-toolbar .toolbar-spacer {
+    display: none;
+  }
+
+  .editor-toolbar .tool-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .editor-toolbar .tool-btn-text {
+    width: auto;
+    padding: 0 9px;
   }
 
   .editor-footbar {
@@ -280,6 +303,11 @@
 
   .email-edit-row .btn {
     width: 100%;
+  }
+
+  .email-edit-row .input {
+    flex: none;
+    height: 36px;
   }
 
   .toolbar-mode span {
@@ -694,4 +722,10 @@
   }
 }
 
+}
+
+@media (max-width: 360px) {
+  .settings-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

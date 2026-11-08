@@ -28,6 +28,14 @@
   flex: none;
 }
 
+.landing-brand .brand-logo {
+  height: 26px;
+}
+
+.landing-footer-brand .brand-logo {
+  height: 24px;
+}
+
 .landing-links {
   display: flex;
   align-items: center;
@@ -93,6 +101,7 @@
 
 .landing-hero h1 {
   margin: 22px 0 0;
+  text-wrap: balance;
   font-size: clamp(42px, 4.6vw, 66px);
   line-height: 1.06;
   letter-spacing: -0.045em;
@@ -426,6 +435,7 @@
 .landing-domains h2,
 .landing-security h2 {
   margin: 0;
+  text-wrap: balance;
   font-size: clamp(28px, 3vw, 40px);
   line-height: 1.14;
   letter-spacing: -0.04em;

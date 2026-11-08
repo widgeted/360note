@@ -12,7 +12,6 @@ import { toast } from '../../stores/toast';
 export default function ApiSettings() {
   const t = useT();
   const isMobile = useIsMobile();
-  const instance = useAuthStore((state) => state.instance);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -70,7 +69,7 @@ export default function ApiSettings() {
     setTimeout(() => setCopied(null), 1600);
   }
 
-  const origin = instance?.publicOrigin ?? window.location.origin;
+  const origin = window.location.origin;
   const bookmarklet = `javascript:(()=>{const u=location.href,t=document.title,s=window.getSelection()?.toString()||'';window.open('${origin}/clip?url='+encodeURIComponent(u)+'&title='+encodeURIComponent(t)+'&text='+encodeURIComponent(s),'_blank')})()`;
   const curlExample = `curl -H "Authorization: Bearer nh_xxx" \\\n  "${origin}/api/notes?workspaceId=YOUR_WORKSPACE_ID&filter=all"`;
 
@@ -145,7 +144,7 @@ export default function ApiSettings() {
             {copied === 'bookmarklet' ? <Check size={12} /> : <Copy size={12} />} {t('复制')}
           </button>
         </div>
-        <div className="setting-note" style={{ marginTop: 6 }}>{t('剪藏页面需要登录 360note。脚本不会在第三方页面发送你的 Cookie。')}</div>
+        <div className="setting-note" style={{ marginTop: 6 }}>{t('剪藏页面需要登录 360笔记。脚本不会在第三方页面发送你的 Cookie。')}</div>
       </section>
 
       <section className="settings-section">

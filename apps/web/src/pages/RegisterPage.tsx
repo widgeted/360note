@@ -3,12 +3,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Check, Copy, Download, Eye, EyeOff, KeyRound, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
 import { getLocale, useT } from '../lib/i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { api } from '../lib/api';
 import { copyText, emailValid, passwordStrength } from '../lib/utils';
 import { AuthLayout } from './AuthLayout';
 
 export default function RegisterPage() {
   const t = useT();
+  useDocumentTitle(t('注册'));
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextParam = searchParams.get('next');
@@ -257,7 +259,7 @@ export default function RegisterPage() {
               />
               <button
                 type="button"
-                className="icon-btn icon-btn-sm"
+                className="icon-btn"
                 onClick={() => setShowPassword((value) => !value)}
                 style={{ position: 'absolute', right: 7, top: 7 }}
                 aria-label={showPassword ? t('隐藏密码') : t('显示密码')}
@@ -312,7 +314,7 @@ export default function RegisterPage() {
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={6}
-              placeholder={t('请输入 6 位邮箱验证码')}
+              placeholder={t('6 位验证码')}
               value={emailCode}
               onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
               autoComplete="one-time-code"

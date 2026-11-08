@@ -465,7 +465,11 @@ export async function updateNote(input: {
   if (oldTitle && title !== oldTitle) {
     linkUpdates = await propagateTitleRename(existing.workspace_id, input.userId, oldTitle, title, input.noteId);
   }
-  return { note: await serializeNote(updated, role), linkUpdates };
+  // RETURNING * only contains note columns, not the aggregated tag JSON from
+  // SUMMARY_SELECT. Re-read the canonical row so clients keep their tags after
+  // every autosave instead of receiving an empty tag array.
+  const fresh = (await getNoteRow(input.noteId)) ?? updated;
+  return { note: await serializeNote(fresh, role), linkUpdates };
 }
 
 /** Rename wiki links that point at a renamed note. Runs after the note update. */
@@ -526,7 +530,8 @@ export async function restoreNote(noteId: string, userId: string): Promise<Note>
     `UPDATE notes SET trashed_at = NULL, folder_id = $2, updated_at = now() WHERE id = $1 RETURNING *`,
     [noteId, folderId],
   );
-  return serializeNote(restored!, role);
+  const fresh = (await getNoteRow(noteId)) ?? restored!;
+  return serializeNote(fresh, role);
 }
 
 export async function deleteNotePermanently(noteId: string, userId: string): Promise<string[]> {

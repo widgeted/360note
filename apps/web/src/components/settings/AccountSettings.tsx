@@ -161,7 +161,7 @@ export default function AccountSettings() {
               <label>{t('邮箱')}</label>
               {!emailEditing ? (
                 <div className="email-edit-row">
-                  <input className="input" value={email} readOnly disabled style={{ flex: 1 }} />
+                  <input className="input" value={email} readOnly disabled />
                   <button type="button" className="btn btn-secondary" onClick={() => { setEmailEditing(true); setNewEmail(email); }}>
                     <Mail size={13} /> {t('修改邮箱')}
                   </button>

@@ -15,7 +15,7 @@ import {
 import type { SessionInfo, User } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
-import { useT } from '../../lib/i18n';
+import { getLocale, translate, useT } from '../../lib/i18n';
 import { copyText, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { Modal } from '../Modal';
 import { toast } from '../../stores/toast';
@@ -317,7 +317,7 @@ export default function SecuritySettings() {
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => {
-                  const blob = new Blob([`360note 两步验证备用码\n\n${backupCodes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
+                  const blob = new Blob([`${translate('360note 两步验证备用码')}\n\n${backupCodes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = url;
@@ -410,7 +410,7 @@ function describeAgent(agent: string): string {
         ? 'Safari'
         : /Firefox\//i.test(agent)
           ? 'Firefox'
-          : '浏览器';
+          : translate('浏览器');
   const os = /iPhone|iPad/i.test(agent)
     ? 'iOS'
     : /Android/i.test(agent)

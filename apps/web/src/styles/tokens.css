@@ -25,8 +25,8 @@
   --text: #181a1f;
   --text-soft: #44443f;
   --text-secondary: #67655f;
-  --text-tertiary: #918d84;
-  --text-faint: #b0aba1;
+  --text-tertiary: #767268;
+  --text-faint: #8a857b;
   --text-inverse: #f5f3ec;
 
   --line: #e7e2d8;
@@ -34,8 +34,8 @@
   --line-strong: #d7d1c5;
   --line-dark: #222a44;
 
-  --blue: #17865b;
-  --blue-strong: #106a46;
+  --blue: #157a52;
+  --blue-strong: #0f5f3f;
   --blue-soft: #e5f4ec;
   --blue-faint: #f1faf5;
   --violet: #6c5ce7;
@@ -58,9 +58,9 @@
   --sidebar-text: #3f3f3a;
   --sidebar-text-soft: #4b4b45;
   --sidebar-text-strong: #181a1f;
-  --sidebar-muted: #7d7970;
+  --sidebar-muted: #6f6b63;
   --sidebar-line: rgba(24, 26, 31, 0.09);
-  --sidebar-accent: #17865b;
+  --sidebar-accent: #157a52;
 
   --font-ui: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei', sans-serif;

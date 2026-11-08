@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Copy, KeyRound, Mail } from 'lucide-react';
 import { api } from '../lib/api';
 import { getLocale, useT } from '../lib/i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { copyText } from '../lib/utils';
 import { AuthLayout } from './AuthLayout';
 
 export default function RecoverPage() {
   const t = useT();
+  useDocumentTitle(t('恢复账户'));
   const navigate = useNavigate();
   const [mode, setMode] = useState<'email' | 'key'>('email');
   const [email, setEmail] = useState('');
@@ -137,7 +139,7 @@ export default function RecoverPage() {
                 maxLength={6}
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder={t('请输入 6 位邮箱验证码')}
+                placeholder={t('6 位验证码')}
                 autoComplete="one-time-code"
                 required
                 style={{ flex: 1 }}
@@ -185,7 +187,9 @@ export default function RecoverPage() {
         )}
       </p>
       <p className="auth-legal">
-        {t('没有恢复密钥？')} <Link to="/register">{t('创建一个新账户')}</Link> · <a href="mailto:noreply@360note.com">{t('联系我们')}</a>
+        {mode === 'key' ? t('没有恢复密钥？') : t('仍然无法登录？')}
+        <br />
+        <Link to="/register">{t('创建一个新账户')}</Link> · <a href="mailto:noreply@360note.com">{t('联系我们')}</a>
       </p>
     </AuthLayout>
   );

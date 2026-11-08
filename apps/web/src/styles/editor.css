@@ -149,7 +149,8 @@
   padding-left: 0;
 }
 
-.prose ul[data-type='taskList'] li > label {
+.prose ul[data-type='taskList'] li > label,
+.prose ul[data-type='taskList'] li > input[type='checkbox'] {
   flex: none;
   margin-top: 0.3em;
   user-select: none;
@@ -169,7 +170,37 @@
   cursor: pointer;
 }
 
-.prose ul[data-type='taskList'] li[data-checked='true'] > div {
+.prose ul[data-type='taskList'] input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  opacity: 1;
+}
+
+.prose ul[data-type='taskList'] input[type='checkbox']:checked {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.prose ul[data-type='taskList'] input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.prose ul[data-type='taskList'] li[data-checked='true'] > div,
+.prose ul[data-type='taskList'] li[data-checked='true'] {
   color: var(--text-tertiary);
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--text-tertiary) 45%, transparent);

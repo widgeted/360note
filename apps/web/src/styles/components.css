@@ -3,6 +3,11 @@
   gap: 8px;
 }
 
+.email-edit-row .input {
+  min-width: 0;
+  flex: 1;
+}
+
 /* Workspace identity picker */
 .identity-picker {
   display: flex;

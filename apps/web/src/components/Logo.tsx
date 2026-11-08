@@ -23,6 +23,7 @@ export function LogoLockup({ inverse = false }: { inverse?: boolean }) {
   return (
     <span className={cn('brand-lockup', inverse && 'brand-lockup-inverse')}>
       <img src={brandLogoPath()} alt={label} className="brand-logo" />
+      <img src="/img/360note_icon.svg" alt="" aria-hidden="true" className="brand-icon" />
     </span>
   );
 }

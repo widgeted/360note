@@ -489,3 +489,11 @@ apps/web/src/styles/tokens.css        设计 token
 - SMTP 使用 `eu1.workspace.org:465`（noreply@360note.com）；测试邮件只发送到操作者明确提供的地址。
 - 域名语言由 `domainLocale()` 固定，不依赖 localStorage 或用户偏好。
 - 空间图标/颜色存储在 `workspaces.icon` / `workspaces.color`；编辑模式存储在 `nh-editor-mode:<noteId>`。
+
+## 2026-11-09 细节回归
+
+- 修复保存/恢复笔记时 PATCH 返回体缺失聚合字段（tags、attachmentCount）导致客户端标签丢失；服务端现在重新读取 SUMMARY_SELECT 行。
+- 侧栏收起时只显示图标（`brand-icon`），完整 wordmark 不再溢出 56px 侧栏。
+- 移动端通知按钮使用独立 `sidebar-icon-btn`，不再被 `.sidebar-collapse` 的移动端隐藏规则影响。
+- 公开分享页任务列表保留 checkbox 并设置 `data-type=taskList`，与编辑器一致。
+- 生产安全审计扩展为 63 项，当前 63/63 通过。

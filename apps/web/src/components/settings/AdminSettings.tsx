@@ -3,6 +3,7 @@ import { Activity, Database, HardDrive, Save, Server, ShieldCheck, Users } from 
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
+import { auditActionLabel } from '../../lib/audit';
 import { formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { toast } from '../../stores/toast';
 
@@ -72,7 +73,7 @@ export default function AdminSettings() {
             { icon: <Database size={15} />, value: stats?.notes ?? 0, label: t('笔记') },
             { icon: <HardDrive size={15} />, value: stats ? formatBytes(stats.storageBytes) : '—', label: t('附件存储') },
             { icon: <Activity size={15} />, value: stats?.activeShares ?? 0, label: t('有效分享') },
-            { icon: <Server size={15} />, value: stats?.workspaces ?? 0, label: t('工作区') },
+            { icon: <Server size={15} />, value: stats?.workspaces ?? 0, label: t('空间') },
             { icon: <ShieldCheck size={15} />, value: stats?.attachments ?? 0, label: t('附件') },
           ].map((item) => (
             <div className="setting-card" key={item.label}>
@@ -83,9 +84,9 @@ export default function AdminSettings() {
           ))}
         </div>
         <div className="setting-card" style={{ marginTop: 8, display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13, color: 'var(--text-tertiary)' }}>
-          <span>{t('注册模式')}：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.registrationMode ?? '—'}</strong></span>
-          <span>{t('OCR')}：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.ocrEnabled ? t('开启') : t('关闭')}</strong></span>
-          <span>{t('AI')}：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.aiEnabled ? t('开启') : t('关闭')}</strong></span>
+          <span>{t('注册模式')}：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.registrationMode === 'invite' ? t('仅邀请') : t('开放')}</strong></span>
+          <span>OCR：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.ocrEnabled ? t('已启用') : t('未启用')}</strong></span>
+          <span>AI：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.aiEnabled ? t('已启用') : t('未启用')}</strong></span>
         </div>
       </section>
 
@@ -118,8 +119,8 @@ export default function AdminSettings() {
                 <tr key={member.id}>
                   <td><strong>{member.email}</strong></td>
                   <td>{member.displayName}</td>
-                  <td><span className="badge">{member.role}</span></td>
-                  <td>{member.totpEnabled ? <span className="badge badge-green">{t('开启')}</span> : <span className="badge">{t('关闭')}</span>}</td>
+                  <td><span className="badge">{member.role === 'admin' ? t('管理员') : t('普通用户')}</span></td>
+                  <td>{member.totpEnabled ? <span className="badge badge-green">{t('已启用')}</span> : <span className="badge">{t('未启用')}</span>}</td>
                   <td>{member.lastLoginAt ? formatRelativeShort(member.lastLoginAt) : '—'}</td>
                 </tr>
               ))}
@@ -138,7 +139,7 @@ export default function AdminSettings() {
             <div key={entry.id} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderBottom: '1px solid var(--line-soft)', fontSize: 13 }}>
               <span style={{ width: 130, flex: 'none', color: 'var(--text-tertiary)' }}>{formatFullDate(entry.createdAt)}</span>
               <span style={{ width: 90, flex: 'none', color: 'var(--text-secondary)' }}>{entry.actorName ?? t('系统')}</span>
-              <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{entry.action}</span>
+              <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{auditActionLabel(t, entry.action)}</span>
               <span style={{ color: 'var(--text-tertiary)' }}>{entry.ip}</span>
             </div>
           ))}

@@ -58,7 +58,7 @@ export function NotificationCenter() {
     <Dropdown
       width={320}
       trigger={
-        <button type="button" className="sidebar-collapse" aria-label={t('通知')} title={t('通知')} style={{ position: 'relative' }}>
+        <button type="button" className="sidebar-icon-btn" aria-label={t('通知')} title={t('通知')} style={{ position: 'relative' }}>
           <Bell size={15} />
           {unread > 0 && (
             <span

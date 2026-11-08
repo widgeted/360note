@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { PublicShare } from '@360note/shared';
 import { api, ApiError } from '../lib/api';
-import { useT } from '../lib/i18n';
+import { getLocale, useT } from '../lib/i18n';
 import { copyText, formatFullDate, formatPrintDate, formatRelative } from '../lib/utils';
 import { renderMarkdown, stripDuplicateTitle } from '../lib/markdown';
 import { cn } from '../lib/utils';
@@ -26,6 +26,7 @@ import { Avatar } from '../components/Avatar';
 
 export default function SharePage() {
   const t = useT();
+  const brand = getLocale() === 'zh-CN' ? '360笔记' : '360note';
   const { token } = useParams<{ token: string }>();
   const [share, setShare] = useState<PublicShare | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,10 +50,11 @@ export default function SharePage() {
       setShare(data);
       setEditContent(data.note.contentMd);
       setEditTitle(data.note.title);
-      document.title = `${data.note.title} — 360note`;
+      document.title = `${data.note.title} — ${brand}`;
       setError(null);
     } catch (error) {
       setError((error as Error).message || t('分享链接不存在或已失效'));
+      document.title = `${t('链接不存在或已失效')} — ${brand}`;
     } finally {
       setLoading(false);
     }
@@ -167,7 +169,7 @@ export default function SharePage() {
           <div className="public-gate-icon"><LockKeyhole size={22} /></div>
           <h1>{t('链接不存在或已失效')}</h1>
           <p>{error ?? t('它可能已被撤销、过期，或链接不完整。')}</p>
-          <Link to="/" className="btn btn-secondary public-gate-cta">{t('了解 360note')}</Link>
+          <Link to="/" className="btn btn-secondary public-gate-cta">{t('了解 360笔记')}</Link>
         </div>
       </div>
     );
@@ -197,7 +199,8 @@ export default function SharePage() {
             </button>
           </form>
           <div className="public-share-brand">
-            <span style={{ fontWeight: 650 }}>360note.</span> {t('由 360note 保护')}
+            <span style={{ fontWeight: 650 }}>{brand}.</span>{' '}
+            {getLocale() === 'zh-CN' ? '由 360笔记 保护' : 'Protected by 360note'}
           </div>
         </div>
       </div>
@@ -311,7 +314,7 @@ export default function SharePage() {
               )}
               <footer className="public-footer">
                 <div className="public-footer-brand">
-                  <span style={{ fontWeight: 650, color: 'var(--text)' }}>360note.</span>
+                  <span style={{ fontWeight: 650, color: 'var(--text)' }}>{brand}.</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <ShieldCheck size={12} />
@@ -390,10 +393,11 @@ export default function SharePage() {
 
 function PublicHeader({ minimal = false }: { minimal?: boolean }) {
   const t = useT();
+  const brand = getLocale() === 'zh-CN' ? '360笔记' : '360note';
   return (
     <header className="public-header">
       <div className="public-header-inner">
-        <Link to="/" aria-label="360note">
+        <Link to="/" aria-label={brand}>
           <LogoLockup />
         </Link>
         {!minimal && (
@@ -404,7 +408,7 @@ function PublicHeader({ minimal = false }: { minimal?: boolean }) {
               </span>
             </div>
             <Link to="/register" className="btn btn-secondary btn-sm public-header-cta">
-              {t('创建你的 360note')} <ArrowLeft size={12} style={{ transform: 'rotate(180deg)' }} />
+              {t('创建你的 360笔记')} <ArrowLeft size={12} style={{ transform: 'rotate(180deg)' }} />
             </Link>
           </>
         )}

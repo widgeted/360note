@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../lib/i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export default function NotFoundPage() {
   const t = useT();
+  useDocumentTitle(t('页面不存在'));
   return (
     <div className="notfound">
       <div>

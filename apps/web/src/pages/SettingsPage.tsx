@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useT } from '../lib/i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
 import { cn } from '../lib/utils';
@@ -47,6 +48,8 @@ export default function SettingsPage({ section }: { section: string }) {
   const workspace = useAuthStore((state) => state.workspaces.find((entry) => entry.id === workspaceId));
   const visibleSections = SECTIONS.filter((entry) => !('adminOnly' in entry) || !entry.adminOnly || user?.role === 'admin');
   const current = visibleSections.some((entry) => entry.id === section) ? section : 'account';
+  const sectionLabel = SECTIONS.find((entry) => entry.id === current)?.label ?? '设置';
+  useDocumentTitle(t(sectionLabel));
 
   const groups = ['个人', '数据', '高级'];
   const from = (location.state as { from?: unknown } | null)?.from;
@@ -62,7 +65,7 @@ export default function SettingsPage({ section }: { section: string }) {
           <ArrowLeft size={17} />
         </button>
         <h1>{t('设置')}</h1>
-        <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+        <span className="page-topbar-context">
           {workspace?.name ?? user?.displayName}
         </span>
         <div style={{ flex: 1 }} />

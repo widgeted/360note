@@ -15,7 +15,7 @@ import {
 import type { BackupInfo, JobInfo } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAppStore } from '../../stores/app';
-import { useT } from '../../lib/i18n';
+import { getLocale, useT } from '../../lib/i18n';
 import { downloadBlob } from '../../lib/api';
 import { formatBytes, formatFullDate, formatRelativeShort, sleep } from '../../lib/utils';
 import { Modal } from '../Modal';
@@ -190,7 +190,11 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
         </button>
         <input ref={uploadRef} type="file" hidden accept=".nhbackup,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBackup(file); event.target.value = ''; }} />
         <div style={{ flex: 1 }} />
-        <span className="setting-note">{backups.length} {t('份备份')}</span>
+        <span className="setting-note">
+          {getLocale() === 'en'
+            ? `${backups.length} backup${backups.length === 1 ? '' : 's'}`
+            : `${backups.length} ${t('份备份')}`}
+        </span>
       </div>
       {!canManage && <div className="banner banner-warning" style={{ marginBottom: 12 }}><AlertCircle size={14} /><div>{t('只有空间管理员可以创建或恢复备份。你仍然可以导出整个空间。')}</div></div>}
       {error && <div className="form-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /> {error}</div>}

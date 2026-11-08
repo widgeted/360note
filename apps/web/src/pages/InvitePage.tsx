@@ -3,13 +3,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, LogIn, UserPlus, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuthStore } from '../stores/auth';
-import { useT } from '../lib/i18n';
+import { getLocale, useT } from '../lib/i18n';
 import { LogoLockup } from '../components/Logo';
 import { Avatar } from '../components/Avatar';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import type { Invitation } from '@360note/shared';
 
 export default function InvitePage() {
   const t = useT();
+  useDocumentTitle(t('邀请'));
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const status = useAuthStore((state) => state.status);
@@ -72,14 +74,16 @@ export default function InvitePage() {
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <LogoLockup />
           </Link>
-          <Link to="/app" className="btn btn-ghost btn-sm" style={{ padding: 0, height: 'auto' }}>
-            <ArrowLeft size={12} /> {t('回到应用')}
+          <Link to={status === 'authenticated' ? '/app' : '/'} className="btn btn-ghost btn-sm">
+            <ArrowLeft size={12} /> {status === 'authenticated' ? t('回到应用') : t('返回首页')}
           </Link>
         </div>
 
         {status !== 'authenticated' ? (
           <>
-            <h1>{t('你被邀请加入')} 360note</h1>
+            <h1>
+              {t('你被邀请加入')} {getLocale() === 'zh-CN' ? '360笔记' : '360note'}
+            </h1>
             <p>{t('登录或创建账户后即可接受邀请。')}</p>
             <Link to={`/login?next=${next}`} className="btn btn-primary btn-block">
               <LogIn size={14} /> {t('登录以继续')}

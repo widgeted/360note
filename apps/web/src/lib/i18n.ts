@@ -270,7 +270,7 @@ const en: Record<string, string> = {
   '拼写检查': 'Spellcheck',
   '保存设置': 'Save settings',
   '已保存设置': 'Settings saved',
-  '隐私政策': 'Privacy',
+  '隐私政策': 'Privacy policy',
   '服务条款': 'Terms of service',
   '数据可携带': 'Data portability',
   '你的数据属于你': 'Your data belongs to you',
@@ -332,7 +332,7 @@ const en: Record<string, string> = {
   '已有分享': 'Existing links',
   '访问次数': 'Views',
   '需要密码': 'Password required',
-  '此分享需要密码': 'This page is password protected',
+  '此分享需要密码': 'Password required',
   '输入密码查看': 'Enter the password to read it',
   '发布为网页': 'Publish as web page',
   '作者': 'Author',
@@ -577,7 +577,7 @@ const en: Record<string, string> = {
   '已撤销': 'Revoked',
   '登录以继续': 'Sign in to continue',
   '此操作需要登录 360note。': 'This action requires a 360note account.',
-  '创建你的 360note': 'Create your 360note',
+  '创建你的 360笔记': 'Create your 360note',
   '开始免费使用': 'Start for free',
   '已有账户': 'I already have an account',
   '注册并保存恢复密钥': 'Create account and save recovery key',
@@ -723,6 +723,19 @@ const en: Record<string, string> = {
   '新的笔记评论': 'New note comment',
   '新的分享评论': 'New share comment',
   '共享笔记被编辑': 'Shared note edited',
+  '仍然无法登录？': 'Still unable to sign in?',
+  '更多格式': 'More formatting',
+  '还没有文件夹': 'No folders yet',
+  '开放': 'Open',
+  '仅邀请': 'Invite only',
+  '未启用': 'Not enabled',
+  '普通用户': 'User',
+  '找回密码': 'Password recovery',
+  '更新笔记': 'Note updated',
+  '恢复笔记': 'Note restored',
+  '永久删除笔记': 'Note permanently deleted',
+  '发表评论': 'Comment posted',
+  '360note 两步验证备用码': '360note two-factor backup codes',
   '主题与阅读宽度会同步到你的账户，在其他设备上也会生效。界面语言由访问域名决定。': 'Theme and reading width sync to your account and apply on other devices. The interface language is determined by the domain you visit.',
   '关闭通知': 'Close notification',
   '个人': 'Personal',
@@ -1035,7 +1048,7 @@ const en: Record<string, string> = {
   '浏览器书签': 'Browser bookmark',
   '移动端可以复制下面的脚本，在桌面浏览器中创建书签；也可以直接打开剪藏页面手动粘贴网址与文字。': 'On mobile, copy the script below and create the bookmark in a desktop browser; or open the clip page and paste the URL and text manually.',
   '把下面的脚本拖到书签栏，或复制后新建一个书签。在任意网页点击它，就会打开 360笔记的剪藏页面，并预填标题、网址与选中的文字。': 'Drag the script below to the bookmarks bar, or copy it into a new bookmark. Click it on any page to open the 360note clip page with the title, URL and selected text prefilled.',
-  '剪藏页面需要登录 360note。脚本不会在第三方页面发送你的 Cookie。': 'The clip page requires signing in to 360note. The script never sends your cookies to third-party pages.',
+  '剪藏页面需要登录 360笔记。脚本不会在第三方页面发送你的 Cookie。': 'The clip page requires signing in to 360note. The script never sends your cookies to third-party pages.',
   '用 Bearer 令牌调用接口。令牌拥有当前账户的读写权限，请不要把它提交到公开仓库。': 'Call the API with a Bearer token. The token carries the current account’s read/write scope; never commit it to a public repository.',
   '列出笔记，支持 workspaceId、filter、q、limit、offset。': 'List notes. Supports workspaceId, filter, q, limit and offset.',
   '创建笔记，正文使用 Markdown。': 'Create a note; the body is Markdown.',
@@ -1295,7 +1308,7 @@ const en: Record<string, string> = {
   '这篇笔记刚刚被其他人更新。你的修改仍在这里，可以复制保存，然后重新加载。': 'This note was just updated by someone else. Your changes are still here; copy them, then reload.',
   '链接不存在或已失效': 'The link does not exist or is no longer valid',
   '它可能已被撤销、过期，或链接不完整。': 'It may have been revoked, expired, or the link is incomplete.',
-  '了解 360note': 'Learn about 360note',
+  '了解 360笔记': 'Learn about 360note',
   '查看笔记': 'View note',
   '到期于': 'Expires',
   '你正在通过分享链接编辑 Markdown。保存后会生成新的历史版本，并通知笔记作者。': 'You are editing Markdown through a share link. Saving creates a new historical version and notifies the note author.',
@@ -1313,6 +1326,28 @@ const en: Record<string, string> = {
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;
 
+const EN_SINGULARS: Record<string, string> = {
+  notes: 'note',
+  spaces: 'space',
+  members: 'member',
+  attachments: 'attachment',
+  links: 'link',
+  words: 'word',
+  characters: 'character',
+  backups: 'backup',
+  days: 'day',
+  people: 'person',
+  copies: 'copy',
+};
+
+/** Keep English counts grammatical without forcing every call site to branch. */
+function singularizeEnglish(output: string): string {
+  return output.replace(
+    /\b1 (active |daily |new |saved )?(notes|spaces|members|attachments|links|words|characters|backups|days|people|copies)\b/g,
+    (_match, qualifier: string, noun: string) => `1 ${qualifier}${EN_SINGULARS[noun] ?? noun}`,
+  );
+}
+
 export function translate(zh: string, vars?: Record<string, string | number>): string {
   let output = currentLocale === 'en' ? en[zh] ?? zh : zh;
   if (vars) {
@@ -1320,6 +1355,7 @@ export function translate(zh: string, vars?: Record<string, string | number>): s
       output = output.replaceAll(`{${key}}`, String(value));
     }
   }
+  if (currentLocale === 'en' && Number(vars?.n) === 1) output = singularizeEnglish(output);
   return output;
 }
 

@@ -21,6 +21,10 @@ const en: Record<string, string> = {
   '请求过于频繁，请稍后再试': 'Too many requests. Please try again later.',
   '请输入有效的邮箱地址': 'Please enter a valid email address',
   '密码至少需要 10 个字符': 'The password must be at least 10 characters',
+  '密码不能全是数字': 'The password cannot be all digits',
+  '密码不能包含邮箱地址': 'The password cannot contain your email address',
+  '密码不能超过 200 个字符': 'The password cannot exceed 200 characters',
+  '没有编辑权限': 'You do not have permission to edit',
   '无效的 ID': 'Invalid ID',
   '标题过长': 'The title is too long',
   '单篇笔记不能超过 2,000,000 个字符': 'A note cannot exceed 2,000,000 characters',
@@ -140,6 +144,9 @@ export function localizeMessage(message: string, language: string): string {
   if (!language.toLowerCase().startsWith('en')) return message;
   const exact = translateExact(message);
   if (exact) return exact;
+
+  if (message.startsWith('文件不能超过 ')) return message.replace('文件不能超过', 'The file cannot exceed');
+  if (message.startsWith('上传失败：')) return `Upload failed: ${message.slice(5)}`;
 
   for (const [pattern, replacement] of dynamic) {
     const match = message.match(pattern);

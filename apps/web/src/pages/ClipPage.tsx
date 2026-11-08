@@ -6,9 +6,11 @@ import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { useIsMobile } from '../lib/useMediaQuery';
 import { LogoLockup } from '../components/Logo';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export default function ClipPage() {
   const t = useT();
+  useDocumentTitle(t('剪藏'));
   const isMobile = useIsMobile();
   const [params] = useSearchParams();
   const navigate = useNavigate();

@@ -191,7 +191,7 @@ export function EditorPane({
   }, [reloadTick, note?.id]);
 
   useEffect(() => {
-    if (note) document.title = `${title || t('未命名笔记')} — 360note`;
+    if (note) document.title = `${title || t('未命名笔记')} — ${getLocale() === 'zh-CN' ? '360笔记' : '360note'}`;
     return () => {
       document.title = getLocale() === 'zh-CN' ? '360笔记 — 把想法留下' : '360note — Keep ideas';
     };

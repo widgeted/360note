@@ -15,6 +15,7 @@ import {
   ListChecks,
   ListOrdered,
   Minus,
+  MoreHorizontal,
   Plus,
   Quote,
   Redo2,
@@ -26,6 +27,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import { useT } from '../../lib/i18n';
+import { useIsMobile } from '../../lib/useMediaQuery';
 import { cn, shortcutLabel } from '../../lib/utils';
 import { Dropdown, MenuItem } from '../Dropdown';
 
@@ -41,6 +43,7 @@ export function EditorToolbar({
   onImage: (file: File) => void;
 }) {
   const t = useT();
+  const isMobile = useIsMobile();
   const fileRef = useRef<HTMLInputElement>(null);
   const state = useEditorState({
     editor,
@@ -104,56 +107,101 @@ export function EditorToolbar({
           <button type="button" className={cn('tool-btn', state?.italic && 'active')} onClick={() => editor.chain().focus().toggleItalic().run()} title={`${t('斜体')} ${shortcutLabel('Mod+I')}`} aria-label={t('斜体')}>
             <Italic size={15} />
           </button>
-          <button type="button" className={cn('tool-btn', state?.underline && 'active')} onClick={() => editor.chain().focus().toggleUnderline().run()} title={`${t('下划线')} ${shortcutLabel('Mod+U')}`} aria-label={t('下划线')}>
-            <UnderlineIcon size={15} />
-          </button>
-          <button type="button" className={cn('tool-btn', state?.strike && 'active')} onClick={() => editor.chain().focus().toggleStrike().run()} title={t('删除线')} aria-label={t('删除线')}>
-            <Strikethrough size={15} />
-          </button>
-          <button type="button" className={cn('tool-btn', state?.code && 'active')} onClick={() => editor.chain().focus().toggleCode().run()} title={t('行内代码')} aria-label={t('行内代码')}>
-            <Code size={15} />
-          </button>
+          {!isMobile && (
+            <>
+              <button type="button" className={cn('tool-btn', state?.underline && 'active')} onClick={() => editor.chain().focus().toggleUnderline().run()} title={`${t('下划线')} ${shortcutLabel('Mod+U')}`} aria-label={t('下划线')}>
+                <UnderlineIcon size={15} />
+              </button>
+              <button type="button" className={cn('tool-btn', state?.strike && 'active')} onClick={() => editor.chain().focus().toggleStrike().run()} title={t('删除线')} aria-label={t('删除线')}>
+                <Strikethrough size={15} />
+              </button>
+              <button type="button" className={cn('tool-btn', state?.code && 'active')} onClick={() => editor.chain().focus().toggleCode().run()} title={t('行内代码')} aria-label={t('行内代码')}>
+                <Code size={15} />
+              </button>
+            </>
+          )}
         </div>
         <div className="toolbar-divider" />
         <div className="toolbar-group">
           <button type="button" className={cn('tool-btn', state?.bulletList && 'active')} onClick={() => editor.chain().focus().toggleBulletList().run()} title={t('无序列表')} aria-label={t('无序列表')}>
             <List size={15} />
           </button>
-          <button type="button" className={cn('tool-btn', state?.orderedList && 'active')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title={t('有序列表')} aria-label={t('有序列表')}>
-            <ListOrdered size={15} />
-          </button>
+          {!isMobile && (
+            <button type="button" className={cn('tool-btn', state?.orderedList && 'active')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title={t('有序列表')} aria-label={t('有序列表')}>
+              <ListOrdered size={15} />
+            </button>
+          )}
           <button type="button" className={cn('tool-btn', state?.taskList && 'active')} onClick={() => editor.chain().focus().toggleTaskList().run()} title={t('任务列表')} aria-label={t('任务列表')}>
             <ListChecks size={15} />
           </button>
-          <button type="button" className={cn('tool-btn', state?.blockquote && 'active')} onClick={() => editor.chain().focus().toggleBlockquote().run()} title={t('引用')} aria-label={t('引用')}>
-            <Quote size={15} />
-          </button>
-          <button type="button" className={cn('tool-btn', state?.codeBlock && 'active')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title={t('代码块')} aria-label={t('代码块')}>
-            <Code2 size={15} />
-          </button>
+          {!isMobile && (
+            <>
+              <button type="button" className={cn('tool-btn', state?.blockquote && 'active')} onClick={() => editor.chain().focus().toggleBlockquote().run()} title={t('引用')} aria-label={t('引用')}>
+                <Quote size={15} />
+              </button>
+              <button type="button" className={cn('tool-btn', state?.codeBlock && 'active')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title={t('代码块')} aria-label={t('代码块')}>
+                <Code2 size={15} />
+              </button>
+            </>
+          )}
         </div>
         <div className="toolbar-divider" />
         <div className="toolbar-group">
           <button type="button" className="tool-btn" onClick={onLink} title={t('插入链接')} aria-label={t('插入链接')}>
             <Link2 size={15} />
           </button>
-          <button type="button" className="tool-btn" onClick={onWiki} title={t('双向链接')} aria-label={t('双向链接')}>
-            <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>[[</span>
-          </button>
+          {!isMobile && (
+            <button type="button" className="tool-btn" onClick={onWiki} title={t('双向链接')} aria-label={t('双向链接')}>
+              <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>[[</span>
+            </button>
+          )}
           <button type="button" className="tool-btn" onClick={() => fileRef.current?.click()} title={t('上传图片或附件')} aria-label={t('上传图片或附件')}>
             <ImagePlus size={15} />
           </button>
-          <button type="button" className="tool-btn" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title={t('插入表格')} aria-label={t('插入表格')}>
-            <Table2 size={15} />
-          </button>
-          <button type="button" className="tool-btn" onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t('分割线')} aria-label={t('分割线')}>
-            <Minus size={15} />
-          </button>
+          {!isMobile && (
+            <>
+              <button type="button" className="tool-btn" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title={t('插入表格')} aria-label={t('插入表格')}>
+                <Table2 size={15} />
+              </button>
+              <button type="button" className="tool-btn" onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t('分割线')} aria-label={t('分割线')}>
+                <Minus size={15} />
+              </button>
+            </>
+          )}
         </div>
-        <div className="toolbar-spacer" />
-        <button type="button" className="tool-btn tool-btn-text" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title={t('清除格式')}>
-          {t('清除格式')}
-        </button>
+        {isMobile && (
+          <Dropdown
+            trigger={
+              <button type="button" className="tool-btn" title={t('更多格式')} aria-label={t('更多格式')}>
+                <MoreHorizontal size={16} />
+              </button>
+            }
+          >
+            {(close) => (
+              <>
+                <MenuItem icon={<UnderlineIcon size={14} />} onClick={() => { close(); editor.chain().focus().toggleUnderline().run(); }}>{t('下划线')}</MenuItem>
+                <MenuItem icon={<Strikethrough size={14} />} onClick={() => { close(); editor.chain().focus().toggleStrike().run(); }}>{t('删除线')}</MenuItem>
+                <MenuItem icon={<Code size={14} />} onClick={() => { close(); editor.chain().focus().toggleCode().run(); }}>{t('行内代码')}</MenuItem>
+                <MenuItem icon={<ListOrdered size={14} />} onClick={() => { close(); editor.chain().focus().toggleOrderedList().run(); }}>{t('有序列表')}</MenuItem>
+                <MenuItem icon={<Quote size={14} />} onClick={() => { close(); editor.chain().focus().toggleBlockquote().run(); }}>{t('引用')}</MenuItem>
+                <MenuItem icon={<Code2 size={14} />} onClick={() => { close(); editor.chain().focus().toggleCodeBlock().run(); }}>{t('代码块')}</MenuItem>
+                <MenuItem icon={<span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>[[</span>} onClick={() => { close(); onWiki(); }}>{t('双向链接')}</MenuItem>
+                <MenuItem icon={<Table2 size={14} />} onClick={() => { close(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}>{t('插入表格')}</MenuItem>
+                <MenuItem icon={<Minus size={14} />} onClick={() => { close(); editor.chain().focus().setHorizontalRule().run(); }}>{t('分割线')}</MenuItem>
+                <div className="menu-separator" />
+                <MenuItem icon={<Minus size={14} />} onClick={() => { close(); editor.chain().focus().unsetAllMarks().clearNodes().run(); }}>{t('清除格式')}</MenuItem>
+              </>
+            )}
+          </Dropdown>
+        )}
+        {!isMobile && (
+          <>
+            <div className="toolbar-spacer" />
+            <button type="button" className="tool-btn tool-btn-text" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title={t('清除格式')}>
+              {t('清除格式')}
+            </button>
+          </>
+        )}
         <input
           ref={fileRef}
           type="file"

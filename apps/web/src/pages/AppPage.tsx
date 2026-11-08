@@ -46,6 +46,13 @@ export default function AppPage() {
   const settingsMode = location.pathname.startsWith('/app/settings');
   const settingsSection = location.pathname.match(/^\/app\/settings\/([^/]+)/)?.[1] ?? 'account';
   const noteId = location.pathname.match(/^\/app\/note\/([^/]+)/)?.[1] ?? null;
+  useEffect(() => {
+    if (location.pathname.startsWith('/app/settings')) return;
+    if (location.pathname.includes('/app/note/')) return;
+    const brand = getLocale() === 'zh-CN' ? '360笔记' : '360note';
+    document.title = `${t('全部笔记')} — ${brand}`;
+  }, [location.pathname, t]);
+
   const isNewRoute = location.pathname === '/app/new';
   const requestedPanel = new URLSearchParams(location.search).get('panel');
 

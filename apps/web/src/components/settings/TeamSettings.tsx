@@ -18,6 +18,7 @@ import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useAppStore } from '../../stores/app';
 import { getLocale, useT } from '../../lib/i18n';
+import { auditActionLabel } from '../../lib/audit';
 import { copyText, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { Avatar } from '../Avatar';
 import { Modal } from '../Modal';
@@ -279,7 +280,7 @@ export default function TeamSettings() {
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{entry.name}</span>
+                  <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{entry.name}</span>
                   <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : t('个人空间')}>
                     {entry.kind === 'team' ? <Users size={12} /> : <UserRound size={12} />}
                   </span>
@@ -453,7 +454,7 @@ export default function TeamSettings() {
                     <div key={entry.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--line-soft)', fontSize: 13 }}>
                       <span style={{ width: 110, flex: 'none', color: 'var(--text-tertiary)' }}>{formatFullDate(entry.createdAt)}</span>
                       <span style={{ width: 90, flex: 'none', color: 'var(--text-secondary)' }}>{entry.actorName ?? t('系统')}</span>
-                      <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{actionLabel(t, entry.action)}</span>
+                      <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{auditActionLabel(t, entry.action)}</span>
                       <span style={{ color: 'var(--text-tertiary)' }}>{entry.ip}</span>
                     </div>
                   ))
@@ -676,40 +677,4 @@ function roleLabel(t: ReturnType<typeof useT>, role: string): string {
   return role;
 }
 
-function actionLabel(t: ReturnType<typeof useT>, action: string): string {
-  const labels: Record<string, string> = {
-    'workspace.create': '创建工作区',
-    'workspace.rename': '重命名工作区',
-    'workspace.delete': '删除工作区',
-    'workspace.export': '导出工作区',
-    'member.invite': '邀请成员',
-    'member.role': '修改成员角色',
-    'member.remove': '移除成员',
-    'invitation.accept': '接受邀请',
-    'note.create': '创建笔记',
-    'note.empty_trash': '清空回收站',
-    'note.version.restore': '恢复历史版本',
-    'share.create': '创建分享链接',
-    'share.update': '更新分享链接',
-    'share.revoke': '撤销分享链接',
-    'backup.create': '创建备份',
-    'backup.restore': '恢复备份',
-    'backup.download': '下载备份',
-    'backup.delete': '删除备份',
-    'api_token.create': '创建 API 令牌',
-    'api_token.revoke': '撤销 API 令牌',
-    'admin.settings.update': '更新实例设置',
-    'auth.login': '登录',
-    'auth.login.2fa': '两步验证登录',
-    'auth.logout': '退出登录',
-    'auth.session.revoke': '撤销会话',
-    'auth.password.change': '修改密码',
-    'auth.2fa.enable': '开启两步验证',
-    'auth.2fa.disable': '关闭两步验证',
-    'auth.recovery_key.rotate': '更新恢复密钥',
-    'account.delete': '注销账户',
-    'account.profile.update': '更新个人资料',
-    'comment.delete': '删除评论',
-  };
-  return labels[action] ? t(labels[action]) : action;
-}
+

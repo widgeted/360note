@@ -3,10 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { AuthLayout } from './AuthLayout';
 
 export default function LoginPage() {
   const t = useT();
+  useDocumentTitle(t('登录'));
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const login = useAuthStore((state) => state.login);
@@ -153,7 +155,7 @@ export default function LoginPage() {
             />
             <button
               type="button"
-              className="icon-btn icon-btn-sm"
+              className="icon-btn"
               onClick={() => setShowPassword((value) => !value)}
               style={{ position: 'absolute', right: 7, top: 7 }}
               aria-label={showPassword ? t('隐藏密码') : t('显示密码')}

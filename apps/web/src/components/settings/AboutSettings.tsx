@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, Focus, Github, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
-import { useT } from '../../lib/i18n';
+import { getLocale, useT } from '../../lib/i18n';
 
 export default function AboutSettings() {
   const t = useT();
   const instance = useAuthStore((state) => state.instance);
   const user = useAuthStore((state) => state.user);
+  const brand = getLocale() === 'zh-CN' ? '360笔记' : '360note';
 
   return (
     <>
@@ -17,11 +18,11 @@ export default function AboutSettings() {
         <div className="settings-section-head"><span className="settings-section-title">{t('构建版本')}</span></div>
         <div className="setting-card">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 30, letterSpacing: '-0.03em' }}>360note</span>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 30, letterSpacing: '-0.03em' }}>{brand}</span>
             <span className="badge">v{instance?.version ?? '—'}</span>
           </div>
           <div className="setting-note" style={{ marginTop: 6 }}>
-            {instance?.publicOrigin} · {t('账户')}: {user?.email}
+            {window.location.origin} · {t('账户')}: {user?.email}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
             <a className="btn btn-secondary btn-sm" href="https://github.com/widgeted/360note" target="_blank" rel="noreferrer">
