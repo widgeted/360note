@@ -75,6 +75,15 @@ try {
             const rect = element.getBoundingClientRect();
             if (rect.width < 1 || rect.height < 1) continue;
             if (element.closest('.sidebar, .toast-viewport, .cmdk-overlay, .slash-menu, [aria-hidden="true"], .modal-overlay')) continue;
+            let scrollable = false;
+            for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+              const style = getComputedStyle(parent);
+              if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth + 1) {
+                scrollable = true;
+                break;
+              }
+            }
+            if (scrollable) continue;
             if (rect.right > viewport + 1 || rect.left < -1) {
               offenders.push({
                 tag: element.tagName,

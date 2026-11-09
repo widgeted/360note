@@ -3,6 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.20] — 2026-11-09
+
+移动端工具栏完整横向滚动。
+
+### Changed
+
+- 移动端格式工具栏不再把下划线、删除线、行内代码、有序列表、引用、代码块、双向链接、表格、分割线折叠到“…”菜单；全部控件直接放入单行横向滚动。
+- 工具栏按钮从 30px 提升到 34px 触控目标。
+- “清除格式”移到工具栏最后，改为红色 `RemoveFormatting` 图标；桌面端保留图标 + 文本。
+- 删除移动端“更多格式”菜单。
+
 ## [0.1.19] — 2026-11-09
 
 移动端设置导航单行横向滚动。

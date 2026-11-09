@@ -1107,6 +1107,15 @@ kbd {
   color: var(--blue);
 }
 
+.tool-btn-danger {
+  color: var(--red);
+}
+
+.tool-btn-danger:hover {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
 .tool-btn:disabled {
   opacity: 0.35;
   cursor: default;

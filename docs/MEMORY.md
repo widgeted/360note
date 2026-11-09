@@ -588,3 +588,9 @@ apps/web/src/styles/tokens.css        设计 token
 ## 2026-11-09 · v0.1.19 移动端设置导航单行
 
 - max760 `.settings-nav` 从 3 列 grid 改为 flex nowrap + overflow-x auto；`settings-nav-group` 不再 display:contents；隐藏滚动条；删除 max360 两列覆盖。
+
+## 2026-11-09 · v0.1.20 移动端工具栏完整滚动
+
+- EditorToolbar 移除 isMobile 折叠分支：所有格式按钮进入同一行；删除移动端“更多格式”Dropdown。
+- 移动端 `.tool-btn` 30→34px；`.editor-toolbar` nowrap + overflow-x auto。
+- 清除格式固定在末尾，`RemoveFormatting` 图标，`.tool-btn-danger` 使用 `--red`/`--red-soft`。
