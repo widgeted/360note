@@ -3,6 +3,20 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.17] — 2026-11-09
+
+右侧信息抽屉与冲突提示。
+
+### Changed
+
+- 移动端右侧信息面板不再铺满全屏：宽度为 `min(350px, 86vw)`，左侧保留带模糊遮罩的笔记内容，明确告知“笔记仍在，关闭抽屉即可继续”。
+- 信息抽屉左侧圆角、右侧贴边，和左侧导航抽屉的操作模型一致；遮罩改为轻量模糊。
+- 冲突发生时不再自动展开“历史”抽屉，只在冲突提示条中保留“查看历史版本”按钮，由用户主动打开。
+
+### Added
+
+- `tests/manual/context-drawer-regression.mjs`：移动端抽屉宽度、左侧模糊可见区域、默认“信息”标签和圆角检查。
+
 ## [0.1.16] — 2026-11-09
 
 图片缩略图与原图按需加载。

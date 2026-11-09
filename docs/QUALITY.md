@@ -371,6 +371,7 @@
 - `tests/manual/site-pages-regression.mjs`：主按钮 hover 文字可读；`/about`、`/privacy`、`/terms` 共用主站 header/footer；旧 `/about.html` 跳转到 `/about`；公开联系邮箱为 contact@360note.com。
 - `tests/manual/note-refresh-regression.mjs`：从列表重新打开同一篇笔记时，编辑器必须显示服务端最新版本。
 - `tests/manual/image-thumbnail-regression.mjs`：编辑器/分享页默认加载 WebP 缩略图，Markdown 保留原图 URL，点击缩略图才加载原图预览，缩略图体积小于原图。
+- `tests/manual/context-drawer-regression.mjs`：移动端右侧信息抽屉只占内容宽度，左侧保留模糊的笔记可见区域，默认打开“信息”而不是自动展开版本历史。
 - `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式“退出并清除本机数据”清空 IndexedDB 与 auth/workspace 键。
 - `updateNote` 使用行锁 + `WHERE version = locked.version` 条件更新，事务内校验 `baseVersion`。
 - 首次注册使用 `pg_advisory_xact_lock` 串行化“用户数 + 插入”事务。

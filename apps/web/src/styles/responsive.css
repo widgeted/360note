@@ -10,9 +10,11 @@
     right: 0;
     bottom: 0;
     z-index: 45;
-    width: min(360px, 88vw);
+    width: min(350px, 86vw);
+    border-radius: 12px 0 0 12px;
     box-shadow: var(--shadow-lg);
     border-left: 1px solid var(--line);
+    overflow: hidden;
   }
 
   .context-scrim {
@@ -20,7 +22,9 @@
     position: fixed;
     inset: 0;
     z-index: 44;
-    background: rgba(7, 10, 21, 0.06);
+    background: rgba(7, 10, 21, 0.1);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     animation: fade-in var(--dur) ease both;
   }
 }
@@ -144,7 +148,7 @@
 @media (max-width: 760px) {
   .context-scrim {
     display: block;
-    background: rgba(7, 10, 21, 0.24);
+    background: rgba(7, 10, 21, 0.12);
   }
   :root {
     --header-height: 50px;
@@ -263,11 +267,6 @@
 
   .breadcrumb-item {
     max-width: 120px;
-  }
-
-  .context-panel {
-    width: 100%;
-    top: 0;
   }
 
   .list-top {
@@ -477,7 +476,7 @@
 @media (max-width: 760px) {
   .context-scrim {
     display: block;
-    background: rgba(7, 10, 21, 0.24);
+    background: rgba(7, 10, 21, 0.12);
   }
   .search-trigger kbd {
     display: none;
@@ -554,7 +553,7 @@
 @media (max-width: 760px) {
   .context-scrim {
     display: block;
-    background: rgba(7, 10, 21, 0.24);
+    background: rgba(7, 10, 21, 0.12);
   }
   .security-grid {
     gap: 20px !important;

@@ -1059,7 +1059,6 @@ async function resolveConflict(
       notes: upsertSummary(get().notes, remote),
       conflictNoteId: noteId,
       contextTab: 'history',
-      contextOpen: true,
       syncState: 'saved',
       reloadTick: get().reloadTick + 1,
     });

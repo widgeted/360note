@@ -573,3 +573,8 @@ apps/web/src/styles/tokens.css        设计 token
 - 原图仍存原路径，缩略图存 `<key>.thumb.nh`；`deleteAttachment` 同步删缩略图。
 - 编辑器 `OptimizedImage` 渲染 `src=...?thumb=1` + `data-original-src` + lazy/async；`htmlToMarkdown` 恢复原图 URL，Markdown 不写入缩略图。
 - 公开分享 `renderMarkdown` 同样改写 img；点击缩略图通过 `nh:open-image` 打开全局 `ImageLightbox`，仅此时加载原图。
+
+## 2026-11-09 · v0.1.17 移动端信息抽屉
+
+- context panel max1240: `width:min(350px,86vw)`, left radius 12px, scrim `rgba(7,10,21,.12)` + blur(3px)；删除 max760 `width:100%` 覆盖，左侧留约 55px 模糊笔记。
+- `resolveConflict` 不再 `contextOpen:true`；冲突只显示提示条，用户点“查看历史版本”才打开。
