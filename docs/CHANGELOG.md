@@ -3,6 +3,16 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.8] — 2026-11-09
+
+空状态操作居中与全站对齐检查。
+
+### Fixed
+
+- 笔记列表空状态的“新建笔记”“清除搜索”操作组改为居中，桌面和移动端一致。
+- 空列表、空编辑器、设置区空状态的通用操作组统一 `justify-content: center` 和 `flex-wrap`，按钮较多或窄屏时仍居中换行。
+- 新增 `tests/manual/centering-regression.mjs`：覆盖搜索空状态、空文件夹、移动端空文件夹、空编辑器和公开分享失效页 CTA 的居中对齐。
+
 ## [0.1.7] — 2026-11-09
 
 门面与细节一致性：首页演示、侧栏高度、主题预览、新用户引导与邮件。

@@ -872,6 +872,14 @@ kbd {
   color: var(--text-tertiary);
 }
 
+.list-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 /* ---------- Main editor area ---------- */
 .main-pane {
   flex: 1;
@@ -1238,6 +1246,8 @@ kbd {
 
 .editor-empty-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin-top: 20px;
 }

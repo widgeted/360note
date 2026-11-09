@@ -316,7 +316,7 @@ export function NoteListPane() {
                     : t('从这里开始记录第一个想法')}
             </div>
             {filter !== 'trash' && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <div className="list-empty-actions">
                 {query && (
                   <button
                     type="button"

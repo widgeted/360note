@@ -518,3 +518,9 @@ apps/web/src/styles/tokens.css        设计 token
 - 外观主题预览改为三栏缩略图，用 `--pv-*` 变量声明 light/dark/system 三套颜色；system 用 50% 分割；宽栏预览 100%、窄栏 72%。
 - `seed.ts` 只返回 1 篇欢迎笔记，Markdown 表格与快捷键并入；删除设计说明笔记。集成测试断言新账号只有 1 篇且无设计内容。
 - 邮件模板：`renderMailLayout` 导出供预览；r=10/8/6；暖纸 #f8f6f1、surface #fffefa、绿 #157a52、文字 #181a1f/#44443f；logo 使用 `/img/360note-wordmark.png` / `/img/360biji-wordmark.png`（rsvg-convert 生成）。
+
+## 2026-11-09 · v0.1.8 空状态居中
+
+- 笔记列表空状态操作组此前是 `display:flex` 但未设置 `justify-content`，按钮靠左；改为 `.list-empty-actions` 居中并允许换行。
+- `.editor-empty-actions`、`.empty-actions` 同样补 `justify-content:center; flex-wrap:wrap`。
+- 新增 `tests/manual/centering-regression.mjs`，测量容器中心与操作组/按钮中心，覆盖桌面/移动端空文件夹、搜索空状态、空编辑器和公开分享失效页。
