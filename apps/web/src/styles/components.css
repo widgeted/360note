@@ -2467,7 +2467,7 @@ a.btn {
   border-bottom: 0;
 }
 
-.admin-share-note,
+.admin-share-link,
 .admin-share-owner {
   min-width: 0;
   overflow: hidden;
@@ -2475,9 +2475,11 @@ a.btn {
   white-space: nowrap;
 }
 
-.admin-share-note {
-  color: var(--text);
-  font-weight: 560;
+.admin-share-link {
+  color: var(--blue);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 .admin-share-row a {

@@ -319,12 +319,11 @@ export default async function adminRoutes(app: FastifyInstance) {
       expires_at: Date | null;
       created_at: Date;
       view_count: number;
-      note_title: string;
       workspace_name: string;
       owner_email: string;
     }>(
       `SELECT s.id, s.token_cipher, s.permission, s.password_hash, s.expires_at, s.created_at, s.view_count,
-        n.title AS note_title, w.name AS workspace_name, u.email AS owner_email
+        w.name AS workspace_name, u.email AS owner_email
        FROM share_links s
        JOIN notes n ON n.id = s.note_id
        JOIN workspaces w ON w.id = n.workspace_id
@@ -336,7 +335,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     return {
       shares: rows.map((row) => ({
         id: row.id,
-        noteTitle: row.note_title,
         workspaceName: row.workspace_name,
         ownerEmail: row.owner_email,
         permission: row.permission,

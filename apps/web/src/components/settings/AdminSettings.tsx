@@ -49,7 +49,7 @@ export default function AdminSettings() {
   const [auditOffset, setAuditOffset] = useState(0);
   const [auditLoading, setAuditLoading] = useState(false);
   const [ipBlocks, setIpBlocks] = useState<Array<{ id: string; ip: string; reason: string | null; createdAt: string }>>([]);
-  const [shares, setShares] = useState<Array<{ id: string; noteTitle: string; workspaceName: string; ownerEmail: string | null; permission: string; hasPassword: boolean; expiresAt: string | null; viewCount: number; url: string }>>([]);
+  const [shares, setShares] = useState<Array<{ id: string; workspaceName: string; ownerEmail: string | null; permission: string; hasPassword: boolean; expiresAt: string | null; viewCount: number; url: string }>>([]);
   const [blockIp, setBlockIp] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
@@ -309,7 +309,11 @@ export default function AdminSettings() {
         <div className="admin-share-list">
           {shares.length === 0 ? <div className="context-empty">{t('暂无有效分享')}</div> : shares.map((share) => (
             <div className="admin-share-row" key={share.id}>
-              <span className="admin-share-note" title={share.noteTitle}>{share.noteTitle}</span>
+              {share.hasPassword ? (
+                <span className="admin-share-link" title={share.url}>{share.url}</span>
+              ) : (
+                <a className="admin-share-link" href={share.url} target="_blank" rel="noopener noreferrer" title={share.url}>{share.url}</a>
+              )}
               <span className="admin-share-owner" title={share.ownerEmail ?? ''}>{share.ownerEmail ?? '—'}</span>
               <span>{share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}</span>
               <span>{share.hasPassword ? t('需要密码') : t('公开')}</span>
