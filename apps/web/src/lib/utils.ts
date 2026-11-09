@@ -14,6 +14,15 @@ export function initials(name: string): string {
   return trimmed.slice(0, 1).toUpperCase();
 }
 
+export function attachmentThumbnailUrl(src: string): string {
+  if (!src) return src;
+  const isPrivate = /\/api\/attachments\/[0-9a-f-]+\/content/i.test(src);
+  const isPublic = /\/api\/public\/shares\/[^/]+\/attachments\/[0-9a-f-]+/i.test(src);
+  if (!isPrivate && !isPublic) return src;
+  if (/[?&]thumb=1(?:&|$)/i.test(src)) return src;
+  return `${src}${src.includes('?') ? '&' : '?'}thumb=1`;
+}
+
 export function untitledNoteTitle(createdAt: string | Date = new Date()): string {
   const date = new Date(createdAt);
   const pad = (value: number) => String(value).padStart(2, '0');

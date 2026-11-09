@@ -3,6 +3,21 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.16] — 2026-11-09
+
+图片缩略图与原图按需加载。
+
+### Added
+
+- 图片上传时生成最长边 960px 的 WebP 缩略图（质量 72）；旧图片在首次请求缩略图时自动补生成。
+- 编辑器与公开分享页默认加载缩略图（`loading="lazy"`、`decoding="async"`），点击图片才打开原图预览。
+- 新增全屏图片预览：显示原图、提供“查看原图”新标签打开和关闭按钮；编辑器与分享页共用。
+- 缩略图沿用原附件权限、ETag 和 24 小时私有缓存；删除附件时同时删除缩略图。
+
+### Changed
+
+- Markdown 正文仍保存原图 URL，缩略图只用于显示，导出/迁移不受影响。
+
 ## [0.1.15] — 2026-11-09
 
 移动端工具栏、提示条与笔记内容刷新。

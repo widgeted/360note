@@ -26,6 +26,10 @@ export function attachmentStorageKey(workspaceId: string, attachmentId: string):
   return path.posix.join(workspaceId, `${attachmentId}.nh`);
 }
 
+export function attachmentThumbnailStorageKey(storageKey: string): string {
+  return storageKey.endsWith('.nh') ? `${storageKey.slice(0, -3)}.thumb.nh` : `${storageKey}.thumb`;
+}
+
 export async function saveAttachment(storageKey: string, data: Buffer): Promise<void> {
   const target = path.join(paths.attachments, storageKey);
   assertInside(paths.attachments, target);
@@ -42,8 +46,13 @@ export async function readAttachment(storageKey: string): Promise<Buffer> {
 
 export async function deleteAttachment(storageKey: string): Promise<void> {
   const target = path.join(paths.attachments, storageKey);
+  const thumb = path.join(paths.attachments, attachmentThumbnailStorageKey(storageKey));
   assertInside(paths.attachments, target);
-  await fsp.rm(target, { force: true });
+  assertInside(paths.attachments, thumb);
+  await Promise.all([
+    fsp.rm(target, { force: true }),
+    fsp.rm(thumb, { force: true }),
+  ]);
 }
 
 export async function attachmentExists(storageKey: string): Promise<boolean> {

@@ -566,3 +566,10 @@ apps/web/src/styles/tokens.css        设计 token
 - 移动端 `.editor-toolbar` 改回单行 `flex-wrap:nowrap; overflow-x:auto`；正文类型按钮显示 `¶`，避免 “Paragraph” 挤走更多格式 “…” 。
 - 删除 mobile banner 的 `actions width:100%` 规则；`.banner-actions` 保持在右侧，关闭按钮不再掉到下一行。
 - `openNote` 不再只是按 id 早退：比较最新服务端 note 的 version/title/contentMd，有变化则写回并 bump `reloadTick`；EditorPane 的 reload effect 更新编辑器正文。解决列表更新但内容页旧的问题。
+
+## 2026-11-09 · v0.1.16 图片缩略图
+
+- 服务端引入 `sharp`，`lib/thumbnails.ts` 生成最长边 960px、quality 72 的 WebP；上传后台生成，`?thumb=1` 请求缺图时懒生成。
+- 原图仍存原路径，缩略图存 `<key>.thumb.nh`；`deleteAttachment` 同步删缩略图。
+- 编辑器 `OptimizedImage` 渲染 `src=...?thumb=1` + `data-original-src` + lazy/async；`htmlToMarkdown` 恢复原图 URL，Markdown 不写入缩略图。
+- 公开分享 `renderMarkdown` 同样改写 img；点击缩略图通过 `nh:open-image` 打开全局 `ImageLightbox`，仅此时加载原图。

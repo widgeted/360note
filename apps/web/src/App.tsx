@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuthStore } from './stores/auth';
 import { useAppStore } from './stores/app';
 import { ToastViewport } from './components/Toasts';
+import { ImageLightbox } from './components/ImageLightbox';
 import { LogoLockup } from './components/Logo';
 import { getLocale } from './lib/i18n';
 import { requestPersistentStorage } from './lib/offline';
@@ -122,6 +123,7 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <ToastViewport />
+      <ImageLightbox />
     </>
   );
 }

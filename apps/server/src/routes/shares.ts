@@ -13,6 +13,7 @@ import { updateNote } from '../services/notes.js';
 import { notify } from '../services/sessions.js';
 import { audit } from '../lib/audit.js';
 import { readAttachment, sendFileHeaders } from '../lib/storage.js';
+import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
 import { originFromRequest } from '../lib/origin.js';
 
 interface ShareRow {
@@ -472,6 +473,7 @@ export default async function shareRoutes(app: FastifyInstance) {
       z.object({ token: z.string().min(8), attachmentId: z.string().uuid() }),
       request.params,
     );
+    const { thumb } = parse(z.object({ thumb: z.enum(['0', '1']).optional() }), request.query);
     const share = await shareByToken(token);
     if (!share) throw errors.notFound();
     ensureAccess(request, share);
@@ -488,13 +490,24 @@ export default async function shareRoutes(app: FastifyInstance) {
       [attachmentId, share.note_id],
     );
     if (!row) throw errors.notFound();
+    let data: Buffer | null = null;
+    let responseMime = row.mime;
+    let etag = row.sha256;
+    if (thumb === '1') {
+      const thumbnail = await ensureAttachmentThumbnail(row.storage_key, row.mime);
+      if (thumbnail) {
+        data = thumbnail;
+        responseMime = 'image/webp';
+        etag = `${row.sha256}-thumb`;
+      }
+    }
+    if (!data) data = await readAttachment(row.storage_key);
     const ifNone = request.headers['if-none-match'];
-    if (ifNone && ifNone.includes(row.sha256)) return reply.status(304).send();
-    const data = await readAttachment(row.storage_key);
+    if (ifNone && ifNone.includes(etag)) return reply.status(304).send();
     return reply
-      .headers(sendFileHeaders(row.filename, row.mime, row.sha256))
+      .headers(sendFileHeaders(row.filename, responseMime, etag))
       .header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'")
-      .header('Cache-Control', 'private, max-age=300')
+      .header('Cache-Control', 'private, max-age=86400')
       .send(data);
   });
 }

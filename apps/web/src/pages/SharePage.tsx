@@ -292,7 +292,18 @@ export default function SharePage() {
                 <span className="dot" />
                 <span>{t('打印于')} {formatPrintDate(new Date().toISOString())}</span>
               </div>
-              <div className="public-body prose" dangerouslySetInnerHTML={{ __html: rendered.html }} />
+              <div
+                className="public-body prose"
+                onClick={(event) => {
+                  const image = (event.target as HTMLElement | null)?.closest('img[data-original-src]');
+                  if (!image) return;
+                  event.preventDefault();
+                  window.dispatchEvent(new CustomEvent('nh:open-image', {
+                    detail: { src: image.getAttribute('data-original-src'), alt: image.getAttribute('alt') ?? '' },
+                  }));
+                }}
+                dangerouslySetInnerHTML={{ __html: rendered.html }}
+              />
               {share.note.attachments.length > 0 && (
                 <section className="public-attachments">
                   <div className="public-toc-title">{t('附件')}</div>

@@ -11,6 +11,7 @@ import { attachmentStorageKey, checksum, deleteAttachment, isDisplayableImage, r
 import { getNoteForUser } from '../services/notes.js';
 import { requireWorkspace } from '../services/workspaces.js';
 import { queueOcr } from '../lib/ocr.js';
+import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
 
 export default async function attachmentRoutes(app: FastifyInstance) {
   app.post('/api/notes/:id/attachments', async (request, reply) => {
@@ -47,6 +48,11 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     const storageKey = attachmentStorageKey(note.workspaceId, attachmentId);
     const digest = checksum(buffer);
     await saveAttachment(storageKey, buffer);
+    if (isDisplayableImage(mime)) {
+      void ensureAttachmentThumbnail(storageKey, mime, buffer).then((thumbnail) => {
+        if (!thumbnail) app.log.warn({ attachmentId }, 'failed to generate attachment thumbnail');
+      });
+    }
     const row = await one<{
       id: string;
       note_id: string;
@@ -88,6 +94,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         ocrStatus: config.ocrEnabled ? 'pending' : 'none',
         createdAt: row!.created_at.toISOString(),
         url: `/api/attachments/${row!.id}/content`,
+        thumbnailUrl: isDisplayableImage(row!.mime) ? `/api/attachments/${row!.id}/content?thumb=1` : null,
       },
     });
   });
@@ -95,6 +102,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
   app.get('/api/attachments/:id/content', async (request, reply) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const { thumb } = parse(z.object({ thumb: z.enum(['0', '1']).optional() }), request.query);
     const row = await one<{
       id: string;
       workspace_id: string;
@@ -114,13 +122,25 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     );
     if (!row || row.note_deleted) throw errors.notFound('附件不存在');
     await requireWorkspace(auth.user.id, row.workspace_id, 'read');
+    let data: Buffer | null = null;
+    let responseMime = row.mime;
+    let etag = row.sha256;
+    if (thumb === '1') {
+      const thumbnail = await ensureAttachmentThumbnail(row.storage_key, row.mime);
+      if (thumbnail) {
+        data = thumbnail;
+        responseMime = 'image/webp';
+        etag = `${row.sha256}-thumb`;
+      }
+    }
+    if (!data) data = await readAttachment(row.storage_key);
     const ifNone = request.headers['if-none-match'];
-    if (ifNone && ifNone.includes(row.sha256)) return reply.status(304).send();
-    const data = await readAttachment(row.storage_key);
+    if (ifNone && ifNone.includes(etag)) return reply.status(304).send();
     return reply
-      .headers(sendFileHeaders(row.filename, row.mime, row.sha256))
+      .headers(sendFileHeaders(row.filename, responseMime, etag))
       .header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'")
       .header('Cross-Origin-Resource-Policy', 'same-origin')
+      .header('Cache-Control', 'private, max-age=86400')
       .send(data);
   });
 

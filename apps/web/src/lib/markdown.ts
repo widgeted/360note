@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { attachmentThumbnailUrl } from './utils';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 import { escapeHtml } from './utils';
@@ -73,6 +74,11 @@ export function htmlToMarkdown(html: string): string {
   if (!html || html === '<p></p>') return '';
   const withoutPlaceholders = new DOMParser().parseFromString(html, 'text/html');
   withoutPlaceholders.querySelectorAll('[data-upload-placeholder]').forEach((element) => element.remove());
+  withoutPlaceholders.querySelectorAll('img[data-original-src]').forEach((image) => {
+    const original = image.getAttribute('data-original-src');
+    if (original) image.setAttribute('src', original);
+    image.removeAttribute('data-original-src');
+  });
   return turndown
     .turndown(withoutPlaceholders.body.innerHTML)
     // Turndown escapes brackets in inline text. Wiki links are deliberate
@@ -175,6 +181,16 @@ export function renderMarkdown(markdown: string, options: { toc?: boolean; wikiL
   const clean = enhanceTaskLists(sanitize(raw), true);
   const doc = new DOMParser().parseFromString(`<div id="__root">${clean}</div>`, 'text/html');
   const root = doc.getElementById('__root')!;
+  root.querySelectorAll('img[src]').forEach((image) => {
+    const original = image.getAttribute('src') ?? '';
+    const thumb = attachmentThumbnailUrl(original);
+    if (thumb !== original) {
+      image.setAttribute('data-original-src', original);
+      image.setAttribute('src', thumb);
+      image.setAttribute('loading', 'lazy');
+      image.setAttribute('decoding', 'async');
+    }
+  });
   if (options.wikiLinks !== false) wikiLinkify(root);
   root.querySelectorAll('a[href]').forEach((anchor) => {
     const href = anchor.getAttribute('href') ?? '';

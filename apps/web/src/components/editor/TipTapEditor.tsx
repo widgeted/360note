@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { htmlToMarkdown, markdownToEditorHtml } from '../../lib/markdown';
 import { translate, useT } from '../../lib/i18n';
-import { cn } from '../../lib/utils';
+import { attachmentThumbnailUrl, cn } from '../../lib/utils';
 
 const lowlight = createLowlight(common);
 
@@ -124,6 +124,32 @@ export interface SlashItem {
   icon: React.ReactNode;
   run: () => void;
 }
+
+const OptimizedImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      originalSrc: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-original-src') || element.getAttribute('src'),
+        renderHTML: (attributes) => (attributes.originalSrc ? { 'data-original-src': attributes.originalSrc } : {}),
+      },
+    };
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const original = String(HTMLAttributes['data-original-src'] || HTMLAttributes.src || '');
+    return [
+      'img',
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+        src: attachmentThumbnailUrl(original),
+        'data-original-src': original,
+        loading: 'lazy',
+        decoding: 'async',
+      }),
+    ];
+  },
+});
 
 const UploadPlaceholder = Node.create<{
   retry: (id: string) => void;
@@ -249,7 +275,7 @@ export function TipTapEditor({
         placeholder: t('开始写…输入 / 插入内容，或从工具栏上传图片'),
         includeChildren: true,
       }),
-      Image.configure({ allowBase64: false, inline: false }),
+      OptimizedImage.configure({ allowBase64: false, inline: false }),
       UploadPlaceholder.configure({
         retry: (id) => retryUploadRef.current(id),
         remove: (id) => removeUploadRef.current(id),
@@ -294,6 +320,14 @@ export function TipTapEditor({
         const position = current?.view.posAtCoords({ left: (event as DragEvent).clientX, top: (event as DragEvent).clientY });
         if (position && current) current.commands.setTextSelection(position.pos);
         insertFilesRef.current(files);
+        return true;
+      },
+      handleClick(_view, _pos, event) {
+        const image = (event.target as HTMLElement | null)?.closest('img');
+        const src = image?.getAttribute('data-original-src') || image?.getAttribute('src');
+        if (!src) return false;
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('nh:open-image', { detail: { src, alt: image?.getAttribute('alt') || '' } }));
         return true;
       },
       handleDOMEvents: {

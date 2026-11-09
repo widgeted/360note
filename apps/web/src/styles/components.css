@@ -2042,3 +2042,84 @@ a.btn {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
 }
+
+/* Full-size image preview: thumbnails load first, originals only on demand. */
+.ProseMirror img[data-original-src],
+.public-body img[data-original-src] {
+  cursor: zoom-in;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 10);
+  display: grid;
+  place-items: center;
+  padding: 56px 24px 24px;
+  background: rgba(7, 10, 12, 0.82);
+  backdrop-filter: blur(10px);
+  animation: fade-in 140ms ease both;
+}
+
+.image-lightbox img {
+  max-width: min(96vw, 1400px);
+  max-height: calc(100dvh - 96px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.image-lightbox-bar {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-lightbox-bar a,
+.image-lightbox-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 22, 20, 0.72);
+  color: #f5f3ec;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.image-lightbox-bar button {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
+
+.image-lightbox-bar a:hover,
+.image-lightbox-bar button:hover {
+  background: rgba(40, 44, 40, 0.9);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .image-lightbox {
+    padding: 52px 12px 16px;
+  }
+
+  .image-lightbox img {
+    max-width: 100%;
+    max-height: calc(100dvh - 84px);
+  }
+
+  .image-lightbox-bar {
+    top: 10px;
+    right: 10px;
+  }
+}
