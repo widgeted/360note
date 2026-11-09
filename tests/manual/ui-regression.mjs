@@ -17,6 +17,12 @@ const errors = [];
 page.on('pageerror', (e) => errors.push('PAGE:' + e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('401')) errors.push('CONSOLE:' + m.text()); });
 
+await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+assert.equal(await page.locator('.landing-float').count(), 0, 'floating hero chips must not be rendered');
+assert.equal(await page.locator('.landing-mock-note').count(), 3, 'hero demo must show a realistic note list');
+assert.ok(await page.locator('.landing-mock-list').isVisible());
+console.log('PASS  landing demo has a realistic list and no floating chips');
+
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
 await page.fill('#login-email', EMAIL);
 await page.fill('#login-password', PASSWORD);
@@ -37,6 +43,19 @@ const placeholderStyle = await page.evaluate(() => {
 });
 assert.equal(placeholderStyle, 'normal');
 console.log('PASS  title placeholder is not italic');
+
+const library = await page.evaluate(() => {
+  const lib = document.querySelector('.sidebar-library');
+  const tree = document.querySelector('.sidebar-tree');
+  const tags = document.querySelector('.tag-scroll');
+  return {
+    overflow: lib ? getComputedStyle(lib).overflowY : null,
+    shared: Boolean(lib && tree?.parentElement === lib && tags?.parentElement === lib),
+  };
+});
+assert.equal(library.overflow, 'auto');
+assert.equal(library.shared, true);
+console.log('PASS  folders and tags share one scrollable library area');
 
 const actionSize = await page.locator('.sidebar-section-action').first().evaluate((el) => {
   const r = el.getBoundingClientRect(); return { w: r.width, h: r.height };
@@ -76,6 +95,16 @@ const themeInfo = await page.evaluate(() => [...document.querySelectorAll('.them
 assert.equal(themeInfo.length, 3);
 assert.ok(themeInfo.every((entry) => entry.style === null && entry.preview && entry.label));
 console.log('PASS  theme preview cards use CSS variants without inline styles');
+
+await page.getByRole('button', { name: '宽', exact: true }).click();
+await page.waitForTimeout(350);
+const wideWidth = await page.locator('.width-preview').evaluate((el) => el.getBoundingClientRect().width);
+await page.getByRole('button', { name: '窄', exact: true }).click();
+await page.waitForTimeout(350);
+const narrowWidth = await page.locator('.width-preview').evaluate((el) => el.getBoundingClientRect().width);
+assert.ok(narrowWidth < wideWidth * 0.8, `narrow preview ${narrowWidth} should be clearly narrower than ${wideWidth}`);
+await page.getByRole('button', { name: '宽', exact: true }).click();
+console.log('PASS  editor width preview reflects narrow and full-width modes');
 
 // Mobile toast distance and horizontal fit.
 await page.setViewportSize({ width: 390, height: 844 });

@@ -58,11 +58,23 @@ export default function AppearanceSettings() {
                 className={`theme-option ${theme === option.id ? 'selected' : ''}`}
               >
                 <div className="theme-preview" data-preview={option.id}>
-                  <div className="theme-preview-sidebar" />
-                  <div className="theme-preview-body">
-                    <div className="theme-preview-line theme-preview-line-strong" />
-                    <div className="theme-preview-line theme-preview-line-soft" />
-                    <div className="theme-preview-line theme-preview-line-short" />
+                  <div className="theme-preview-sidebar">
+                    <span className="theme-preview-brand" />
+                    <span className="theme-preview-nav active" />
+                    <span className="theme-preview-nav" />
+                    <span className="theme-preview-nav short" />
+                  </div>
+                  <div className="theme-preview-list">
+                    <span className="theme-preview-search" />
+                    <span className="theme-preview-card active"><i /><i /></span>
+                    <span className="theme-preview-card"><i /><i /></span>
+                    <span className="theme-preview-card"><i /><i /></span>
+                  </div>
+                  <div className="theme-preview-editor">
+                    <span className="theme-preview-line theme-preview-line-strong" />
+                    <span className="theme-preview-line theme-preview-line-soft" />
+                    <span className="theme-preview-line theme-preview-line-short" />
+                    <span className="theme-preview-line theme-preview-line-soft" />
                   </div>
                 </div>
                 <div className="theme-option-label">
@@ -108,19 +120,8 @@ export default function AppearanceSettings() {
         </div>
         <div className="setting-note" style={{ marginTop: 8 }}>
           {t('预览：正文将以当前字体和宽度显示。')}
-          <div
-            className="prose"
-            style={{
-              marginTop: 10,
-              padding: '14px 16px',
-              border: '1px solid var(--line)',
-              borderRadius: 8,
-              background: 'var(--surface)',
-              fontSize: 14,
-              maxWidth: width === 'narrow' ? 430 : 560,
-            }}
-          >
-            <p style={{ margin: 0 }}>{t('好的编辑体验不打扰思路。文字应该像落在纸上，而不是落在一个表单里。')}</p>
+          <div className={`width-preview ${width}`}>
+            <p>{t('好的编辑体验不打扰思路。文字应该像落在纸上，而不是落在一个表单里。')}</p>
           </div>
         </div>
       </section>

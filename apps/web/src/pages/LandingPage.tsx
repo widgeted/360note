@@ -1,17 +1,21 @@
 import { Link } from 'react-router-dom';
 import {
+  Archive,
   ArrowRight,
-  BookOpen,
   Check,
+  ChevronDown,
+  ChevronRight,
+  Clock3,
   CloudOff,
   Download,
+  FilePlus2,
   FolderTree,
-  Link2,
   Lock,
   Search,
   ShieldCheck,
   Sparkles,
-  Tags,
+  Star,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { getLocale } from '../lib/i18n';
@@ -38,7 +42,11 @@ const copy = {
     ],
     mockTags: ['开始', '产品', '灵感'],
     mockFolder: '开始使用',
-    mockNotes: ['欢迎来到 360笔记', 'Markdown 与排版速查', '本周产品会议'],
+    mockNotes: [
+      { title: '欢迎来到 360笔记', excerpt: '把记录、整理、搜索和分享放在同一条路径上。', date: '今天', tag: '开始' },
+      { title: 'Markdown 与排版速查', excerpt: '标题、列表、表格、任务与链接，底层都是 Markdown。', date: '昨天', tag: '参考' },
+      { title: '本周产品会议', excerpt: '记录决策、负责人和下一步行动。', date: '周一', tag: '产品' },
+    ],
     featuresTitle: '把一条笔记，变成可靠的工作方式。',
     featuresLead: '高频功能留在主路径，低频功能收进设置与命令面板。界面安静，能力完整。',
     features: [
@@ -84,7 +92,7 @@ const copy = {
     lead: '360note puts capture, organization, search, sharing and backup on one path. Markdown underneath, a quiet interface on top, and your data always portable.',
     cta: 'Create a free account',
     ctaGhost: 'I already have an account',
-    trust: ['Email sign-up', 'Works offline', 'Export anytime'],
+    trust: ['Email sign-up', 'Works offline', 'Portable data'],
     mockTitle: 'Welcome to 360note',
     mockLines: [
       '360note is a calm, fast notebook that belongs to you.',
@@ -92,7 +100,11 @@ const copy = {
     ],
     mockTags: ['Getting started', 'Product', 'Ideas'],
     mockFolder: 'Getting started',
-    mockNotes: ['Welcome to 360note', 'Markdown cheat sheet', 'Weekly product meeting'],
+    mockNotes: [
+      { title: 'Welcome to 360note', excerpt: 'Capture, organize, search and share on one quiet path.', date: 'Today', tag: 'Start' },
+      { title: 'Markdown & formatting', excerpt: 'Headings, lists, tables, tasks and links — all Markdown.', date: 'Yesterday', tag: 'Reference' },
+      { title: 'Weekly product meeting', excerpt: 'Decisions, owners and the next steps from Tuesday.', date: 'Mon', tag: 'Product' },
+    ],
     featuresTitle: 'Turn one note into a reliable way of working.',
     featuresLead: 'High-frequency actions stay on the main path; low-frequency settings move into settings and the command palette.',
     features: [
@@ -130,8 +142,6 @@ const copy = {
 };
 
 const featureIcons = [Sparkles, Search, CloudOff, Users, Download, Lock];
-// Tags and folder icons are kept for the mock editor.
-const mockIcons = [FolderTree, Tags, BookOpen, Link2, ShieldCheck, Check];
 
 export default function LandingPage() {
   const zh = getLocale() === 'zh-CN';
@@ -187,42 +197,66 @@ export default function LandingPage() {
               </div>
               <div className="landing-window-body">
                 <aside className="landing-mock-sidebar">
-                  <div className="landing-mock-logo">{zh ? '360笔记' : '360note'}<span>.</span></div>
-                  <div className="landing-mock-nav active"><BookOpen size={12} />{zh ? '全部笔记' : 'All notes'}</div>
-                  <div className="landing-mock-nav"><Search size={12} />{zh ? '搜索' : 'Search'}</div>
+                  <div className="landing-mock-brand">
+                    <img src={zh ? '/img/360biji.svg' : '/img/360note.svg'} alt="" />
+                  </div>
+                  <div className="landing-mock-workspace">
+                    <span className="landing-mock-workspace-icon">◇</span>
+                    <span>{zh ? '我的空间' : 'My space'}</span>
+                    <ChevronDown size={10} />
+                  </div>
+                  <div className="landing-mock-nav active"><Archive size={11} />{zh ? '全部笔记' : 'All notes'}<span className="landing-mock-count">{c.mockNotes.length + 9}</span></div>
+                  <div className="landing-mock-nav"><Clock3 size={11} />{zh ? '最近编辑' : 'Recent'}</div>
+                  <div className="landing-mock-nav"><Star size={11} />{zh ? '收藏' : 'Favorites'}</div>
+                  <div className="landing-mock-nav"><Trash2 size={11} />{zh ? '回收站' : 'Trash'}</div>
                   <div className="landing-mock-label">{zh ? '文件夹' : 'Folders'}</div>
-                  <div className="landing-mock-nav"><FolderTree size={12} />{c.mockFolder}</div>
+                  <div className="landing-mock-nav landing-mock-folder"><ChevronDown size={10} /><FolderTree size={11} />{c.mockFolder}</div>
                   <div className="landing-mock-label">{zh ? '标签' : 'Tags'}</div>
                   <div className="landing-mock-tags">
-                    {c.mockTags.map((tag) => <span key={tag}>{tag}</span>)}
+                    {c.mockTags.map((tag) => <span key={tag}># {tag}</span>)}
                   </div>
                 </aside>
                 <div className="landing-mock-list">
-                  <div className="landing-mock-list-head">{zh ? '最近编辑' : 'Recently edited'}</div>
+                  <div className="landing-mock-list-top">
+                    <div className="landing-mock-search"><Search size={11} /><span>{zh ? '搜索笔记…' : 'Search notes…'}</span><kbd>⌘K</kbd></div>
+                    <span className="landing-mock-new"><FilePlus2 size={12} /></span>
+                  </div>
+                  <div className="landing-mock-list-head">{zh ? '全部笔记' : 'All notes'}<span>{c.mockNotes.length + 9}</span></div>
                   {c.mockNotes.map((note, index) => (
-                    <div key={note} className={index === 0 ? 'landing-mock-note active' : 'landing-mock-note'}>
-                      <div className="landing-mock-note-title">{note}</div>
-                      <div className="landing-mock-note-line" />
+                    <div key={note.title} className={index === 0 ? 'landing-mock-note active' : 'landing-mock-note'}>
+                      <div className="landing-mock-note-title">{note.title}</div>
+                      <div className="landing-mock-note-excerpt">{note.excerpt}</div>
                       <div className="landing-mock-note-meta">
-                        <span>{zh ? '今天' : 'Today'}</span>
-                        <span>{c.mockTags[index % c.mockTags.length]}</span>
+                        <span>{note.date}</span>
+                        <span className="landing-mock-mini-tag">{note.tag}</span>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="landing-mock-editor">
-                  <div className="landing-mock-kicker">{c.mockFolder} / {c.mockTags[0]}</div>
-                  <div className="landing-mock-title">{c.mockTitle}</div>
-                  {c.mockLines.map((line) => <p key={line}>{line}</p>)}
-                  <div className="landing-mock-quote">{zh ? '写下第一个想法，然后让它长成一套知识。' : 'Write the first idea, then let it grow into knowledge.'}</div>
-                  <div className="landing-mock-toolbar">
-                    <span>H1</span><span>B</span><span>I</span><span>•</span><span>1.</span><span>“</span><span>▦</span>
+                  <div className="landing-mock-topbar">
+                    <div className="landing-mock-breadcrumb">
+                      <span>{zh ? '我的空间' : 'My space'}</span>
+                      <ChevronRight size={10} />
+                      <span>{c.mockFolder}</span>
+                    </div>
+                    <div className="landing-mock-save"><span className="landing-mock-save-dot" />{zh ? '已保存' : 'Saved'}</div>
+                  </div>
+                  <div className="landing-mock-doc">
+                    <div className="landing-mock-title">{c.mockTitle}</div>
+                    <div className="landing-mock-meta">{zh ? '刚刚编辑 · 1 分钟阅读' : 'Edited just now · 1 min read'}</div>
+                    {c.mockLines.map((line) => <p key={line}>{line}</p>)}
+                    <div className="landing-mock-section-title">{zh ? '从三个动作开始' : 'Start with three actions'}</div>
+                    <ol className="landing-mock-steps">
+                      <li><strong>{zh ? '写下来。' : 'Write.'}</strong> {zh ? '内容会自动保存。' : 'Everything autosaves.'}</li>
+                      <li><strong>{zh ? '找回来。' : 'Find.'}</strong> {zh ? '搜索标题、正文、标签和附件名。' : 'Search titles, body text, tags and attachments.'}</li>
+                      <li><strong>{zh ? '放心用。' : 'Relax.'}</strong> {zh ? '离线继续写，联网后自动同步。' : 'Write offline; sync when you reconnect.'}</li>
+                    </ol>
+                    <div className="landing-mock-quote">{zh ? '写下第一个想法，然后让它长成一套知识。' : 'Write the first idea, then let it grow into knowledge.'}</div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="landing-float landing-float-a"><ShieldCheck size={14} />{zh ? '附件已加密' : 'Attachments encrypted'}</div>
-            <div className="landing-float landing-float-b"><Download size={14} />{zh ? '随时导出' : 'Export anytime'}</div>
           </div>
         </section>
 
@@ -236,7 +270,7 @@ export default function LandingPage() {
           </div>
           <div className="landing-feature-grid">
             {c.features.map((feature, index) => {
-              const Icon = featureIcons[index] ?? mockIcons[index % mockIcons.length];
+              const Icon = featureIcons[index % featureIcons.length];
               return (
                 <article className="landing-feature" key={feature.title}>
                   <span className="landing-feature-icon"><Icon size={17} /></span>

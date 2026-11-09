@@ -301,12 +301,21 @@
   color: var(--sidebar-text);
 }
 
+.sidebar-library {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
+}
+
+.sidebar-library .sidebar-section:first-child {
+  margin-top: 14px;
+}
+
 .sidebar-tree {
   padding: 0 10px;
-  overflow-y: auto;
-  min-height: 0;
-  flex: 0 1 auto;
-  max-height: 38vh;
+  flex: none;
 }
 
 .tree-folder {
@@ -1669,7 +1678,7 @@ kbd {
   left: -8px;
 }
 
-.app-root.sidebar-collapsed .sidebar-tree {
+.app-root.sidebar-collapsed .sidebar-library {
   display: none;
 }
 
@@ -1852,11 +1861,9 @@ kbd {
 
 /* Tags are a wrapping cloud, not a second vertical navigation list. */
 .tag-scroll {
-  max-height: 24vh;
-  overflow-y: auto;
   flex: none;
   padding: 0 10px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 
 .tag-cloud {

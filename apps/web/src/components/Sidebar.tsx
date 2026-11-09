@@ -495,123 +495,125 @@ export function Sidebar() {
           </button>
         </div>
 
-        <div className="sidebar-section" style={{ marginTop: 14 }}>
-          <span className="sidebar-section-label">{t('文件夹')}</span>
-          <button
-            type="button"
-            className="sidebar-section-action"
-            onClick={() => startCreateFolder(null)}
-            aria-label={t('新建文件夹')}
-          >
-            <FolderPlus size={13} />
-          </button>
-        </div>
-        <div className="sidebar-tree" ref={folderTreeRef}>
-          {editingFolder && !editingFolder.id && !editingFolder.parentId && (
-            <div className="tree-folder-row is-editing" style={{ paddingLeft: 6 }}>
-              <span className="tree-chevron"><span style={{ width: 12 }} /></span>
+        <div className="sidebar-library app-scroll">
+          <div className="sidebar-section">
+            <span className="sidebar-section-label">{t('文件夹')}</span>
+            <button
+              type="button"
+              className="sidebar-section-action"
+              onClick={() => startCreateFolder(null)}
+              aria-label={t('新建文件夹')}
+            >
               <FolderPlus size={13} />
-              <InlineNameInput
-                placeholder={t('文件夹名称')}
-                onSubmit={(value) => saveFolder(value)}
-                onCancel={() => setEditingFolder(null)}
-              />
-            </div>
-          )}
-          {folders.length ? (
-            renderFolders(null)
-          ) : !editingFolder || editingFolder.parentId ? (
-            <div className="sidebar-empty">{t('还没有文件夹')}</div>
-          ) : null}
-        </div>
+            </button>
+          </div>
+          <div className="sidebar-tree" ref={folderTreeRef}>
+            {editingFolder && !editingFolder.id && !editingFolder.parentId && (
+              <div className="tree-folder-row is-editing" style={{ paddingLeft: 6 }}>
+                <span className="tree-chevron"><span style={{ width: 12 }} /></span>
+                <FolderPlus size={13} />
+                <InlineNameInput
+                  placeholder={t('文件夹名称')}
+                  onSubmit={(value) => saveFolder(value)}
+                  onCancel={() => setEditingFolder(null)}
+                />
+              </div>
+            )}
+            {folders.length ? (
+              renderFolders(null)
+            ) : !editingFolder || editingFolder.parentId ? (
+              <div className="sidebar-empty">{t('还没有文件夹')}</div>
+            ) : null}
+          </div>
 
-        <div className="sidebar-section">
-          <span className="sidebar-section-label">{t('标签')}</span>
-          <button
-            type="button"
-            className="sidebar-section-action"
-            onClick={startCreateTag}
-            aria-label={t('新建标签')}
-          >
-            <Plus size={13} />
-          </button>
-        </div>
-        <div ref={tagListRef} className="tag-scroll">
-          {editingTag || tags.length ? (
-            <div className="tag-cloud">
-              {editingTag && !editingTag.id && (
-                <div className="tag-edit-row">
-                  <Hash size={12} style={{ color: 'var(--sidebar-muted)', flex: 'none' }} />
-                  <InlineNameInput
-                    placeholder={t('标签名称')}
-                    onSubmit={(value) => saveTag(value)}
-                    onCancel={() => setEditingTag(null)}
-                  />
-                </div>
-              )}
-              {tags.slice(0, 30).map((tag) =>
-                editingTag?.id === tag.id ? (
-                  <div className="tag-edit-row" key={tag.id}>
+          <div className="sidebar-section">
+            <span className="sidebar-section-label">{t('标签')}</span>
+            <button
+              type="button"
+              className="sidebar-section-action"
+              onClick={startCreateTag}
+              aria-label={t('新建标签')}
+            >
+              <Plus size={13} />
+            </button>
+          </div>
+          <div ref={tagListRef} className="tag-scroll">
+            {editingTag || tags.length ? (
+              <div className="tag-cloud">
+                {editingTag && !editingTag.id && (
+                  <div className="tag-edit-row">
                     <Hash size={12} style={{ color: 'var(--sidebar-muted)', flex: 'none' }} />
                     <InlineNameInput
-                      initialValue={editingTag.name}
                       placeholder={t('标签名称')}
-                      onSubmit={(value) => saveTag(value, tag.id)}
+                      onSubmit={(value) => saveTag(value)}
                       onCancel={() => setEditingTag(null)}
                     />
                   </div>
-                ) : (
-                  <div className="tag-chip" key={tag.id}>
-                    <button
-                      type="button"
-                      className={cn('tag-chip-main', !settingsActive && filter === 'tag' && tagId === tag.id && 'active')}
-                      aria-current={!settingsActive && filter === 'tag' && tagId === tag.id ? 'page' : undefined}
-                      onClick={() => void selectFilter('tag', { tagId: tag.id })}
-                      title={`#${tag.name}`}
-                    >
-                      <Hash size={11} style={{ color: tag.color ?? 'var(--sidebar-muted)', flex: 'none' }} />
-                      <span className="tag-chip-name">{tag.name}</span>
-                      <span className="tag-chip-count">{tag.noteCount ?? 0}</span>
-                    </button>
-                    <Dropdown
-                      trigger={
-                        <button type="button" className="tag-chip-more" aria-label={t('{name}的更多操作', { name: tag.name })}>
-                          <MoreHorizontal size={11} />
-                        </button>
-                      }
-                    >
-                      {(close) => (
-                        <>
-                          <MenuItem
-                            icon={<Hash size={14} />}
-                            onClick={() => {
-                              close();
-                              setEditingFolder(null);
-                              setEditingTag({ id: tag.id, name: tag.name });
-                            }}
-                          >
-                            {t('重命名')}
-                          </MenuItem>
-                          <MenuItem
-                            danger
-                            icon={<Trash2 size={14} />}
-                            onClick={() => {
-                              close();
-                              setDeleteNode({ kind: 'tag', id: tag.id, name: tag.name });
-                            }}
-                          >
-                            {t('删除标签')}
-                          </MenuItem>
-                        </>
-                      )}
-                    </Dropdown>
-                  </div>
-                ),
-              )}
-            </div>
-          ) : (
-            <div className="sidebar-empty">{t('还没有标签')}</div>
-          )}
+                )}
+                {tags.slice(0, 30).map((tag) =>
+                  editingTag?.id === tag.id ? (
+                    <div className="tag-edit-row" key={tag.id}>
+                      <Hash size={12} style={{ color: 'var(--sidebar-muted)', flex: 'none' }} />
+                      <InlineNameInput
+                        initialValue={editingTag.name}
+                        placeholder={t('标签名称')}
+                        onSubmit={(value) => saveTag(value, tag.id)}
+                        onCancel={() => setEditingTag(null)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="tag-chip" key={tag.id}>
+                      <button
+                        type="button"
+                        className={cn('tag-chip-main', !settingsActive && filter === 'tag' && tagId === tag.id && 'active')}
+                        aria-current={!settingsActive && filter === 'tag' && tagId === tag.id ? 'page' : undefined}
+                        onClick={() => void selectFilter('tag', { tagId: tag.id })}
+                        title={`#${tag.name}`}
+                      >
+                        <Hash size={11} style={{ color: tag.color ?? 'var(--sidebar-muted)', flex: 'none' }} />
+                        <span className="tag-chip-name">{tag.name}</span>
+                        <span className="tag-chip-count">{tag.noteCount ?? 0}</span>
+                      </button>
+                      <Dropdown
+                        trigger={
+                          <button type="button" className="tag-chip-more" aria-label={t('{name}的更多操作', { name: tag.name })}>
+                            <MoreHorizontal size={11} />
+                          </button>
+                        }
+                      >
+                        {(close) => (
+                          <>
+                            <MenuItem
+                              icon={<Hash size={14} />}
+                              onClick={() => {
+                                close();
+                                setEditingFolder(null);
+                                setEditingTag({ id: tag.id, name: tag.name });
+                              }}
+                            >
+                              {t('重命名')}
+                            </MenuItem>
+                            <MenuItem
+                              danger
+                              icon={<Trash2 size={14} />}
+                              onClick={() => {
+                                close();
+                                setDeleteNode({ kind: 'tag', id: tag.id, name: tag.name });
+                              }}
+                            >
+                              {t('删除标签')}
+                            </MenuItem>
+                          </>
+                        )}
+                      </Dropdown>
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : (
+              <div className="sidebar-empty">{t('还没有标签')}</div>
+            )}
+          </div>
         </div>
 
         <div className="sidebar-footer" style={{ marginTop: 'auto' }}>

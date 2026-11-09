@@ -104,6 +104,13 @@ async function main() {
   assert.equal(b.firstUser, false);
 
   const spaceA = a.workspaces.find((workspace) => workspace.kind === 'personal');
+  const seeded = await req(`/api/notes?workspaceId=${spaceA.id}`, { cookie: a.cookie });
+  assert.equal(seeded.status, 200, seeded.text);
+  assert.equal(seeded.json.notes.length, 1, 'new accounts get exactly one welcome note');
+  assert.match(seeded.json.notes[0].title, /欢迎|Welcome/);
+  const seededNote = await req(`/api/notes/${seeded.json.notes[0].id}`, { cookie: a.cookie });
+  assert.match(seededNote.json.note.contentMd, /Markdown/, 'welcome note includes the Markdown reference');
+  assert.doesNotMatch(seededNote.json.note.contentMd, /关于 360note 的设计|About the design/, 'design note content must be gone');
   const note = await req('/api/notes', {
     method: 'POST',
     cookie: a.cookie,

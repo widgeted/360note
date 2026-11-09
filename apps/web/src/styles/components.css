@@ -1461,71 +1461,161 @@
 }
 
 .theme-preview {
-  height: 64px;
+  --pv-bg: #f8f6f1;
+  --pv-surface: #fffefa;
+  --pv-sidebar: #f1eee7;
+  --pv-line: #e7e2d8;
+  --pv-soft: #efeae1;
+  --pv-text: #23201a;
+  --pv-muted: #d7d1c5;
+  --pv-accent: #157a52;
+  --pv-accent-soft: #e5f4ec;
+  height: 74px;
   border-radius: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
   overflow: hidden;
   border: 1px solid var(--line);
   display: flex;
-  background: var(--paper-100);
+  background: var(--pv-bg);
 }
 
 .theme-preview[data-preview='dark'] {
-  background: #0a0f0c;
+  --pv-bg: #0d1210;
+  --pv-surface: #0f1511;
+  --pv-sidebar: #070b09;
+  --pv-line: #223028;
+  --pv-soft: #1a261f;
+  --pv-text: #ece9e2;
+  --pv-muted: #2d3d33;
+  --pv-accent: #5fd3a0;
+  --pv-accent-soft: #10291f;
 }
 
 .theme-preview[data-preview='system'] {
-  background: linear-gradient(90deg, #0a0f0c 50%, #f8f6f1 50%);
+  --pv-bg: linear-gradient(90deg, #0d1210 50%, #f8f6f1 50%);
+  --pv-surface: linear-gradient(90deg, #0f1511 50%, #fffefa 50%);
+  --pv-sidebar: linear-gradient(90deg, #070b09 50%, #f1eee7 50%);
+  --pv-line: #8e9991;
+  --pv-soft: linear-gradient(90deg, #1a261f 50%, #efeae1 50%);
+  --pv-text: linear-gradient(90deg, #ece9e2 50%, #23201a 50%);
+  --pv-muted: linear-gradient(90deg, #2d3d33 50%, #d7d1c5 50%);
+  --pv-accent: linear-gradient(90deg, #5fd3a0 50%, #157a52 50%);
+  --pv-accent-soft: linear-gradient(90deg, #10291f 50%, #e5f4ec 50%);
 }
 
 .theme-preview-sidebar {
-  width: 22px;
+  width: 25%;
   flex: none;
-  background: #f1eee7;
+  padding: 7px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--pv-sidebar);
+  border-right: 1px solid var(--pv-line);
 }
 
-.theme-preview[data-preview='dark'] .theme-preview-sidebar {
-  background: #070b09;
+.theme-preview-brand {
+  width: 65%;
+  height: 4px;
+  margin-bottom: 3px;
+  border-radius: 2px;
+  background: var(--pv-text);
+  opacity: 0.7;
 }
 
-.theme-preview[data-preview='system'] .theme-preview-sidebar {
-  background: linear-gradient(90deg, #070b09 50%, #f1eee7 50%);
+.theme-preview-nav {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--pv-muted);
+  opacity: 0.75;
 }
 
-.theme-preview-body {
+.theme-preview-nav.active {
+  background: var(--pv-accent-soft);
+  opacity: 1;
+}
+
+.theme-preview-nav.short {
+  width: 62%;
+}
+
+.theme-preview-list {
+  width: 34%;
+  flex: none;
+  padding: 7px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--pv-surface);
+  border-right: 1px solid var(--pv-line);
+}
+
+.theme-preview-search {
+  height: 7px;
+  border-radius: 3px;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-bg);
+}
+
+.theme-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 4px 5px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+}
+
+.theme-preview-card.active {
+  background: var(--pv-accent-soft);
+  border-color: var(--pv-line);
+}
+
+.theme-preview-card i {
+  display: block;
+  height: 2px;
+  width: 82%;
+  border-radius: 1px;
+  background: var(--pv-muted);
+}
+
+.theme-preview-card i:first-child {
+  height: 3px;
+  width: 66%;
+  background: var(--pv-text);
+  opacity: 0.75;
+}
+
+.theme-preview-editor {
   flex: 1;
-  padding: 7px;
+  min-width: 0;
+  padding: 11px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--pv-surface);
 }
 
 .theme-preview-line {
   height: 3px;
   border-radius: 2px;
-  background: #ddd8ce;
-  margin-top: 5px;
+  background: var(--pv-soft);
 }
 
 .theme-preview-line-strong {
-  height: 5px;
-  width: 55%;
-  margin-top: 0;
-  background: #23252a;
+  height: 6px;
+  width: 62%;
+  margin-bottom: 2px;
+  background: var(--pv-text);
   opacity: 0.8;
 }
 
 .theme-preview-line-soft {
-  width: 80%;
+  width: 92%;
 }
 
 .theme-preview-line-short {
-  width: 66%;
-}
-
-.theme-preview[data-preview='dark'] .theme-preview-line {
-  background: #2d3d33;
-}
-
-.theme-preview[data-preview='dark'] .theme-preview-line-strong {
-  background: #e6e3dc;
+  width: 68%;
 }
 
 .theme-option-label {
@@ -1539,6 +1629,34 @@
 .theme-option-check {
   margin-left: auto;
   color: var(--blue);
+}
+
+.width-preview {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  transition: max-width 180ms var(--ease);
+}
+
+.width-preview.narrow {
+  max-width: 72%;
+}
+
+.width-preview.wide {
+  max-width: 100%;
+}
+
+.width-preview p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.width-preview.narrow p {
+  font-size: 13.5px;
 }
 
 .theme-grid {
