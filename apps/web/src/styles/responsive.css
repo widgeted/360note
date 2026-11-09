@@ -503,25 +503,37 @@
   }
 
   .settings-nav {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 5px;
-    align-items: stretch;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
     max-height: none;
     padding: calc(9px + var(--header-height)) 12px 9px;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
     border-bottom: 1px solid var(--line-soft);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .settings-nav-group {
-    display: contents;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 3px;
+    margin: 0;
   }
 
   .settings-nav-item {
-    width: 100%;
-    height: 40px;
+    width: auto;
+    height: 34px;
+    flex: none;
     justify-content: center;
-    padding: 0 6px;
+    padding: 0 10px;
     white-space: nowrap;
   }
 
@@ -586,12 +598,5 @@
   .restore-counts .setting-card,
   .import-counts .setting-card {
     padding: 9px !important;
-  }
-}
-
-
-@media (max-width: 360px) {
-  .settings-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

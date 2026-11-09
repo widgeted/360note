@@ -584,3 +584,7 @@ apps/web/src/styles/tokens.css        设计 token
 - 修正 v0.1.17 的视觉不一致：去掉 context panel 圆角/阴影；移动端 transform translateX(102%) + 260ms 过渡，关闭时 visibility hidden；z 60/59。
 - 遮罩统一 `rgba(5,8,21,.42)` + blur(2px)。
 - AppPage 在 note 存在时始终挂载 scrim/panel，通过 `.is-open` 切换；桌面关闭用 display:none。
+
+## 2026-11-09 · v0.1.19 移动端设置导航单行
+
+- max760 `.settings-nav` 从 3 列 grid 改为 flex nowrap + overflow-x auto；`settings-nav-group` 不再 display:contents；隐藏滚动条；删除 max360 两列覆盖。

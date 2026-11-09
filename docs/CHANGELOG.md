@@ -3,6 +3,15 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.19] — 2026-11-09
+
+移动端设置导航单行横向滚动。
+
+### Fixed
+
+- 移动端设置顶部导航从 3 列网格（三行）改为单行 flex，可左右滑动；隐藏滚动条，保留触控惯性滚动。
+- 移除 360px 以下两列网格覆盖，避免再次堆成多行。
+
 ## [0.1.18] — 2026-11-09
 
 右侧抽屉与左侧抽屉完全统一。

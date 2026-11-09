@@ -109,6 +109,15 @@ console.log('PASS  editor width preview reflects narrow and full-width modes');
 // Mobile toast distance and horizontal fit.
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(`${BASE}/app/settings/appearance`, { waitUntil: 'networkidle' });
+const navInfo = await page.evaluate(() => {
+  const nav = document.querySelector('.settings-nav');
+  const rows = new Set([...nav.querySelectorAll('.settings-nav-item')].map((element) => Math.round(element.getBoundingClientRect().top)));
+  return { rows: rows.size, overflow: getComputedStyle(nav).overflowX, scrollWidth: nav.scrollWidth, clientWidth: nav.clientWidth };
+});
+assert.equal(navInfo.rows, 1, 'mobile settings nav must be one row');
+assert.equal(navInfo.overflow, 'auto');
+assert.ok(navInfo.scrollWidth > navInfo.clientWidth, 'mobile settings nav should scroll horizontally');
+console.log('PASS  mobile settings navigation is a single scrollable row');
 const toastBottom = await page.evaluate(() => {
   const el = document.createElement('div');
   el.className = 'toast-viewport';
