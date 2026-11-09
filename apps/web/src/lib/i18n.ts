@@ -523,6 +523,7 @@ const en: Record<string, string> = {
   '删除分享链接': 'Delete share link',
   '复制分享链接': 'Copy share link',
   '创建于 {date}': 'Created {date}',
+  '到期于 {date}': 'Expires {date}',
   '浏览': 'Views',
   '只读': 'View',
   '可评论': 'Comment',

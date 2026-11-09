@@ -335,6 +335,11 @@ async function main() {
   });
   check('owner can create a public share', publicShare.status === 200);
   const publicToken = publicShare.json?.share?.token;
+  check(
+    'public share token uses a compact 96-bit form',
+    typeof publicToken === 'string' && /^[A-Za-z0-9_-]{16}$/.test(publicToken),
+    publicToken,
+  );
   const publicRead = await request(`/api/public/shares/${publicToken}`);
   check('public share is readable', publicRead.status === 200 && publicRead.json?.hasAccess === true);
   const publicAttachment = await request(`/api/public/shares/${publicToken}/attachments/${attachmentId}`);

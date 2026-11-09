@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  CalendarDays,
   Check,
   Clock3,
   Copy,
@@ -203,46 +204,38 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {shares.map((share) => (
-                  <div
-                    key={share.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 9,
-                      padding: '9px 10px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line)',
-                      background: share.revokedAt ? 'var(--paper-50)' : 'var(--surface)',
-                      opacity: share.revokedAt ? 0.55 : 1,
-                    }}
-                  >
-                    <span className="badge badge-blue">
-                      {share.permission === 'view' ? <Eye size={10} /> : share.permission === 'edit' ? <Edit3 size={10} /> : <MessageCircle size={10} />}
-                      {share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}
-                    </span>
-                    {share.hasPassword && <LockKeyhole size={12} style={{ color: 'var(--text-tertiary)' }} />}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Link2 size={11} />
-                      {formatFullDate(share.createdAt)}
-                      {share.expiresAt && <><Clock3 size={11} /> {formatFullDate(share.expiresAt)}</>}
-                      <span>· {t('浏览 {n}', { n: share.viewCount })}</span>
-                    </span>
-                    {!share.revokedAt ? (
-                      <>
+                  <div key={share.id} className={share.revokedAt ? 'share-item is-revoked' : 'share-item'}>
+                    <span className="share-item-icon"><Link2 size={15} /></span>
+                    <div className="share-item-body">
+                      <div className="share-item-badges">
+                        <span className="badge badge-blue">
+                          {share.permission === 'view' ? <Eye size={11} /> : share.permission === 'edit' ? <Edit3 size={11} /> : <MessageCircle size={11} />}
+                          {share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}
+                        </span>
+                        {share.hasPassword && <span className="share-item-note"><LockKeyhole size={12} />{t('需要密码')}</span>}
+                        {share.revokedAt && <span className="badge">{t('已撤销')}</span>}
+                      </div>
+                      <div className="share-item-meta">
+                        <span><CalendarDays size={13} />{t('创建于 {date}', { date: formatFullDate(share.createdAt) })}</span>
+                        <span><Clock3 size={13} />{share.expiresAt ? t('到期于 {date}', { date: formatFullDate(share.expiresAt) }) : t('永不过期')}</span>
+                        <span><Eye size={13} />{t('浏览 {n}', { n: share.viewCount })}</span>
+                      </div>
+                    </div>
+                    {!share.revokedAt && (
+                      <div className="share-item-actions">
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => void copy(share)}>
-                          {copied === share.id ? <Check size={12} /> : <Copy size={12} />} {copied === share.id ? t('已复制') : t('复制')}
+                          {copied === share.id ? <Check size={13} /> : <Copy size={13} />} {copied === share.id ? t('已复制') : t('复制')}
                         </button>
                         <button
                           type="button"
                           className={`btn btn-sm ${revokeId === share.id ? 'btn-danger' : 'btn-ghost'}`}
                           onClick={() => void revoke(share.id)}
                           title={t('撤销')}
+                          aria-label={revokeId === share.id ? t('再次点击确认') : t('撤销')}
                         >
-                          <Trash2 size={12} /> {revokeId === share.id ? t('再次点击确认') : ''}
+                          <Trash2 size={13} /> {revokeId === share.id ? t('再次点击确认') : ''}
                         </button>
-                      </>
-                    ) : (
-                      <span className="badge">{t('已撤销')}</span>
+                      </div>
                     )}
                   </div>
                 ))}

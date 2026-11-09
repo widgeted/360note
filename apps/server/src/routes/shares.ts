@@ -126,7 +126,9 @@ export default async function shareRoutes(app: FastifyInstance) {
       request.body,
     );
     if (body.expiresAt && new Date(body.expiresAt) <= new Date()) throw errors.badRequest('过期时间必须晚于现在');
-    const token = randomToken(24);
+    // 12 random bytes = 96 bits, rendered as 16 base64url characters. This is
+    // short enough to paste comfortably and still infeasible to brute-force.
+    const token = randomToken(12);
     const shareId = crypto.randomUUID();
     const passwordHash = body.password ? await hashPassword(body.password) : null;
     await one(

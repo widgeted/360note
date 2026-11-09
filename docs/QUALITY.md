@@ -355,7 +355,7 @@
 
 ## 生产安全回归（2026-11-08）
 
-`tests/manual/security-audit.mjs` 覆盖 65 项检查：未登录边界、CSRF、跨个人空间读写/列表/搜索/导出/备份、团队 owner/admin/editor/viewer 权限、邀请接受、分享链接（公开/密码/评论/撤销/过期）、附件权限、API 令牌范围与撤销、邮箱验证码错误/尝试上限、找回密码、修改邮箱、实例管理员边界、SQL 元字符。当前结果：**65 passed, 0 failed**。
+`tests/manual/security-audit.mjs` 覆盖 66 项检查：未登录边界、CSRF、跨个人空间读写/列表/搜索/导出/备份、团队 owner/admin/editor/viewer 权限、邀请接受、分享链接（公开/密码/评论/撤销/过期）、附件权限、API 令牌范围与撤销、邮箱验证码错误/尝试上限、找回密码、修改邮箱、实例管理员边界、SQL 元字符。当前结果：**66 passed, 0 failed**。
 
 该脚本只创建临时数据并在结束时清理；不发送任何邮件。
 
@@ -364,6 +364,7 @@
 - `tests/manual/concurrency-test.mjs`：并发 PATCH 只允许一个提交，另一个返回 409；同一 TOTP 时间步/备用码只能消费一次。
 - `tests/manual/first-admin-test.mjs`：临时数据库 + 临时 API，两次并发首次注册只产生一个管理员。
 - `tests/manual/backup-limits-test.mjs`：拒绝超量条目、超大单条目、异常压缩比和结构无效的备份。
+- `tests/manual/share-mobile-regression.mjs`：390px 下分享卡片图标 ≥30px，创建/到期/浏览量三行堆叠，操作按钮独占整行，页面无横向溢出。
 - `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式“退出并清除本机数据”清空 IndexedDB 与 auth/workspace 键。
 - `updateNote` 使用行锁 + `WHERE version = locked.version` 条件更新，事务内校验 `baseVersion`。
 - 首次注册使用 `pg_advisory_xact_lock` 串行化“用户数 + 插入”事务。
@@ -379,7 +380,7 @@
 - `tests/e2e/core.spec.ts`（Playwright）：桌面新建/编辑/刷新/搜索；390px 移动端编辑器无横向溢出。**2 passed。**
 - `tests/manual/ui-regression.mjs`：面包屑显示当前空间、标题占位非斜体、侧栏热区 24px、文件夹菜单创建子文件夹、主题卡无内联颜色、移动端 toast 18px、键盘焦点可见。**通过。**
 - `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式清除删除 IndexedDB 与 auth/workspace 键。**通过。**
-- `tests/manual/security-audit.mjs`：**65 passed, 0 failed**。
+- `tests/manual/security-audit.mjs`：**66 passed, 0 failed**。
 - `tests/manual/concurrency-test.mjs`、`first-admin-test.mjs`、`backup-limits-test.mjs`：**通过**。
 
 ## 2026-11-09 补充安全回归

@@ -524,3 +524,10 @@ apps/web/src/styles/tokens.css        设计 token
 - 笔记列表空状态操作组此前是 `display:flex` 但未设置 `justify-content`，按钮靠左；改为 `.list-empty-actions` 居中并允许换行。
 - `.editor-empty-actions`、`.empty-actions` 同样补 `justify-content:center; flex-wrap:wrap`。
 - 新增 `tests/manual/centering-regression.mjs`，测量容器中心与操作组/按钮中心，覆盖桌面/移动端空文件夹、搜索空状态、空编辑器和公开分享失效页。
+
+## 2026-11-09 · v0.1.9 移动端分享列表与短链接
+
+- 分享 token 改为 `randomToken(12)`：16 个 base64url 字符、96 位熵；旧 token 按 hash 查询不受影响。
+- `ShareDialog` 已有分享项改为 `.share-item` 卡片：30px 链接图标、权限/密码行、三行 meta（创建/到期/浏览量），移动端操作按钮独占一行。
+- 移动端同类修复：团队成员行操作下移、邀请表单纵向全宽、审计日志改为纵向四行。
+- 安全审计新增“分享 token 为紧凑 96 位形式”，总数 66。

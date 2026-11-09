@@ -374,28 +374,29 @@ export default function TeamSettings() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {members.map((member) => (
-                <div key={member.userId} className="setting-card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10 }}>
+                <div key={member.userId} className="setting-card member-row">
                   <Avatar name={member.displayName} color={member.avatarColor} size="sm" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 560, color: 'var(--text)' }}>{member.displayName}</span>
+                  <div className="member-main">
+                    <div className="member-name-line">
+                      <span className="member-name">{member.displayName}</span>
                       {member.userId === user?.id && <span className="badge">{t('你')}</span>}
                       {member.role === 'owner' && <Crown size={11} style={{ color: 'var(--amber)' }} />}
+                      {!(canManage && member.role !== 'owner') && <span className="badge">{roleLabel(t, member.role)}</span>}
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{member.email} · {t('加入于 {date}', { date: formatRelativeShort(member.joinedAt) })}</div>
+                    <div className="member-meta">{member.email} · {t('加入于 {date}', { date: formatRelativeShort(member.joinedAt) })}</div>
                   </div>
-                  {canManage && member.role !== 'owner' ? (
-                    <select className="select select-sm" value={member.role} onChange={(event) => void changeRole(member, event.target.value)} style={{ width: 100 }}>
-                      {ROLES.map((role) => <option key={role} value={role}>{roleLabel(t, role)}</option>)}
-                      {isOwner && <option value="owner">{t('转移所有权')}</option>}
-                    </select>
-                  ) : (
-                    <span className="badge">{roleLabel(t, member.role)}</span>
-                  )}
-                  {canManage && member.role !== 'owner' && member.userId !== user?.id && (
-                    <button type="button" className="icon-btn icon-btn-sm" onClick={() => setRemoveMember(member)} aria-label={t('移除')} title={t('移除')}>
-                      <UserMinus size={13} />
-                    </button>
+                  {canManage && member.role !== 'owner' && (
+                    <div className="member-actions">
+                      <select className="select select-sm" value={member.role} onChange={(event) => void changeRole(member, event.target.value)} style={{ width: 100 }}>
+                        {ROLES.map((role) => <option key={role} value={role}>{roleLabel(t, role)}</option>)}
+                        {isOwner && <option value="owner">{t('转移所有权')}</option>}
+                      </select>
+                      {member.userId !== user?.id && (
+                        <button type="button" className="icon-btn icon-btn-sm" onClick={() => setRemoveMember(member)} aria-label={t('移除')} title={t('移除')}>
+                          <UserMinus size={13} />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -410,7 +411,7 @@ export default function TeamSettings() {
               </div>
               <div className="setting-inline-form">
                 <div className="field"><label>{t('邮箱')}</label><input className="input" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="teammate@example.com" /></div>
-                <div className="field" style={{ flex: '0 0 120px' }}><label>{t('角色')}</label><select className="select" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as typeof inviteRole)}>{ROLES.map((role) => <option key={role} value={role}>{roleLabel(t, role)}</option>)}</select></div>
+                <div className="field field-role"><label>{t('角色')}</label><select className="select" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as typeof inviteRole)}>{ROLES.map((role) => <option key={role} value={role}>{roleLabel(t, role)}</option>)}</select></div>
                 <button type="button" className="btn btn-primary btn-sm" onClick={invite} disabled={inviting || !inviteEmail.trim()}>
                   {inviting ? <span className="spinner" /> : <MailPlus size={13} />} {t('创建邀请')}
                 </button>
@@ -425,14 +426,16 @@ export default function TeamSettings() {
               {invitations.length > 0 && (
                 <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {invitations.map((invitation) => (
-                    <div key={invitation.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 9px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--surface)' }}>
-                      <Shield size={13} style={{ color: 'var(--text-tertiary)' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, color: 'var(--text)' }}>{invitation.email} <span className="badge" style={{ marginLeft: 5 }}>{roleLabel(t, invitation.role)}</span></div>
-                        <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{t('待接受')} · {formatRelativeShort(invitation.createdAt)}</div>
+                    <div key={invitation.id} className="invite-row">
+                      <Shield size={13} className="invite-row-icon" />
+                      <div className="invite-row-main">
+                        <div className="invite-row-title"><span>{invitation.email}</span> <span className="badge">{roleLabel(t, invitation.role)}</span></div>
+                        <div className="invite-row-meta">{t('待接受')} · {formatRelativeShort(invitation.createdAt)}</div>
                       </div>
-                      {invitation.url && <button type="button" className="icon-btn icon-btn-sm" onClick={() => copy(invitation.url!, invitation.id)} aria-label={t('复制邀请链接')}>{copied === invitation.id ? <Check size={12} /> : <Copy size={12} />}</button>}
-                      <button type="button" className="icon-btn icon-btn-sm" onClick={() => void revokeInvitation(invitation.id)} aria-label={t('撤销')}><Trash2 size={12} /></button>
+                      <div className="invite-row-actions">
+                        {invitation.url && <button type="button" className="icon-btn icon-btn-sm" onClick={() => copy(invitation.url!, invitation.id)} aria-label={t('复制邀请链接')}>{copied === invitation.id ? <Check size={12} /> : <Copy size={12} />}</button>}
+                        <button type="button" className="icon-btn icon-btn-sm" onClick={() => void revokeInvitation(invitation.id)} aria-label={t('撤销')}><Trash2 size={12} /></button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -451,11 +454,11 @@ export default function TeamSettings() {
                   <div className="context-empty">{t('暂无记录')}</div>
                 ) : (
                   audit.slice(0, 20).map((entry) => (
-                    <div key={entry.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--line-soft)', fontSize: 13 }}>
-                      <span style={{ width: 110, flex: 'none', color: 'var(--text-tertiary)' }}>{formatFullDate(entry.createdAt)}</span>
-                      <span style={{ width: 90, flex: 'none', color: 'var(--text-secondary)' }}>{entry.actorName ?? t('系统')}</span>
-                      <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{auditActionLabel(t, entry.action)}</span>
-                      <span style={{ color: 'var(--text-tertiary)' }}>{entry.ip}</span>
+                    <div key={entry.id} className="audit-row">
+                      <span className="audit-time">{formatFullDate(entry.createdAt)}</span>
+                      <span className="audit-actor">{entry.actorName ?? t('系统')}</span>
+                      <span className="audit-action">{auditActionLabel(t, entry.action)}</span>
+                      <span className="audit-ip">{entry.ip}</span>
                     </div>
                   ))
                 )}
