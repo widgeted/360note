@@ -43,25 +43,6 @@
   .settings-inner {
     padding: 32px 30px 90px;
   }
-
-  .marketing-nav {
-    padding: 0 24px;
-  }
-
-  .hero {
-    padding: 48px 24px 78px;
-    gap: 34px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr);
-  }
-
-  .app-mock {
-    height: 380px;
-    grid-template-columns: 66px 168px 1fr;
-  }
-
-  .marketing-section {
-    padding: 70px 24px;
-  }
 }
 
 @media (max-width: 900px) {
@@ -141,50 +122,8 @@
     padding: 28px 24px 80px;
   }
 
-  .hero {
-    grid-template-columns: 1fr;
-    padding-top: 30px;
-    gap: 40px;
-  }
-
-  .hero-copy {
-    max-width: 610px;
-  }
-
-  .hero-stage {
-    min-height: 390px;
-    max-width: 650px;
-    width: 100%;
-    margin: 0 auto;
-  }
-
   .principles-grid {
     grid-template-columns: 1fr;
-  }
-
-  .principle {
-    min-height: 0;
-  }
-
-  .feature-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-page {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-visual {
-    display: none;
-  }
-
-  .auth-logo-mobile {
-    display: flex;
-  }
-
-  .auth-panel {
-    min-height: 100dvh;
-    padding: 42px 24px;
   }
 
   .public-layout {
@@ -413,97 +352,7 @@
   }
 
   .toast-viewport {
-    bottom: calc(74px + env(safe-area-inset-bottom));
-  }
-
-  .hero {
-    padding: 18px 18px 56px;
-  }
-
-  .marketing-nav {
-    height: 62px;
-    padding: 0 18px;
-  }
-
-  .marketing-nav-links {
-    display: none;
-  }
-
-  .marketing-nav-actions .marketing-login {
-    display: none;
-  }
-
-  .hero-title {
-    font-size: clamp(38px, 11vw, 54px);
-  }
-
-  .hero-desc {
-    font-size: 13.5px;
-  }
-
-  .hero-actions {
-    flex-wrap: wrap;
-  }
-
-  .hero-stage {
-    min-height: 300px;
-  }
-
-  .app-mock {
-    height: 300px;
-    grid-template-columns: 54px 130px 1fr;
-    transform: none;
-  }
-
-  .mock-editor {
-    padding: 20px 17px;
-  }
-
-  .mock-title {
-    height: 11px;
-  }
-
-  .hero-float-card {
-    display: none;
-  }
-
-  .marketing-section {
-    padding: 52px 18px;
-  }
-
-  .marketing-section-head {
-    margin-bottom: 28px;
-  }
-
-  .section-title {
-    font-size: 30px;
-  }
-
-  .marketing-quote-inner {
-    padding: 58px 20px;
-  }
-
-  .marketing-footer {
-    padding: 22px 18px;
-  }
-
-  .marketing-footer-inner {
-    flex-wrap: wrap;
-  }
-
-  .marketing-footer-links {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .auth-panel {
-    padding: 28px 20px;
-    align-items: flex-start;
-  }
-
-  .auth-card {
-    max-width: none;
-    padding-top: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom));
   }
 
   .auth-heading {
@@ -593,12 +442,6 @@
   .editor-page {
     padding-left: 16px;
     padding-right: 16px;
-  }
-
-  .hero-actions .hero-cta,
-  .hero-actions .hero-cta-ghost {
-    width: 100%;
-    justify-content: center;
   }
 }
 
@@ -722,7 +565,6 @@
   }
 }
 
-}
 
 @media (max-width: 360px) {
   .settings-nav {

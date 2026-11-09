@@ -315,10 +315,24 @@ export function NoteListPane() {
                     ? t('点击笔记右侧的星标即可收藏。')
                     : t('从这里开始记录第一个想法')}
             </div>
-            {!query && filter !== 'trash' && (
-              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 14 }} onClick={newNote}>
-                <FilePlus2 size={13} /> {t('新建笔记')}
-              </button>
+            {filter !== 'trash' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                {query && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      setSearchValue('');
+                      setQuery('');
+                    }}
+                  >
+                    <X size={13} /> {t('清除搜索')}
+                  </button>
+                )}
+                <button type="button" className="btn btn-primary btn-sm" onClick={newNote}>
+                  <FilePlus2 size={13} /> {t('新建笔记')}
+                </button>
+              </div>
             )}
           </div>
         )}

@@ -296,11 +296,40 @@ export async function createBackup(input: {
 }): Promise<{ id: string; name: string; size: number; offsite?: 'uploaded' | 'disabled' | 'failed' }> {
   const role = await requireWorkspace(input.userId, input.workspaceId, input.kind === 'pre-restore' ? 'read' : 'manage');
   void role;
+  if (input.jobId) {
+    const existing = await one<{ id: string; filename: string; size_bytes: string; meta: Record<string, unknown> | null }>(
+      'SELECT id, filename, size_bytes, meta FROM backups WHERE job_id = $1 AND workspace_id = $2',
+      [input.jobId, input.workspaceId],
+    );
+    if (existing) {
+      return {
+        id: existing.id,
+        name: existing.filename,
+        size: Number(existing.size_bytes),
+        offsite: (existing.meta?.offsite as 'uploaded' | 'disabled' | 'failed' | undefined) ?? 'disabled',
+      };
+    }
+  }
   const { buffer, document, name } = await createBackupDocument(input.workspaceId);
   const encryptedSize = await saveBackup(name, buffer);
+  try {
+    // Verify decryption and ZIP structure before publishing the backup row.
+    const stored = await readBackup(name);
+    const preview = previewBackup(stored, input.workspaceId);
+    if (
+      preview.counts.notes !== document.counts.notes ||
+      preview.counts.attachments !== document.counts.attachments ||
+      preview.workspace.id !== input.workspaceId
+    ) {
+      throw new Error('备份校验失败：内容与清单不一致');
+    }
+  } catch (error) {
+    await deleteBackupFile(name).catch(() => {});
+    throw error;
+  }
   const row = await one<{ id: string; created_at: Date }>(
-    `INSERT INTO backups (workspace_id, filename, storage_key, size_bytes, kind, status, note_count, attachment_count, meta, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'ready', $6, $7, $8, $9) RETURNING id, created_at`,
+    `INSERT INTO backups (workspace_id, filename, storage_key, size_bytes, kind, status, note_count, attachment_count, meta, created_by, job_id)
+     VALUES ($1, $2, $3, $4, $5, 'ready', $6, $7, $8, $9, $10) RETURNING id, created_at`,
     [
       input.workspaceId,
       name,
@@ -311,6 +340,7 @@ export async function createBackup(input: {
       document.counts.attachments,
       JSON.stringify({ createdAt: document.createdAt, folderCount: document.counts.folders, tagCount: document.counts.tags }),
       input.userId,
+      input.jobId ?? null,
     ],
   );
   if (input.jobId) await updateJob(input.jobId, { progress: 82, message: '正在处理异地备份…' });

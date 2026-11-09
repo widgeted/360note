@@ -90,6 +90,8 @@ export function EditorPane({
   const setFocusMode = useAppStore((state) => state.setFocusMode);
   const user = useAuthStore((state) => state.user);
   const instance = useAuthStore((state) => state.instance);
+  const workspaces = useAuthStore((state) => state.workspaces);
+  const currentWorkspace = workspaces.find((workspace) => workspace.id === workspaceId);
 
   const [title, setTitle] = useState(note?.title ?? '');
   const [content, setContent] = useState(note ? stripDuplicateTitle(note.contentMd, note.title) : '');
@@ -574,7 +576,9 @@ export function EditorPane({
           <ArrowLeft size={17} />
         </button>
         <div className="topbar-breadcrumb">
-          <button type="button" className="breadcrumb-item" onClick={() => navigate('/app')}>{t('全部笔记')}</button>
+          <button type="button" className="breadcrumb-item" onClick={() => navigate('/app')} title={t('当前空间')}>
+            {currentWorkspace?.name ?? t('全部笔记')}
+          </button>
           {(note.folderPath ?? []).map((folder) => (
             <span key={folder.id} style={{ display: 'contents' }}>
               <ChevronRight size={11} className="breadcrumb-sep" />
@@ -726,7 +730,7 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-error" style={{ maxWidth: 900, margin: '0 auto' }}>
             <AlertTriangle size={15} />
-            <div style={{ flex: 1 }}>{t('保存失败')}{syncMessage ? ` · ${syncMessage}` : ''}</div>
+            <div style={{ flex: 1 }}>{t('保存失败')}{syncMessage ? ` · ${syncMessage}` : ''}<div className="setting-note" style={{ marginTop: 2 }}>{t('当前正文和草稿已保存在这台设备，可重试或先复制正文。')}</div></div>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => void saveNowRef.current('manual')}>{t('重试')}</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => void copyText(contentRef.current)}>{t('复制正文')}</button>
           </div>

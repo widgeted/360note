@@ -140,18 +140,20 @@ export default function LandingPage() {
   return (
     <div className="landing">
       <header className="landing-nav">
-        <Link to="/" className="landing-brand" aria-label={zh ? '360笔记' : '360note'}>
-          <LogoLockup />
-        </Link>
-        <nav className="landing-links" aria-label={zh ? '主导航' : 'Main navigation'}>
-          <a href="#features">{c.nav[0]}</a>
-          <a href="#security">{c.nav[1]}</a>
-          <a href="/about.html">{c.nav[2]}</a>
-        </nav>
-        <div className="landing-actions">
-          <a className="landing-lang" href={c.langHref}>{c.langSwitch}</a>
-          <Link className="btn btn-ghost btn-sm landing-login" to="/login">{c.login}</Link>
-          <Link className="btn btn-primary btn-sm" to="/register">{c.start}</Link>
+        <div className="landing-nav-inner">
+          <Link to="/" className="landing-brand" aria-label={zh ? '360笔记' : '360note'}>
+            <LogoLockup />
+          </Link>
+          <nav className="landing-links" aria-label={zh ? '主导航' : 'Main navigation'}>
+            <a href="#features">{c.nav[0]}</a>
+            <a href="#security">{c.nav[1]}</a>
+            <a href="/about.html">{c.nav[2]}</a>
+          </nav>
+          <div className="landing-actions">
+            <a className="landing-lang" href={c.langHref}>{c.langSwitch}</a>
+            <Link className="btn btn-ghost btn-sm landing-login" to="/login">{c.login}</Link>
+            <Link className="btn btn-primary btn-sm" to="/register">{c.start}</Link>
+          </div>
         </div>
       </header>
 
@@ -278,7 +280,6 @@ export default function LandingPage() {
             </ul>
           </div>
           <div className="landing-security-card" aria-hidden="true">
-            <div className="landing-security-glow" />
             <div className="landing-security-row"><Lock size={16} /><span>TLS 1.3</span><em>{zh ? '传输加密' : 'In transit'}</em></div>
             <div className="landing-security-row"><ShieldCheck size={16} /><span>AES-256-GCM</span><em>{zh ? '静态加密' : 'At rest'}</em></div>
             <div className="landing-security-row"><KeyIcon /><span>TOTP</span><em>{zh ? '两步验证' : 'Two-factor'}</em></div>

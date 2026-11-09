@@ -90,6 +90,7 @@ openssl rand -base64 32  # NOTE360_MASTER_KEY（必须 32 字节）
 - `WEB_DIST=/opt/360note/apps/web/dist`
 - `NOTE360_ENV_FILE=/etc/360note/360note.env`
 - `REGISTRATION_MODE=open`（或 `invite` + `REGISTRATION_INVITE_CODE=...`）
+- `BOOTSTRAP_ADMIN_EMAIL=owner@example.com`（可选，强烈建议：把首个实例管理员固定为这个邮箱；未设置时首个完成邮箱验证的注册者会成为管理员）
 - `OCR_ENABLED=true`（已安装 OCR 时）
 - `NODE_ENV=production`
 

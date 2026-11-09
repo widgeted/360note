@@ -497,3 +497,16 @@ apps/web/src/styles/tokens.css        设计 token
 - 移动端通知按钮使用独立 `sidebar-icon-btn`，不再被 `.sidebar-collapse` 的移动端隐藏规则影响。
 - 公开分享页任务列表保留 checkbox 并设置 `data-type=taskList`，与编辑器一致。
 - 生产安全审计扩展为 65 项，当前 65/65 通过。
+
+## 2026-11-09 任务恢复、备份校验与邀请身份
+
+- `jobs.ts` 增加 `claimJob()`：`UPDATE ... WHERE status='queued'` 原子领取；重复 `runJob` 只执行一次。
+- `recoverInterruptedJobs()` 在每次启动迁移后运行，把遗留 `queued/running` 标记为 error，错误文案固定为“服务重启导致任务中断，请重新执行”；`done` 不受影响。
+- 备份：`005_backup_job_id.sql` 增加 `backups.job_id` 唯一索引；`createBackup` 先按 `job_id + workspace_id` 返回已有记录，写入后 `readBackup` + `previewBackup` 核对 workspace/notes/attachments，不一致删除文件并失败。自动备份复用该路径。
+- 邀请：`006_invitation_unique.sql` 先撤销同空间/邮箱的重复 pending，再建部分唯一索引；POST 捕获 23505 返回 409。接受/拒绝/列表改为“已知 invitee 用用户 ID，未知用邮箱”，改邮箱不丢邀请，旧邮箱新账号也不能继承。
+- 注册：新增可选 `BOOTSTRAP_ADMIN_EMAIL`，首个用户注册前校验邮箱；advisory lock 继续保证只有一个 admin。
+- 离线：数据设置新增 IndexedDB 明文说明与清除按钮；启动时调用 `navigator.storage.persist()`。普通登出保留同账号缓存，切换账号清旧缓存，显式登出清除。
+- UI：面包屑首项改为空间名；搜索空状态增加清除搜索/新建笔记；分享对话框显示版本与更新时间；侧栏操作 24px、移动 toast 18px、标题占位非斜体；文件夹菜单创建子文件夹；主题预览改 CSS 变体。
+- 测试脚本：`tests/integration/{postgres-api,jobs-recovery,backup-restore-drill}.mjs`、`tests/e2e/core.spec.ts`、`tests/manual/ui-regression.mjs`。
+- 生产验证：迁移 005/006 已执行；security-audit 65/65；并发/首次管理员/备份限制/缓存隔离/Playwright/UI 全部通过；两域名 HTTP 200。
+

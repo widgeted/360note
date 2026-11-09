@@ -196,6 +196,18 @@ export async function cacheSize(): Promise<number> {
   return estimate.usage ?? 0;
 }
 
+/**
+ * Ask the browser not to evict offline note bodies/drafts under storage
+ * pressure. Browsers may grant this silently based on engagement.
+ */
+export async function requestPersistentStorage(): Promise<void> {
+  try {
+    await navigator.storage?.persist?.();
+  } catch {
+    /* unsupported or denied; offline caching still works opportunistically */
+  }
+}
+
 export async function updateCachedNote(note: Note): Promise<void> {
   if (!localWritesEnabled) return;
   try {

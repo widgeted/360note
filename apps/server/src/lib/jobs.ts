@@ -55,10 +55,51 @@ export async function updateJob(
   );
 }
 
+/**
+ * Atomically take ownership of a queued job. Returns false when another worker
+ * (or a previous run) already claimed or completed it, so a task never runs twice.
+ */
+export async function claimJob(jobId: string): Promise<boolean> {
+  const row = await one(
+    `UPDATE jobs
+       SET status = 'running', progress = GREATEST(progress, 1), message = '正在处理…', updated_at = now()
+     WHERE id = $1 AND status = 'queued'
+     RETURNING id`,
+    [jobId],
+  );
+  return Boolean(row);
+}
+
+/**
+ * On startup, every queued/running job belongs to a process that no longer
+ * exists: callbacks cannot be restored after a restart. Mark them failed with a
+ * clear retry hint instead of leaving jobs at "running" forever.
+ */
+export async function recoverInterruptedJobs(): Promise<number> {
+  const rows = await many(
+    `UPDATE jobs
+       SET status = 'error',
+           progress = 100,
+           message = NULL,
+           error = COALESCE(NULLIF(error, ''), '服务重启导致任务中断，请重新执行'),
+           updated_at = now()
+     WHERE status IN ('queued', 'running')
+     RETURNING id`,
+  );
+  return rows.length;
+}
+
 /** Run an async job without blocking the request; failures are serialized into the jobs table. */
 export function runJob(jobId: string, task: () => Promise<Record<string, unknown>>): void {
   void (async () => {
-    await updateJob(jobId, { status: 'running', progress: 1, message: '正在处理…' });
+    let claimed = false;
+    try {
+      claimed = await claimJob(jobId);
+    } catch (error) {
+      console.error('[job] claim failed', jobId, error);
+      return;
+    }
+    if (!claimed) return;
     try {
       const result = await task();
       await updateJob(jobId, { status: 'done', progress: 100, message: null, result });

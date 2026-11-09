@@ -6,6 +6,7 @@ import { useAppStore } from './stores/app';
 import { ToastViewport } from './components/Toasts';
 import { LogoLockup } from './components/Logo';
 import { getLocale } from './lib/i18n';
+import { requestPersistentStorage } from './lib/offline';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -74,6 +75,10 @@ export default function App() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  useEffect(() => {
+    void requestPersistentStorage();
+  }, []);
 
   useEffect(() => {
     const onOnline = () => {

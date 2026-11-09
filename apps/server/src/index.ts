@@ -26,6 +26,7 @@ import backupRoutes from './routes/backups.js';
 import adminRoutes from './routes/admin.js';
 import accountRoutes from './routes/account.js';
 import { resumePendingOcr } from './lib/ocr.js';
+import { recoverInterruptedJobs } from './lib/jobs.js';
 import { cleanupImportUploads, runAutoBackups } from './services/backups.js';
 
 async function buildServer() {
@@ -178,6 +179,11 @@ async function buildServer() {
 async function start() {
   ensureDataDirs();
   await migrate();
+  const recovered = await recoverInterruptedJobs().catch((error) => {
+    console.error('[job] recovery failed', error);
+    return 0;
+  });
+  if (recovered > 0) console.warn(`[job] marked ${recovered} interrupted job(s) as failed`);
   const app = await buildServer();
   await app.listen({ port: config.port, host: config.host });
   app.log.info(`360note API listening on http://${config.host}:${config.port}`);

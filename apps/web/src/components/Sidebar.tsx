@@ -129,7 +129,7 @@ export function Sidebar() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const folderTreeRef = useRef<HTMLDivElement>(null);
   const tagListRef = useRef<HTMLDivElement>(null);
-  const [editingFolder, setEditingFolder] = useState<{ id?: string; name: string } | null>(null);
+  const [editingFolder, setEditingFolder] = useState<{ id?: string; name: string; parentId?: string | null } | null>(null);
   const [editingTag, setEditingTag] = useState<{ id?: string; name: string } | null>(null);
   const [deleteNode, setDeleteNode] = useState<{ kind: 'folder' | 'tag'; id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -173,7 +173,11 @@ export function Sidebar() {
     if (!workspaceId || !name.trim()) return false;
     try {
       if (id) await api.patch(`/api/folders/${id}`, { name: name.trim() });
-      else await api.post('/api/folders', { workspaceId, name: name.trim(), parentId: null });
+      else {
+        const parentId = editingFolder?.parentId ?? null;
+        await api.post('/api/folders', { workspaceId, name: name.trim(), parentId });
+        if (parentId) setExpanded((current) => new Set(current).add(parentId));
+      }
       await refreshFolders();
       setEditingFolder(null);
       return true;
@@ -197,10 +201,14 @@ export function Sidebar() {
     }
   }
 
-  function startCreateFolder() {
+  function startCreateFolder(parentId: string | null = null) {
     setEditingTag(null);
-    setEditingFolder({ name: '' });
-    requestAnimationFrame(() => folderTreeRef.current?.scrollTo({ top: 0 }));
+    setEditingFolder({ name: '', parentId });
+    if (parentId) setExpanded((current) => new Set(current).add(parentId));
+    requestAnimationFrame(() => {
+      if (parentId) return;
+      folderTreeRef.current?.scrollTo({ top: 0 });
+    });
   }
 
   function startCreateTag() {
@@ -270,8 +278,19 @@ export function Sidebar() {
               }}
               role="button"
               tabIndex={0}
+              aria-label={folder.name}
+              aria-expanded={children.length > 0 ? isOpen : undefined}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') void selectFilter('folder', { folderId: folder.id });
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setExpanded((current) => {
+                    const next = new Set(current);
+                    if (next.has(folder.id)) next.delete(folder.id);
+                    else next.add(folder.id);
+                    return next;
+                  });
+                  void selectFilter('folder', { folderId: folder.id });
+                }
               }}
             >
               <span className="tree-chevron">
@@ -282,7 +301,7 @@ export function Sidebar() {
               {folder.noteCount ? <span className="tree-folder-count">{folder.noteCount}</span> : null}
               <Dropdown
                 trigger={
-                  <button type="button" className="sidebar-section-action" aria-label={t('更多操作')}>
+                  <button type="button" className="sidebar-section-action" aria-label={t('{name}的更多操作', { name: folder.name })}>
                     <MoreHorizontal size={13} />
                   </button>
                 }
@@ -293,10 +312,10 @@ export function Sidebar() {
                       icon={<Plus size={14} />}
                       onClick={() => {
                         close();
-                        startCreateFolder();
+                        startCreateFolder(folder.id);
                       }}
                     >
-                      {t('新建文件夹')}
+                      {t('新建子文件夹')}
                     </MenuItem>
                     <MenuItem
                       icon={<FolderClosed size={14} />}
@@ -323,7 +342,22 @@ export function Sidebar() {
                 )}
               </Dropdown>
             </div>
-            {isOpen && children.length > 0 && <div className="tree-children">{renderFolders(folder.id, depth + 1)}</div>}
+            {isOpen && (children.length > 0 || (!editingFolder?.id && editingFolder?.parentId === folder.id)) && (
+              <div className="tree-children">
+                {renderFolders(folder.id, depth + 1)}
+                {!editingFolder?.id && editingFolder?.parentId === folder.id && (
+                  <div className="tree-folder-row is-editing" style={{ paddingLeft: 6 + (depth + 1) * 9 }}>
+                    <span className="tree-chevron"><span style={{ width: 12 }} /></span>
+                    <FolderPlus size={13} />
+                    <InlineNameInput
+                      placeholder={t('子文件夹名称')}
+                      onSubmit={(value) => saveFolder(value)}
+                      onCancel={() => setEditingFolder(null)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       });
@@ -442,20 +476,20 @@ export function Sidebar() {
         </Dropdown>
 
         <div className="sidebar-nav">
-          <button type="button" className={cn('nav-item', !settingsActive && filter === 'all' && 'active')} onClick={() => void selectFilter('all')}>
+          <button type="button" className={cn('nav-item', !settingsActive && filter === 'all' && 'active')} aria-current={!settingsActive && filter === 'all' ? 'page' : undefined} onClick={() => void selectFilter('all')}>
             <Archive size={15} />
             <span className="nav-label">{t('全部笔记')}</span>
             <span className="nav-count">{total}</span>
           </button>
-          <button type="button" className={cn('nav-item', !settingsActive && filter === 'recent' && 'active')} onClick={() => void selectFilter('recent')}>
+          <button type="button" className={cn('nav-item', !settingsActive && filter === 'recent' && 'active')} aria-current={!settingsActive && filter === 'recent' ? 'page' : undefined} onClick={() => void selectFilter('recent')}>
             <Clock3 size={15} />
             <span className="nav-label">{t('最近编辑')}</span>
           </button>
-          <button type="button" className={cn('nav-item', !settingsActive && filter === 'favorites' && 'active')} onClick={() => void selectFilter('favorites')}>
+          <button type="button" className={cn('nav-item', !settingsActive && filter === 'favorites' && 'active')} aria-current={!settingsActive && filter === 'favorites' ? 'page' : undefined} onClick={() => void selectFilter('favorites')}>
             <Star size={15} />
             <span className="nav-label">{t('收藏')}</span>
           </button>
-          <button type="button" className={cn('nav-item', !settingsActive && filter === 'trash' && 'active')} onClick={() => void selectFilter('trash')}>
+          <button type="button" className={cn('nav-item', !settingsActive && filter === 'trash' && 'active')} aria-current={!settingsActive && filter === 'trash' ? 'page' : undefined} onClick={() => void selectFilter('trash')}>
             <Trash2 size={15} />
             <span className="nav-label">{t('回收站')}</span>
           </button>
@@ -466,14 +500,14 @@ export function Sidebar() {
           <button
             type="button"
             className="sidebar-section-action"
-            onClick={startCreateFolder}
+            onClick={() => startCreateFolder(null)}
             aria-label={t('新建文件夹')}
           >
             <FolderPlus size={13} />
           </button>
         </div>
         <div className="sidebar-tree" ref={folderTreeRef}>
-          {editingFolder && !editingFolder.id && (
+          {editingFolder && !editingFolder.id && !editingFolder.parentId && (
             <div className="tree-folder-row is-editing" style={{ paddingLeft: 6 }}>
               <span className="tree-chevron"><span style={{ width: 12 }} /></span>
               <FolderPlus size={13} />
@@ -486,7 +520,7 @@ export function Sidebar() {
           )}
           {folders.length ? (
             renderFolders(null)
-          ) : !editingFolder ? (
+          ) : !editingFolder || editingFolder.parentId ? (
             <div className="sidebar-empty">{t('还没有文件夹')}</div>
           ) : null}
         </div>
@@ -531,6 +565,7 @@ export function Sidebar() {
                     <button
                       type="button"
                       className={cn('tag-chip-main', !settingsActive && filter === 'tag' && tagId === tag.id && 'active')}
+                      aria-current={!settingsActive && filter === 'tag' && tagId === tag.id ? 'page' : undefined}
                       onClick={() => void selectFilter('tag', { tagId: tag.id })}
                       title={`#${tag.name}`}
                     >
@@ -540,7 +575,7 @@ export function Sidebar() {
                     </button>
                     <Dropdown
                       trigger={
-                        <button type="button" className="tag-chip-more" aria-label={t('更多操作')}>
+                        <button type="button" className="tag-chip-more" aria-label={t('{name}的更多操作', { name: tag.name })}>
                           <MoreHorizontal size={11} />
                         </button>
                       }

@@ -43,6 +43,8 @@ export const config = {
   webDist: process.env.WEB_DIST || path.join(repoRoot, 'apps/web/dist'),
   registrationMode: (process.env.REGISTRATION_MODE || 'open') as 'open' | 'invite',
   inviteCode: process.env.REGISTRATION_INVITE_CODE || '',
+  // Optional: pin first-user administrator bootstrap to a known address.
+  bootstrapAdminEmail: (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase() || null,
   sessionDays: Number(process.env.SESSION_DAYS || 30),
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES || 25 * 1024 * 1024),
   trustProxy: (() => {

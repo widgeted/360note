@@ -293,12 +293,19 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const invitee = await one<DbUser>('SELECT * FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL', [body.email]);
     const inviter = await one<{ display_name: string }>('SELECT display_name FROM users WHERE id = $1', [auth.user.id]);
     const workspace = await one<{ name: string }>('SELECT name FROM workspaces WHERE id = $1', [id]);
-    const invitation = await one<{ id: string; created_at: Date; expires_at: Date }>(
-      `INSERT INTO workspace_invitations (workspace_id, inviter_id, email, invitee_id, role, token_hash, token_cipher, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, now() + interval '14 days')
-       RETURNING id, created_at, expires_at`,
-      [id, auth.user.id, body.email, invitee?.id ?? null, body.role, sha256(token), 'pending-cipher'],
-    );
+    let invitation: { id: string; created_at: Date; expires_at: Date } | null;
+    try {
+      invitation = await one<{ id: string; created_at: Date; expires_at: Date }>(
+        `INSERT INTO workspace_invitations (workspace_id, inviter_id, email, invitee_id, role, token_hash, token_cipher, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now() + interval '14 days')
+         RETURNING id, created_at, expires_at`,
+        [id, auth.user.id, body.email, invitee?.id ?? null, body.role, sha256(token), 'pending-cipher'],
+      );
+    } catch (error) {
+      // A parallel request won the unique pending-invitation index.
+      if ((error as { code?: string }).code === '23505') throw errors.conflict('已经向这个邮箱发送过邀请');
+      throw error;
+    }
     const cipher = encryptString(token, `invite:${invitation!.id}`);
     await one('UPDATE workspace_invitations SET token_cipher = $2 WHERE id = $1 RETURNING id', [invitation!.id, cipher]);
     if (invitee) {
@@ -373,9 +380,10 @@ export default async function workspaceRoutes(app: FastifyInstance) {
        FROM workspace_invitations i
        JOIN workspaces w ON w.id = i.workspace_id
        LEFT JOIN users u ON u.id = i.inviter_id
-       WHERE i.status = 'pending' AND lower(i.email) = lower($1) AND i.expires_at > now()
+       WHERE i.status = 'pending' AND i.expires_at > now()
+         AND (i.invitee_id = $2 OR (i.invitee_id IS NULL AND lower(i.email) = lower($1)))
        ORDER BY i.created_at DESC`,
-      [auth.user.email],
+      [auth.user.email, auth.user.id],
     );
     return {
       invitations: rows.map((row) => ({
@@ -404,16 +412,20 @@ export default async function workspaceRoutes(app: FastifyInstance) {
       status: string;
       expires_at: Date;
       inviter_id: string;
+      invitee_id: string | null;
       workspace_name: string;
     }>(
-      `SELECT i.id, i.workspace_id, i.email, i.role, i.status, i.expires_at, i.inviter_id, w.name AS workspace_name
+      `SELECT i.id, i.workspace_id, i.email, i.role, i.status, i.expires_at, i.inviter_id, i.invitee_id, w.name AS workspace_name
        FROM workspace_invitations i JOIN workspaces w ON w.id = i.workspace_id
        WHERE i.token_hash = $1`,
       [sha256(token)],
     );
     if (!row || row.status !== 'pending') throw errors.notFound('邀请不存在或已失效');
     if (row.expires_at < new Date()) throw errors.badRequest('邀请已过期');
-    if (row.email.toLowerCase() !== auth.user.email.toLowerCase()) throw errors.forbidden('这个邀请属于另一个账号');
+    // A known invitee is bound by user id so a changed email cannot transfer the
+    // invitation; email matching is only for addresses without an account yet.
+    const belongsToUser = row.invitee_id ? row.invitee_id === auth.user.id : row.email.toLowerCase() === auth.user.email.toLowerCase();
+    if (!belongsToUser) throw errors.forbidden('这个邀请属于另一个账号');
     await transaction(async (client) => {
       // Only one concurrent accept may consume a pending, unexpired invitation.
       const accepted = await client.query<{ id: string }>(
@@ -451,12 +463,13 @@ export default async function workspaceRoutes(app: FastifyInstance) {
   app.post('/api/invitations/:token/decline', async (request) => {
     const auth = requireAuth(request);
     const { token } = parse(z.object({ token: z.string().min(10) }), request.params);
-    const row = await one<{ id: string; email: string; expires_at: Date }>(
-      `SELECT id, email, expires_at FROM workspace_invitations WHERE token_hash = $1`,
+    const row = await one<{ id: string; email: string; expires_at: Date; invitee_id: string | null }>(
+      `SELECT id, email, expires_at, invitee_id FROM workspace_invitations WHERE token_hash = $1`,
       [sha256(token)],
     );
     if (!row) throw errors.notFound('邀请不存在或已失效');
-    if (row.email.toLowerCase() !== auth.user.email.toLowerCase()) throw errors.forbidden();
+    const belongsToUser = row.invitee_id ? row.invitee_id === auth.user.id : row.email.toLowerCase() === auth.user.email.toLowerCase();
+    if (!belongsToUser) throw errors.forbidden();
     const declined = await one<{ id: string }>(
       `UPDATE workspace_invitations SET status = 'declined'
        WHERE id = $1 AND status = 'pending' AND expires_at > now() RETURNING id`,

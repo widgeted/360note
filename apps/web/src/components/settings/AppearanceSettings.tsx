@@ -41,7 +41,7 @@ export default function AppearanceSettings() {
           <span className="settings-section-title">{t('主题')}</span>
           <span className="settings-section-desc">{t('跟随系统会在日落时自动切换')}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 9 }} className="theme-grid">
+        <div className="theme-grid">
           {(
             [
               { id: 'system', label: t('跟随系统'), icon: Monitor },
@@ -55,45 +55,19 @@ export default function AppearanceSettings() {
                 key={option.id}
                 type="button"
                 onClick={() => changeTheme(option.id)}
-                style={{
-                  textAlign: 'left',
-                  padding: 10,
-                  borderRadius: 9,
-                  border: `1px solid ${theme === option.id ? 'var(--blue)' : 'var(--line)'}`,
-                  background: 'var(--surface)',
-                }}
+                className={`theme-option ${theme === option.id ? 'selected' : ''}`}
               >
-                <div
-                  style={{
-                    height: 64,
-                    borderRadius: 6,
-                    marginBottom: 8,
-                    overflow: 'hidden',
-                    border: '1px solid var(--line)',
-                    display: 'flex',
-                    background: option.id === 'dark' ? '#0d111e' : option.id === 'light' ? '#f8f6f1' : 'linear-gradient(90deg,#0d111e 50%,#f8f6f1 50%)',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 22,
-                      background:
-                        option.id === 'light'
-                          ? '#f1eee7'
-                          : option.id === 'dark'
-                            ? '#070c1c'
-                            : 'linear-gradient(90deg,#070c1c 50%,#f1eee7 50%)',
-                    }}
-                  />
-                  <div style={{ flex: 1, padding: 7 }}>
-                    <div style={{ height: 5, width: '55%', borderRadius: 2, background: option.id === 'dark' ? '#e6e3dc' : '#23252a', opacity: 0.8 }} />
-                    <div style={{ height: 3, width: '80%', borderRadius: 2, background: option.id === 'dark' ? '#3a4157' : '#ddd8ce', marginTop: 5 }} />
-                    <div style={{ height: 3, width: '66%', borderRadius: 2, background: option.id === 'dark' ? '#3a4157' : '#ddd8ce', marginTop: 3 }} />
+                <div className="theme-preview" data-preview={option.id}>
+                  <div className="theme-preview-sidebar" />
+                  <div className="theme-preview-body">
+                    <div className="theme-preview-line theme-preview-line-strong" />
+                    <div className="theme-preview-line theme-preview-line-soft" />
+                    <div className="theme-preview-line theme-preview-line-short" />
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)' }}>
+                <div className="theme-option-label">
                   <Icon size={13} /> {option.label}
-                  {theme === option.id && <Check size={12} style={{ marginLeft: 'auto', color: 'var(--blue)' }} />}
+                  {theme === option.id && <Check size={12} className="theme-option-check" />}
                 </div>
               </button>
             );

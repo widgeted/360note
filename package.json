@@ -1,7 +1,7 @@
 {
   "name": "360note",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "360note — a calm, local-first notebook for ideas, knowledge, and publishing.",
   "workspaces": [
     "apps/*",
@@ -12,7 +12,9 @@
     "build": "npm run build -w @360note/shared && npm run build -w @360note/server && npm run build -w @360note/web",
     "start": "npm run start -w @360note/server",
     "test": "npm run test -w @360note/server && npm run test -w @360note/web",
-    "typecheck": "npm run typecheck -w @360note/shared && npm run typecheck -w @360note/server && npm run typecheck -w @360note/web"
+    "typecheck": "npm run typecheck -w @360note/shared && npm run typecheck -w @360note/server && npm run typecheck -w @360note/web",
+    "test:integration": "node tests/integration/postgres-api.mjs && node tests/integration/jobs-recovery.mjs && node tests/integration/backup-restore-drill.mjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",

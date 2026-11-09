@@ -108,6 +108,10 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
         </div>
       ) : (
         <>
+          <div className="info-line" style={{ marginBottom: 12 }}>
+            <Info size={13} />
+            <span>{t('分享页始终展示最新版本：当前 v{version}，最后更新 {time}。', { version: note.version, time: formatFullDate(note.updatedAt) })}</span>
+          </div>
           {activeShares.length > 0 && (
             <div className="banner banner-info" style={{ marginBottom: 14 }}>
               <Info size={15} />

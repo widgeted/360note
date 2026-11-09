@@ -369,6 +369,19 @@
 - 首次注册使用 `pg_advisory_xact_lock` 串行化“用户数 + 插入”事务。
 - TOTP 使用 `totp_last_step < step` 原子更新；备用码使用 `used_at IS NULL` 原子 UPDATE。
 
+## 2026-11-09 任务恢复、备份演练与邀请身份回归
+
+使用 `/opt/node22/bin/node` 运行（系统 Node 18 会让前端构建的 terser 插件报 `crypto is not defined`）。
+
+- `tests/integration/postgres-api.mjs`：一次性数据库 + API；注册/登录、空间隔离、笔记、备份完成/预览、邀请在改邮箱后仍按用户 ID 绑定、旧邮箱新账号不能继承邀请、并发重复邀请只留一条 pending。**通过。**
+- `tests/integration/jobs-recovery.mjs`：原子领取只成功一次；两次 `runJob` 只执行一次任务；重启恢复把 queued/running 标为 error，保留 done。**通过。**
+- `tests/integration/backup-restore-drill.mjs`：创建/预览/下载备份 → 永久删除笔记 → 上传备份 → 合并恢复 → 搜索并校验正文；同一 `job_id` 重复创建返回同一份校验通过的备份。**通过。**
+- `tests/e2e/core.spec.ts`（Playwright）：桌面新建/编辑/刷新/搜索；390px 移动端编辑器无横向溢出。**2 passed。**
+- `tests/manual/ui-regression.mjs`：面包屑显示当前空间、标题占位非斜体、侧栏热区 24px、文件夹菜单创建子文件夹、主题卡无内联颜色、移动端 toast 18px、键盘焦点可见。**通过。**
+- `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式清除删除 IndexedDB 与 auth/workspace 键。**通过。**
+- `tests/manual/security-audit.mjs`：**65 passed, 0 failed**。
+- `tests/manual/concurrency-test.mjs`、`first-admin-test.mjs`、`backup-limits-test.mjs`：**通过**。
+
 ## 2026-11-09 补充安全回归
 
 - 并发保存：行锁 + 条件版本更新；`concurrency-test.mjs` 验证一成功一 409。

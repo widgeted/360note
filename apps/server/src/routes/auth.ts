@@ -146,6 +146,9 @@ export default async function authRoutes(app: FastifyInstance) {
     }
     const issues = passwordIssues(body.password, body.email);
     if (issues.length) throw errors.badRequest(issues[0]);
+    if (count === 0 && config.bootstrapAdminEmail && body.email.toLowerCase() !== config.bootstrapAdminEmail) {
+      throw errors.forbidden('实例尚未初始化，请使用管理员邮箱完成首次注册');
+    }
     const exists = await one('SELECT id FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL', [body.email]);
     if (exists) throw errors.conflict('这个邮箱已注册');
     const codeOk = await consumeEmailCode(body.email, 'register', body.emailCode);
