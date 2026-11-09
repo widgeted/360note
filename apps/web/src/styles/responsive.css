@@ -9,23 +9,42 @@
     top: 0;
     right: 0;
     bottom: 0;
-    z-index: 45;
+    z-index: 60;
     width: min(350px, 86vw);
-    border-radius: 12px 0 0 12px;
-    box-shadow: var(--shadow-lg);
+    border-radius: 0;
+    box-shadow: none;
     border-left: 1px solid var(--line);
     overflow: hidden;
+    transform: translateX(102%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 260ms var(--ease), visibility 0s linear 260ms;
+  }
+
+  .context-panel.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    animation: none;
+    transition: transform 260ms var(--ease);
   }
 
   .context-scrim {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 44;
-    background: rgba(7, 10, 21, 0.1);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-    animation: fade-in var(--dur) ease both;
+    z-index: 59;
+    background: rgba(5, 8, 21, 0.42);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 260ms var(--ease);
+  }
+
+  .context-scrim.is-open {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
@@ -146,10 +165,6 @@
 }
 
 @media (max-width: 760px) {
-  .context-scrim {
-    display: block;
-    background: rgba(7, 10, 21, 0.12);
-  }
   :root {
     --header-height: 50px;
     --toolbar-height: 40px;
@@ -474,10 +489,6 @@
 }
 
 @media (max-width: 760px) {
-  .context-scrim {
-    display: block;
-    background: rgba(7, 10, 21, 0.12);
-  }
   .search-trigger kbd {
     display: none;
   }
@@ -551,10 +562,6 @@
 }
 
 @media (max-width: 760px) {
-  .context-scrim {
-    display: block;
-    background: rgba(7, 10, 21, 0.12);
-  }
   .security-grid {
     gap: 20px !important;
   }

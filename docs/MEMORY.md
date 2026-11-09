@@ -578,3 +578,9 @@ apps/web/src/styles/tokens.css        设计 token
 
 - context panel max1240: `width:min(350px,86vw)`, left radius 12px, scrim `rgba(7,10,21,.12)` + blur(3px)；删除 max760 `width:100%` 覆盖，左侧留约 55px 模糊笔记。
 - `resolveConflict` 不再 `contextOpen:true`；冲突只显示提示条，用户点“查看历史版本”才打开。
+
+## 2026-11-09 · v0.1.18 右侧抽屉与左侧统一
+
+- 修正 v0.1.17 的视觉不一致：去掉 context panel 圆角/阴影；移动端 transform translateX(102%) + 260ms 过渡，关闭时 visibility hidden；z 60/59。
+- 遮罩统一 `rgba(5,8,21,.42)` + blur(2px)。
+- AppPage 在 note 存在时始终挂载 scrim/panel，通过 `.is-open` 切换；桌面关闭用 display:none。

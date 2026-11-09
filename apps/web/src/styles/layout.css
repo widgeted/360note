@@ -1277,7 +1277,16 @@ kbd {
   flex-direction: column;
   background: var(--paper-50);
   border-left: 1px solid var(--line);
-  animation: slide-in-right var(--dur-slow) var(--ease);
+}
+
+@media (min-width: 1241px) {
+  .context-panel:not(.is-open) {
+    display: none;
+  }
+
+  .context-panel.is-open {
+    animation: slide-in-right var(--dur-slow) var(--ease);
+  }
 }
 
 .context-head {

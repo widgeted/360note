@@ -3,6 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.18] — 2026-11-09
+
+右侧抽屉与左侧抽屉完全统一。
+
+### Changed
+
+- 右侧信息抽屉去掉 12px 圆角与额外阴影，改为和左侧导航一样的直角、全高、同侧边框样式。
+- 打开/关闭都使用与左侧侧栏相同的 260ms transform 过渡；关闭时不再瞬间消失。
+- 遮罩统一为与左侧相同的 `rgba(5,8,21,0.42)` + `blur(2px)`，层级 60/59。
+- 抽屉在关闭后设置 `visibility:hidden`，不会进入键盘焦点序列。
+
 ## [0.1.17] — 2026-11-09
 
 右侧信息抽屉与冲突提示。

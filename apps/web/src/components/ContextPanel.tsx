@@ -79,6 +79,8 @@ export function ContextPanel() {
     return path;
   }, [note?.folderId, folders]);
 
+  const open = useAppStore((state) => state.contextOpen);
+
   useEffect(() => {
     if (!note) return;
     if (tab === 'backlinks') {
@@ -230,7 +232,7 @@ export function ContextPanel() {
   }
 
   return (
-    <aside className="context-panel">
+    <aside className={cn('context-panel', open && 'is-open')} aria-hidden={!open}>
       <div className="context-head">
         <div className="context-tabs">
           {(['info', 'backlinks', 'comments', 'history'] as const).map((entry) => (

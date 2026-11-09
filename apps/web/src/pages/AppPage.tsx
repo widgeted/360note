@@ -253,9 +253,9 @@ export default function AppPage() {
               <EmptyEditorState />
             )}
           </main>
-          {note && contextOpen && (
+          {note && (
             <>
-              <div className="context-scrim" onClick={() => setContextOpen(false)} />
+              <div className={cn('context-scrim', contextOpen && 'is-open')} onClick={() => setContextOpen(false)} />
               <ContextPanel />
             </>
           )}
