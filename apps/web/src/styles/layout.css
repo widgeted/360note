@@ -1043,10 +1043,6 @@ kbd {
   background: var(--text-faint);
 }
 
-.note-submeta-tag {
-  color: var(--text-secondary);
-}
-
 .editor-toolbar-wrap {
   position: sticky;
   top: 0;
@@ -1279,23 +1275,46 @@ kbd {
 
 /* ---------- Context panel ---------- */
 .context-panel {
-  width: var(--context-width);
-  flex: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  width: min(350px, 86vw);
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--paper-50);
   border-left: 1px solid var(--line);
+  overflow: hidden;
+  transform: translateX(102%);
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 260ms var(--ease), visibility 0s linear 260ms;
 }
 
-@media (min-width: 1241px) {
-  .context-panel:not(.is-open) {
-    display: none;
-  }
+.context-panel.is-open {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 260ms var(--ease);
+}
 
-  .context-panel.is-open {
-    animation: slide-in-right var(--dur-slow) var(--ease);
-  }
+.context-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: rgba(5, 8, 21, 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms var(--ease);
+}
+
+.context-scrim.is-open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .context-head {
@@ -1395,33 +1414,6 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-
-.context-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 23px;
-  padding: 0 7px;
-  border-radius: 6px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.context-tag button {
-  color: var(--text-tertiary);
-  display: grid;
-  place-items: center;
-  width: 13px;
-  height: 13px;
-  border-radius: 3px;
-}
-
-.context-tag button:hover {
-  color: var(--red);
-  background: var(--red-soft);
 }
 
 .context-add-tag {
@@ -1628,8 +1620,50 @@ kbd {
   margin-top: 2px;
 }
 
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.version-accordion {
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.version-accordion.open {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.version-chevron {
+  flex: none;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+  transition: transform 160ms var(--ease);
+}
+
+.version-chevron.open {
+  transform: rotate(180deg);
+}
+
+.version-collapse {
+  padding: 0 8px 10px;
+  animation: fade-in 140ms ease both;
+}
+
+.version-collapse-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.version-collapse .setting-note {
+  margin-top: 6px;
+}
+
 .version-preview {
-  margin-top: 12px;
+  margin-top: 4px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;

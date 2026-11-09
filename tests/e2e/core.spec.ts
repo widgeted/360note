@@ -49,7 +49,11 @@ test('mobile: core editor controls fit without horizontal overflow', async ({ pa
   await login(page);
   await page.locator('.note-item').first().click();
   await page.waitForTimeout(700);
-  await expect(page.getByRole('button', { name: /More formatting|更多格式/i })).toBeVisible();
+  const toolbar = page.locator('.editor-toolbar');
+  await expect(toolbar).toBeVisible();
+  const toolbarScrolls = await toolbar.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+  expect(toolbarScrolls).toBe(true);
+  await expect(page.getByRole('button', { name: /Clear formatting|清除格式/i })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 });

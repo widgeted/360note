@@ -6,6 +6,7 @@ import { useT } from '../../lib/i18n';
 import { auditActionLabel } from '../../lib/audit';
 import { formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { toast } from '../../stores/toast';
+import { useAuthStore } from '../../stores/auth';
 
 interface Stats {
   users: number;
@@ -14,6 +15,11 @@ interface Stats {
   attachments: number;
   storageBytes: number;
   activeShares: number;
+  activeSessions: number;
+  pendingJobs: number;
+  failedJobs: number;
+  databaseBytes: number;
+  lastBackupAt: string | null;
 }
 
 interface AdminUser {
@@ -24,21 +30,28 @@ interface AdminUser {
   totpEnabled: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  workspaceCount: number;
+  noteCount: number;
+  storageBytes: number;
+  sessionCount: number;
 }
 
 export default function AdminSettings() {
   const t = useT();
+  const currentUser = useAuthStore((state) => state.user);
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
+  const [runtime, setRuntime] = useState<{ uptimeSeconds: number; memoryBytes: number; nodeVersion: string } | null>(null);
   const [retention, setRetention] = useState(30);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get<{ stats: Stats; instance: typeof instance }>('/api/admin/stats').then((res) => {
+    api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime }>('/api/admin/stats').then((res) => {
       setStats(res.stats);
       setInstance(res.instance as typeof instance);
+      setRuntime(res.runtime as typeof runtime);
       setRetention(res.instance?.backupRetentionDays ?? 30);
     }).catch(() => {});
     api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch(() => {});
@@ -54,6 +67,31 @@ export default function AdminSettings() {
       toast('error', t('保存失败'), (error as Error).message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function refreshUsers() {
+    const response = await api.get<{ users: AdminUser[] }>('/api/admin/users');
+    setUsers(response.users);
+  }
+
+  async function changeRole(member: AdminUser, role: 'user' | 'admin') {
+    try {
+      await api.patch(`/api/admin/users/${member.id}/role`, { role });
+      await refreshUsers();
+      toast('success', t('角色已更新'));
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
+    }
+  }
+
+  async function revokeUserSessions(member: AdminUser) {
+    try {
+      await api.post(`/api/admin/users/${member.id}/revoke-sessions`);
+      await refreshUsers();
+      toast('success', t('已退出该用户的全部设备'));
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
     }
   }
 
@@ -88,6 +126,16 @@ export default function AdminSettings() {
           <span>OCR：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.ocrEnabled ? t('已启用') : t('未启用')}</strong></span>
           <span>AI：<strong style={{ color: 'var(--text-secondary)' }}>{instance?.aiEnabled ? t('已启用') : t('未启用')}</strong></span>
         </div>
+        <div className="admin-runtime">
+          <span>{t('运行时间')} <strong>{runtime ? `${Math.floor(runtime.uptimeSeconds / 3600)}h ${Math.floor((runtime.uptimeSeconds % 3600) / 60)}m` : '—'}</strong></span>
+          <span>{t('进程内存')} <strong>{runtime ? formatBytes(runtime.memoryBytes) : '—'}</strong></span>
+          <span>{t('数据库大小')} <strong>{stats ? formatBytes(stats.databaseBytes) : '—'}</strong></span>
+          <span>{t('活动会话')} <strong>{stats?.activeSessions ?? 0}</strong></span>
+          <span>{t('待处理任务')} <strong>{stats?.pendingJobs ?? 0}</strong></span>
+          <span>{t('24h 失败任务')} <strong style={{ color: (stats?.failedJobs ?? 0) > 0 ? 'var(--red)' : undefined }}>{stats?.failedJobs ?? 0}</strong></span>
+          <span>{t('最近备份')} <strong>{stats?.lastBackupAt ? formatRelativeShort(stats.lastBackupAt) : '—'}</strong></span>
+          <span>{t('Node')} <strong>{runtime?.nodeVersion ?? '—'}</strong></span>
+        </div>
       </section>
 
       <section className="settings-section">
@@ -112,21 +160,35 @@ export default function AdminSettings() {
           <span className="settings-section-desc">{users.length}</span>
         </div>
         <div className="setting-card" style={{ padding: 0, overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead><tr><th>{t('邮箱')}</th><th>{t('昵称')}</th><th>{t('角色')}</th><th>2FA</th><th>{t('最后登录')}</th></tr></thead>
+          <table className="data-table admin-users-table">
+            <thead><tr><th>{t('邮箱')}</th><th>{t('昵称')}</th><th>{t('角色')}</th><th>{t('空间 / 笔记')}</th><th>{t('附件存储')}</th><th>{t('会话')}</th><th>{t('最后登录')}</th><th>{t('操作')}</th></tr></thead>
             <tbody>
               {users.map((member) => (
                 <tr key={member.id}>
                   <td><strong>{member.email}</strong></td>
                   <td>{member.displayName}</td>
-                  <td><span className="badge">{member.role === 'admin' ? t('管理员') : t('普通用户')}</span></td>
-                  <td>{member.totpEnabled ? <span className="badge badge-green">{t('已启用')}</span> : <span className="badge">{t('未启用')}</span>}</td>
+                  <td>
+                    <select className="select select-sm" value={member.role} disabled={member.id === currentUser?.id} onChange={(event) => void changeRole(member, event.target.value as 'user' | 'admin')}>
+                      <option value="user">{t('普通用户')}</option>
+                      <option value="admin">{t('管理员')}</option>
+                    </select>
+                    {member.totpEnabled && <span className="badge badge-green" style={{ marginLeft: 5 }}>2FA</span>}
+                  </td>
+                  <td>{member.workspaceCount} / {member.noteCount}</td>
+                  <td>{formatBytes(member.storageBytes)}</td>
+                  <td>{member.sessionCount}</td>
                   <td>{member.lastLoginAt ? formatRelativeShort(member.lastLoginAt) : '—'}</td>
+                  <td>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeUserSessions(member)} disabled={member.sessionCount === 0 || member.id === currentUser?.id}>
+                      {t('退出设备')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <p className="setting-note" style={{ marginTop: 8 }}>{t('管理员可以查看账户元数据、空间/笔记/附件数量、会话与审计日志，并可调整角色或强制退出设备。不会提供读取用户笔记正文的后门；正文只在其授权的空间内可访问。')}</p>
       </section>
 
       <section className="settings-section">

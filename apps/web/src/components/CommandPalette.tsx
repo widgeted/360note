@@ -33,6 +33,7 @@ import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { getStoredTheme, storeTheme } from '../lib/theme';
+import { useIsMobile } from '../lib/useMediaQuery';
 import { formatNoteDate, shortcutLabel } from '../lib/utils';
 import { toast } from '../stores/toast';
 
@@ -59,6 +60,7 @@ export function CommandPalette() {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const instance = useAuthStore((state) => state.instance);
+  const isMobile = useIsMobile();
   const setUser = useAuthStore((state) => state.setUser);
   const [query, setQueryValue] = useState('');
   const [results, setResults] = useState<NoteSummary[]>([]);
@@ -316,6 +318,7 @@ export function CommandPalette() {
   ];
 
   const filteredCommands = commands.filter((command) => {
+    if (isMobile && command.id === 'focus') return false;
     if (!query.trim()) return true;
     const haystack = `${command.title} ${command.description ?? ''} ${command.keywords ?? ''}`.toLowerCase();
     return haystack.includes(query.trim().toLowerCase());

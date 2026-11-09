@@ -463,7 +463,11 @@ export async function updateNote(input: {
     const oldTitle = locked.title;
     const reason = input.reason ?? 'auto';
     const forceSnapshot = reason !== 'auto';
-    const version = locked.version + 1;
+    // Metadata-only changes (favorite, pin, folder, tags) must not consume a
+    // document version: otherwise pinning a note while typing makes the next
+    // autosave look like a stale-device conflict.
+    const contentEdited = input.title !== undefined || input.contentMd !== undefined;
+    const version = contentEdited ? locked.version + 1 : locked.version;
 
     const row = await client.query<NoteRow>(
       `UPDATE notes SET title = $2, content_md = $3, excerpt = $4, folder_id = $5,
@@ -496,7 +500,9 @@ export async function updateNote(input: {
 
     await setTags(client, input.noteId, locked.workspace_id, input.tagIds, input.tagNames);
     await rebuildLinks(client, input.noteId, locked.workspace_id, content);
-    await snapshotVersion(client, input.noteId, version, title, content, input.userId, reason, forceSnapshot);
+    if (contentEdited) {
+      await snapshotVersion(client, input.noteId, version, title, content, input.userId, reason, forceSnapshot);
+    }
 
     const fresh = await getNoteRow(input.noteId, client);
     if (!fresh) throw errors.notFound('笔记不存在');

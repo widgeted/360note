@@ -494,7 +494,7 @@ function NoteItem({
             <span className="dot" />
             <div className="note-item-tags">
               {note.tags.slice(0, 2).map((tag) => (
-                <span className="mini-tag" key={tag.id}>{tag.name}</span>
+                <span className="mini-tag" key={tag.id}>#{tag.name}</span>
               ))}
               {note.tags.length > 2 && <span className="mini-tag">+{note.tags.length - 2}</span>}
             </div>

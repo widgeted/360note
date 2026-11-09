@@ -1043,7 +1043,6 @@ async function resolveConflict(
         reloadTick: get().reloadTick + 1,
       });
       await cacheNote(note);
-      toast('success', translate('已自动合并另一台设备的更改'));
       return note;
     } catch {
       /* fall through to conflict copy */
@@ -1063,7 +1062,6 @@ async function resolveConflict(
       reloadTick: get().reloadTick + 1,
     });
     await cacheNote(remote);
-    toast('warning', translate('检测到冲突，已保存到版本历史'), translate('本地内容没有丢失，可在历史版本中查看。'));
     return remote;
   } catch (error) {
     toast('error', translate('冲突内容保存失败'), (error as Error).message);

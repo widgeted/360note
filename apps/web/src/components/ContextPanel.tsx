@@ -2,17 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Check,
+  ChevronDown,
   Download,
   ExternalLink,
   FileText,
-  Hash,
   History,
   MessageCircle,
   Paperclip,
   Plus,
   RotateCcw,
   Send,
-  Tag,
   Trash2,
   X,
 } from 'lucide-react';
@@ -58,6 +57,7 @@ export function ContextPanel() {
   const [versions, setVersions] = useState<{ currentVersion: number; versions: NoteVersion[] } | null>(null);
   const [versionLoading, setVersionLoading] = useState(false);
   const [versionDetail, setVersionDetail] = useState<NoteVersionDetail | null>(null);
+  const [loadingVersionId, setLoadingVersionId] = useState<number | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
   const [tagOpen, setTagOpen] = useState(false);
   const [tagQuery, setTagQuery] = useState('');
@@ -202,12 +202,15 @@ export function ContextPanel() {
 
   async function loadVersion(version: NoteVersion) {
     setVersionDetail(null);
+    setLoadingVersionId(version.id);
     try {
       const response = await api.get<{ version: NoteVersionDetail }>(`/api/notes/${note!.id}/versions/${version.id}`);
       setVersionDetail(response.version);
       setConfirmRestore(null);
     } catch (error) {
       toast('error', t('无法加载版本'), (error as Error).message);
+    } finally {
+      setLoadingVersionId(null);
     }
   }
 
@@ -259,11 +262,11 @@ export function ContextPanel() {
               <div className="context-tag-list">
                 {note.tags.length === 0 && !tagOpen && <span className="setting-note">{t('还没有标签')}</span>}
                 {note.tags.map((tag) => (
-                  <span className="context-tag" key={tag.id}>
-                    <Hash size={11} style={{ color: tag.color ?? 'var(--text-tertiary)', flex: 'none' }} />
-                    {tag.name}
+                  <span className="tag-token" key={tag.id}>
+                    <span className="tag-hash">#</span>
+                    <span className="tag-token-name">{tag.name}</span>
                     <button type="button" onClick={() => void removeTag(tag.id)} aria-label={t('移除')}>
-                      <X size={10} />
+                      <X size={11} />
                     </button>
                   </span>
                 ))}
@@ -287,7 +290,7 @@ export function ContextPanel() {
                   />
                   {tagResults.map((tag) => (
                     <button key={tag.id} type="button" className="menu-item" onClick={() => void addTag(tag.id)} disabled={addTagLoading} style={{ fontSize: 13 }}>
-                      <Tag size={12} /> {tag.name}
+                      <span className="tag-hash">#</span> {tag.name}
                     </button>
                   ))}
                   {tagQuery.trim() && !tagResults.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase()) && (
@@ -435,40 +438,57 @@ export function ContextPanel() {
             ) : !versions || versions.versions.length === 0 ? (
               <div className="context-empty">{t('版本由自动保存与手动保存生成。')}</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {versions.versions.map((version) => (
-                  <button
-                    key={version.id}
-                    type="button"
-                    className={cn('version-item', versionDetail?.id === version.id && 'active')}
-                    onClick={() => void loadVersion(version)}
-                  >
-                    <History size={13} style={{ color: 'var(--text-tertiary)', marginTop: 2 }} />
-                    <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                      <span className="version-time" style={{ display: 'block' }}>{formatFullDate(version.createdAt)}</span>
-                      <span className="version-reason">
-                        {t(REASON_LABELS[version.reason] ?? '自动保存')}
-                        {version.reason === 'conflict' ? '' : version.version === versions.currentVersion ? ` · ${t('当前版本')}` : ` · v${version.version}`}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+              <div className="version-list">
+                {versions.versions.map((version) => {
+                  const expanded = versionDetail?.id === version.id;
+                  return (
+                    <div className={cn('version-accordion', expanded && 'open')} key={version.id}>
+                      <button
+                        type="button"
+                        className={cn('version-item', expanded && 'active')}
+                        aria-expanded={expanded}
+                        onClick={() => {
+                          if (expanded) {
+                            setVersionDetail(null);
+                            setConfirmRestore(null);
+                          } else {
+                            void loadVersion(version);
+                          }
+                        }}
+                      >
+                        <History size={13} style={{ color: 'var(--text-tertiary)', marginTop: 2 }} />
+                        <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                          <span className="version-time" style={{ display: 'block' }}>{formatFullDate(version.createdAt)}</span>
+                          <span className="version-reason">
+                            {t(REASON_LABELS[version.reason] ?? '自动保存')}
+                            {version.reason === 'conflict' ? '' : version.version === versions.currentVersion ? ` · ${t('当前版本')}` : ` · v${version.version}`}
+                          </span>
+                        </span>
+                        <ChevronDown size={14} className={cn('version-chevron', expanded && 'open')} />
+                      </button>
+                      {expanded && (
+                        <div className="version-collapse">
+                          {loadingVersionId === version.id || !versionDetail ? (
+                            <div className="loading-row"><span className="spinner" /> {t('加载中…')}</div>
+                          ) : (
+                            <>
+                              <div className="version-preview prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(versionDetail.contentMd).html }} />
+                              <div className="version-collapse-actions">
+                                <button type="button" className={cn('btn btn-sm', confirmRestore === versionDetail.id ? 'btn-danger' : 'btn-secondary')} onClick={() => void doRestore(versionDetail)}>
+                                  <RotateCcw size={12} /> {confirmRestore === versionDetail.id ? t('再次点击确认恢复') : t('恢复此版本')}
+                                </button>
+                              </div>
+                              <p className="setting-note">{t('恢复会创建一个新版本，当前内容不会被静默覆盖。')}</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
-            {versionDetail && (
-              <div style={{ marginTop: 12 }}>
-                <div className="context-section-title">
-                  <span>{t('版本预览')} · {versionDetail.reason === 'conflict' ? t('冲突副本') : `v${versionDetail.version}`}</span>
-                </div>
-                <div className="version-preview prose" style={{ fontSize: 13 }} dangerouslySetInnerHTML={{ __html: renderMarkdown(versionDetail.contentMd).html }} />
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  <button type="button" className={cn('btn btn-sm', confirmRestore === versionDetail.id ? 'btn-danger' : 'btn-secondary')} onClick={() => void doRestore(versionDetail)}>
-                    <RotateCcw size={12} /> {confirmRestore === versionDetail.id ? t('再次点击确认恢复') : t('恢复此版本')}
-                  </button>
-                </div>
-                <p className="setting-note" style={{ marginTop: 6 }}>{t('恢复会创建一个新版本，当前内容不会被静默覆盖。')}</p>
-              </div>
-            )}
+            <p className="setting-note" style={{ marginTop: 8 }}>{t('自动保存最多每 5 分钟生成一个版本；手动保存、导入、恢复与冲突会立即生成。每篇笔记最多保留 60 个版本。')}</p>
           </div>
         )}
       </div>

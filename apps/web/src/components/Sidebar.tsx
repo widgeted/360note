@@ -542,7 +542,7 @@ export function Sidebar() {
               <div className="tag-cloud">
                 {editingTag && !editingTag.id && (
                   <div className="tag-edit-row">
-                    <Hash size={12} style={{ color: 'var(--sidebar-muted)', flex: 'none' }} />
+                    <span className="tag-hash" style={{ color: 'var(--sidebar-muted)' }}>#</span>
                     <InlineNameInput
                       placeholder={t('标签名称')}
                       onSubmit={(value) => saveTag(value)}
@@ -553,7 +553,7 @@ export function Sidebar() {
                 {tags.slice(0, 30).map((tag) =>
                   editingTag?.id === tag.id ? (
                     <div className="tag-edit-row" key={tag.id}>
-                      <Hash size={12} style={{ color: 'var(--sidebar-muted)', flex: 'none' }} />
+                      <span className="tag-hash" style={{ color: 'var(--sidebar-muted)' }}>#</span>
                       <InlineNameInput
                         initialValue={editingTag.name}
                         placeholder={t('标签名称')}
@@ -570,7 +570,7 @@ export function Sidebar() {
                         onClick={() => void selectFilter('tag', { tagId: tag.id })}
                         title={`#${tag.name}`}
                       >
-                        <Hash size={11} style={{ color: tag.color ?? 'var(--sidebar-muted)', flex: 'none' }} />
+                        <span className="tag-hash" style={{ color: tag.color ?? 'var(--sidebar-muted)' }}>#</span>
                         <span className="tag-chip-name">{tag.name}</span>
                         <span className="tag-chip-count">{tag.noteCount ?? 0}</span>
                       </button>

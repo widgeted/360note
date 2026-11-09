@@ -34,6 +34,7 @@ import {
 import { useAppStore, isLocalNote } from '../../stores/app';
 import { useAuthStore } from '../../stores/auth';
 import { useT, getLocale } from '../../lib/i18n';
+import { useIsMobile } from '../../lib/useMediaQuery';
 import {
   charCount,
   cn,
@@ -53,6 +54,7 @@ import { ConfirmDialog, Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 import { EditorToolbar } from './EditorToolbar';
 import { TipTapEditor, type EditorHandle, type UploadedAttachment } from './TipTapEditor';
+import { EditorTagBar } from './EditorTagBar';
 import { ShareDialog } from './ShareDialog';
 import { SummaryDialog } from './SummaryDialog';
 
@@ -87,6 +89,7 @@ export function EditorPane({
   const reloadNote = useAppStore((state) => state.reloadNote);
   const setFilter = useAppStore((state) => state.setFilter);
   const focusMode = useAppStore((state) => state.focusMode);
+  const isMobile = useIsMobile();
   const setFocusMode = useAppStore((state) => state.setFocusMode);
   const user = useAuthStore((state) => state.user);
   const instance = useAuthStore((state) => state.instance);
@@ -121,6 +124,7 @@ export function EditorPane({
   const editor = editorHandle?.editor ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showShare, setShowShare] = useState(false);
+  const [hasActiveShare, setHasActiveShare] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
@@ -130,7 +134,6 @@ export function EditorPane({
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
-  const [externalReload, setExternalReload] = useState(false);
   const [showExport, setShowExport] = useState(false);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -160,7 +163,6 @@ export function EditorPane({
     baseVersionRef.current = note.version;
     dirtyRef.current = false;
     setRichSeed((value) => value + 1);
-    setExternalReload(false);
     if (fresh) {
       useAppStore.setState({ freshNoteId: null });
       requestAnimationFrame(() => titleRef.current?.focus());
@@ -183,6 +185,9 @@ export function EditorPane({
   useEffect(() => {
     if (!note || reloadTick === lastReloadRef.current) return;
     lastReloadRef.current = reloadTick;
+    // Never replace text under an active edit. The user's unsaved words win;
+    // metadata saves no longer bump the document version, so this is rare.
+    if (dirtyRef.current) return;
     const latest = useAppStore.getState().note;
     if (!latest || latest.id !== note.id) return;
     clearTimeout(saveTimer.current ?? undefined);
@@ -194,9 +199,12 @@ export function EditorPane({
     baseVersionRef.current = latest.version;
     dirtyRef.current = false;
     setRichSeed((value) => value + 1);
-    setExternalReload(true);
     void clearDraft(latest.id);
   }, [reloadTick, note?.id]);
+
+  useEffect(() => {
+    if (note) baseVersionRef.current = note.version;
+  }, [note?.version]);
 
   useEffect(() => {
     if (note) document.title = `${title || t('未命名笔记')} — ${getLocale() === 'zh-CN' ? '360笔记' : '360note'}`;
@@ -337,6 +345,24 @@ export function EditorPane({
   }, [note?.id, workspaceId]);
 
   useEffect(() => {
+    if (!note?.canShare || isLocalNote(note.id)) {
+      setHasActiveShare(false);
+      return;
+    }
+    let active = true;
+    api.get<{ shares: Array<{ revokedAt: string | null }> }>(`/api/notes/${note.id}/shares`)
+      .then((response) => {
+        if (active) setHasActiveShare(response.shares.some((share) => !share.revokedAt));
+      })
+      .catch(() => {
+        if (active) setHasActiveShare(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [note?.id, note?.canShare, showShare]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
@@ -378,12 +404,14 @@ export function EditorPane({
   const canShare = note.canShare && !note.trashedAt && !isLocalNote(note.id);
 
   function applyTitle(next: string) {
+    if (next === titleValueRef.current) return;
     setTitle(next);
     scheduleSave();
     scheduleDraft();
   }
 
   function applyContent(next: string) {
+    if (next === contentRef.current) return;
     setContent(next);
     contentRef.current = next;
     scheduleSave();
@@ -635,8 +663,14 @@ export function EditorPane({
             {note.isFavorite ? <Star size={16} fill="currentColor" /> : <Star size={16} />}
           </button>
           {canShare && (
-            <button type="button" className="btn btn-soft btn-sm hide-mobile" onClick={() => setShowShare(true)}>
-              <Share2 size={13} /> {t('分享')}
+            <button
+              type="button"
+              className={cn('icon-btn hide-mobile', hasActiveShare && 'share-active')}
+              onClick={() => setShowShare(true)}
+              title={hasActiveShare ? t('已创建分享链接') : t('分享')}
+              aria-label={hasActiveShare ? t('已创建分享链接') : t('分享')}
+            >
+              <Share2 size={16} />
             </button>
           )}
           <button
@@ -672,7 +706,9 @@ export function EditorPane({
                   <MenuItem icon={<Sparkles size={14} />} onClick={() => { close(); setShowSummary(true); }}>{t('生成摘要')}</MenuItem>
                 )}
                 <MenuItem icon={<Mic size={14} />} onClick={() => { close(); startVoice(); }}>{voiceActive ? t('正在聆听…') : t('语音输入')}</MenuItem>
-                <MenuItem icon={focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} onClick={() => { close(); setFocusMode(!focusMode); }}>{focusMode ? t('退出聚焦') : t('聚焦模式')}</MenuItem>
+                {!isMobile && (
+                  <MenuItem icon={focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} onClick={() => { close(); setFocusMode(!focusMode); }}>{focusMode ? t('退出聚焦') : t('聚焦模式')}</MenuItem>
+                )}
                 <div className="menu-separator" />
                 <div className="menu-label">{t('导出')}</div>
                 <MenuItem icon={<FileText size={14} />} onClick={() => { close(); void exportNote('md'); }}>{t('导出为 Markdown')}</MenuItem>
@@ -708,19 +744,6 @@ export function EditorPane({
           <div className="banner banner-info" style={{ maxWidth: 900, margin: '0 auto' }}>
             <Info size={15} />
             <div>{t('你在这个空间中拥有只读权限。')}</div>
-          </div>
-        </div>
-      )}
-      {externalReload && (
-        <div style={{ padding: '10px 18px 0' }}>
-          <div className="banner banner-info" style={{ maxWidth: 900, margin: '0 auto' }}>
-            <Check size={15} />
-            <div className="banner-body">{t('已加载其他设备合并后的最新内容。')}</div>
-            <div className="banner-actions">
-              <button type="button" className="icon-btn icon-btn-sm banner-close" onClick={() => setExternalReload(false)} aria-label={t('关闭提示')}>
-                <X size={14} />
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -812,14 +835,6 @@ export function EditorPane({
             <span>{t('{n} 字', { n: words })}</span>
             <span className="dot" />
             <span>{t('约 {n} 分钟阅读', { n: readMinutes })}</span>
-            {note.tags.length > 0 && (
-              <>
-                <span className="dot" />
-                {note.tags.slice(0, 3).map((tag) => (
-                  <span className="note-submeta-tag" key={tag.id}>#{tag.name}</span>
-                ))}
-              </>
-            )}
           </div>
 
           {mode === 'markdown' ? (
@@ -847,6 +862,7 @@ export function EditorPane({
               uploadFile={uploadAttachment}
             />
           )}
+          <EditorTagBar />
         </div>
       </div>
 

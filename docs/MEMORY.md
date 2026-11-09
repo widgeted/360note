@@ -594,3 +594,12 @@ apps/web/src/styles/tokens.css        设计 token
 - EditorToolbar 移除 isMobile 折叠分支：所有格式按钮进入同一行；删除移动端“更多格式”Dropdown。
 - 移动端 `.tool-btn` 30→34px；`.editor-toolbar` nowrap + overflow-x auto。
 - 清除格式固定在末尾，`RemoveFormatting` 图标，`.tool-btn-danger` 使用 `--red`/`--red-soft`。
+
+## 2026-11-09 · v0.1.21 稳定性、历史折叠、标签与管理员
+
+- 服务端 `updateNote` 仅 title/contentMd 变化时 bump version；favorite/pin/folder/tags 不消耗版本，避免编辑中被元数据更新打成 409。
+- 客户端 EditorPane reload effect 在有 dirty 内容时不再覆盖；移除 externalReload banner 和自动合并 toast；openNote 比较 version/title/content 后 bump reloadTick。
+- 桌面 info panel 与移动端统一为 fixed right drawer；focus mode 在移动端菜单/命令面板隐藏。
+- 历史版本改为 `.version-accordion` 折叠，预览内联；自动快照 5 分钟阈值仍由 `snapshotVersion` 控制，最多 60 条。
+- 顶部 share 改 icon-btn + `.share-active` 绿色；新增 EditorTagBar，标签使用 `.tag-token`/`.tag-hash`；Sidebar/ContextPanel 标签图标统一为字面 `#`。
+- Admin stats 增加运行状态；users 增加聚合计数、角色修改、强制退会话；新增 docs/ADMIN.md。

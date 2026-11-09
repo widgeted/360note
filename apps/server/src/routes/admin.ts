@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { many, one } from '../db.js';
+import { many, one, query } from '../db.js';
 import { clientIp, requireAuth } from '../auth.js';
 import { audit } from '../lib/audit.js';
 import { AppError, errors } from '../lib/errors.js';
@@ -26,6 +26,11 @@ export default async function adminRoutes(app: FastifyInstance) {
       attachments: string;
       bytes: string;
       shares: string;
+      sessions: string;
+      pending_jobs: string;
+      failed_jobs: string;
+      database_bytes: string;
+      last_backup: Date | null;
     }>(
       `SELECT
         (SELECT count(*)::text FROM users WHERE deleted_at IS NULL) AS users,
@@ -33,7 +38,12 @@ export default async function adminRoutes(app: FastifyInstance) {
         (SELECT count(*)::text FROM notes WHERE deleted_at IS NULL AND trashed_at IS NULL) AS notes,
         (SELECT count(*)::text FROM attachments WHERE deleted_at IS NULL) AS attachments,
         (SELECT COALESCE(sum(size_bytes),0)::text FROM attachments WHERE deleted_at IS NULL) AS bytes,
-        (SELECT count(*)::text FROM share_links WHERE revoked_at IS NULL) AS shares`,
+        (SELECT count(*)::text FROM share_links WHERE revoked_at IS NULL) AS shares,
+        (SELECT count(*)::text FROM sessions WHERE revoked_at IS NULL AND expires_at > now()) AS sessions,
+        (SELECT count(*)::text FROM jobs WHERE status IN ('queued', 'running')) AS pending_jobs,
+        (SELECT count(*)::text FROM jobs WHERE status = 'error' AND created_at > now() - interval '24 hours') AS failed_jobs,
+        pg_database_size(current_database())::text AS database_bytes,
+        (SELECT max(created_at) FROM backups) AS last_backup`,
     );
     return {
       stats: {
@@ -43,6 +53,16 @@ export default async function adminRoutes(app: FastifyInstance) {
         attachments: Number(stats!.attachments),
         storageBytes: Number(stats!.bytes),
         activeShares: Number(stats!.shares),
+        activeSessions: Number(stats!.sessions),
+        pendingJobs: Number(stats!.pending_jobs),
+        failedJobs: Number(stats!.failed_jobs),
+        databaseBytes: Number(stats!.database_bytes),
+        lastBackupAt: stats!.last_backup?.toISOString() ?? null,
+      },
+      runtime: {
+        uptimeSeconds: Math.round(process.uptime()),
+        memoryBytes: process.memoryUsage().rss,
+        nodeVersion: process.version,
       },
       instance: {
         version: config.version,
@@ -65,9 +85,20 @@ export default async function adminRoutes(app: FastifyInstance) {
       totp_enabled: boolean;
       last_login_at: Date | null;
       created_at: Date;
+      workspace_count: string;
+      note_count: string;
+      storage_bytes: string;
+      session_count: string;
     }>(
-      `SELECT id, email, display_name, role, totp_enabled, last_login_at, created_at
-       FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 500`,
+      `SELECT u.id, u.email, u.display_name, u.role, u.totp_enabled, u.last_login_at, u.created_at,
+        (SELECT count(*) FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
+          WHERE m.user_id = u.id AND w.deleted_at IS NULL)::text AS workspace_count,
+        (SELECT count(*) FROM notes n JOIN workspace_members m ON m.workspace_id = n.workspace_id
+          WHERE m.user_id = u.id AND n.deleted_at IS NULL AND n.trashed_at IS NULL)::text AS note_count,
+        (SELECT COALESCE(sum(a.size_bytes),0) FROM attachments a JOIN workspace_members m ON m.workspace_id = a.workspace_id
+          WHERE m.user_id = u.id AND a.deleted_at IS NULL)::text AS storage_bytes,
+        (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now())::text AS session_count
+       FROM users u WHERE u.deleted_at IS NULL ORDER BY u.created_at DESC LIMIT 500`,
     );
     return {
       users: rows.map((row) => ({
@@ -78,8 +109,43 @@ export default async function adminRoutes(app: FastifyInstance) {
         totpEnabled: row.totp_enabled,
         lastLoginAt: row.last_login_at?.toISOString() ?? null,
         createdAt: row.created_at.toISOString(),
+        workspaceCount: Number(row.workspace_count),
+        noteCount: Number(row.note_count),
+        storageBytes: Number(row.storage_bytes),
+        sessionCount: Number(row.session_count),
       })),
     };
+  });
+
+  app.patch('/api/admin/users/:id/role', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const body = parse(z.object({ role: z.enum(['user', 'admin']) }), request.body);
+    if (id === auth.user.id && body.role !== 'admin') throw errors.badRequest('不能移除自己的管理员权限');
+    if (body.role === 'user') {
+      const admins = await one<{ count: string }>(
+        `SELECT count(*)::text AS count FROM users WHERE role = 'admin' AND deleted_at IS NULL`,
+      );
+      if (Number(admins?.count ?? 0) <= 1) throw errors.badRequest('实例至少需要保留一个管理员');
+    }
+    const updated = await one<{ id: string }>(
+      'UPDATE users SET role = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id',
+      [id, body.role],
+    );
+    if (!updated) throw errors.notFound('用户不存在');
+    await audit({ actorId: auth.user.id, action: 'admin.user.role', targetType: 'user', targetId: id, meta: { role: body.role }, ip: clientIp(request) });
+    return { ok: true };
+  });
+
+  app.post('/api/admin/users/:id/revoke-sessions', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    if (id === auth.user.id) throw errors.badRequest('请在账户安全页退出自己的其他设备');
+    await query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
+    await audit({ actorId: auth.user.id, action: 'admin.user.sessions', targetType: 'user', targetId: id, ip: clientIp(request) });
+    return { ok: true };
   });
 
   app.get('/api/admin/settings', async (request) => {

@@ -232,6 +232,11 @@ a.btn {
   color: var(--blue);
 }
 
+.icon-btn.share-active {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
 .icon-btn:disabled {
   opacity: 0.35;
   cursor: default;
@@ -2122,4 +2127,137 @@ a.btn {
     top: 10px;
     right: 10px;
   }
+}
+
+/* Shared tag token: one visual language across sidebar, drawer and editor. */
+.tag-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  height: 26px;
+  max-width: 220px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-150);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.tag-hash {
+  color: var(--text-tertiary);
+  font-weight: 650;
+  flex: none;
+}
+
+.tag-token-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-token button {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: -3px;
+  border-radius: 3px;
+  color: var(--text-tertiary);
+}
+
+.tag-token button:hover {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.tag-token-add,
+.tag-token-select {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.tag-token-add:hover,
+.tag-token-select:hover {
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.editor-tag-section {
+  margin-top: 38px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.editor-tag-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.editor-tag-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-tag-popover {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.editor-tag-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.editor-tag-input-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .editor-tag-section {
+    margin-top: 30px;
+  }
+}
+
+.admin-runtime {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-50);
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.admin-runtime strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.admin-users-table {
+  min-width: 820px;
 }
