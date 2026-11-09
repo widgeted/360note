@@ -496,4 +496,4 @@ apps/web/src/styles/tokens.css        设计 token
 - 侧栏收起时只显示图标（`brand-icon`），完整 wordmark 不再溢出 56px 侧栏。
 - 移动端通知按钮使用独立 `sidebar-icon-btn`，不再被 `.sidebar-collapse` 的移动端隐藏规则影响。
 - 公开分享页任务列表保留 checkbox 并设置 `data-type=taskList`，与编辑器一致。
-- 生产安全审计扩展为 63 项，当前 63/63 通过。
+- 生产安全审计扩展为 65 项，当前 65/65 通过。

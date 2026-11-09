@@ -413,12 +413,19 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     if (row.expires_at < new Date()) throw errors.badRequest('邀请已过期');
     if (row.email.toLowerCase() !== auth.user.email.toLowerCase()) throw errors.forbidden('这个邀请属于另一个账号');
     await transaction(async (client) => {
+      // Only one concurrent accept may consume a pending, unexpired invitation.
+      const accepted = await client.query<{ id: string }>(
+        `UPDATE workspace_invitations SET status = 'accepted', accepted_at = now()
+         WHERE id = $1 AND status = 'pending' AND expires_at > now()
+         RETURNING id`,
+        [row.id],
+      );
+      if (accepted.rowCount !== 1) throw errors.notFound('邀请不存在或已失效');
       await client.query(
         `INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, $3)
          ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
         [row.workspace_id, auth.user.id, row.role],
       );
-      await client.query(`UPDATE workspace_invitations SET status = 'accepted', accepted_at = now() WHERE id = $1`, [row.id]);
       await client.query(
         `INSERT INTO notifications (user_id, type, title, body, link) VALUES ($1, 'invitation', $2, $3, '/app')`,
         [row.inviter_id, `${auth.user.display_name} 接受了加入「${row.workspace_name}」的邀请`, null],
@@ -442,13 +449,18 @@ export default async function workspaceRoutes(app: FastifyInstance) {
   app.post('/api/invitations/:token/decline', async (request) => {
     const auth = requireAuth(request);
     const { token } = parse(z.object({ token: z.string().min(10) }), request.params);
-    const row = await one<{ id: string; email: string }>(
-      `SELECT id, email FROM workspace_invitations WHERE token_hash = $1 AND status = 'pending'`,
+    const row = await one<{ id: string; email: string; expires_at: Date }>(
+      `SELECT id, email, expires_at FROM workspace_invitations WHERE token_hash = $1`,
       [sha256(token)],
     );
     if (!row) throw errors.notFound('邀请不存在或已失效');
     if (row.email.toLowerCase() !== auth.user.email.toLowerCase()) throw errors.forbidden();
-    await one(`UPDATE workspace_invitations SET status = 'declined' WHERE id = $1 RETURNING id`, [row.id]);
+    const declined = await one<{ id: string }>(
+      `UPDATE workspace_invitations SET status = 'declined'
+       WHERE id = $1 AND status = 'pending' AND expires_at > now() RETURNING id`,
+      [row.id],
+    );
+    if (!declined) throw errors.notFound('邀请不存在或已失效');
     return { ok: true };
   });
 

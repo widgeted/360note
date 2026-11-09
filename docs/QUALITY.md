@@ -355,6 +355,25 @@
 
 ## 生产安全回归（2026-11-08）
 
-`tests/manual/security-audit.mjs` 覆盖 61 项检查：未登录边界、CSRF、跨个人空间读写/列表/搜索/导出/备份、团队 owner/admin/editor/viewer 权限、邀请接受、分享链接（公开/密码/评论/撤销/过期）、附件权限、API 令牌范围与撤销、邮箱验证码错误/尝试上限、找回密码、修改邮箱、实例管理员边界、SQL 元字符。当前结果：**61 passed, 0 failed**。
+`tests/manual/security-audit.mjs` 覆盖 65 项检查：未登录边界、CSRF、跨个人空间读写/列表/搜索/导出/备份、团队 owner/admin/editor/viewer 权限、邀请接受、分享链接（公开/密码/评论/撤销/过期）、附件权限、API 令牌范围与撤销、邮箱验证码错误/尝试上限、找回密码、修改邮箱、实例管理员边界、SQL 元字符。当前结果：**65 passed, 0 failed**。
 
 该脚本只创建临时数据并在结束时清理；不发送任何邮件。
+
+## 2026-11-09 并发与资源限制回归
+
+- `tests/manual/concurrency-test.mjs`：并发 PATCH 只允许一个提交，另一个返回 409；同一 TOTP 时间步/备用码只能消费一次。
+- `tests/manual/first-admin-test.mjs`：临时数据库 + 临时 API，两次并发首次注册只产生一个管理员。
+- `tests/manual/backup-limits-test.mjs`：拒绝超量条目、超大单条目、异常压缩比和结构无效的备份。
+- `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式“退出并清除本机数据”清空 IndexedDB 与 auth/workspace 键。
+- `updateNote` 使用行锁 + `WHERE version = locked.version` 条件更新，事务内校验 `baseVersion`。
+- 首次注册使用 `pg_advisory_xact_lock` 串行化“用户数 + 插入”事务。
+- TOTP 使用 `totp_last_step < step` 原子更新；备用码使用 `used_at IS NULL` 原子 UPDATE。
+
+## 2026-11-09 补充安全回归
+
+- 并发保存：行锁 + 条件版本更新；`concurrency-test.mjs` 验证一成功一 409。
+- 并发首次注册：advisory lock；`first-admin-test.mjs` 在临时数据库/API 上验证只有一个 admin。
+- TOTP/备用码：原子消费；`concurrency-test.mjs` 验证并发只成功一次且重放失败。
+- 备份：`backup-limits-test.mjs` 验证条目数、单条目、压缩比、结构无效均被拒绝。
+- 缓存隔离：`cache-isolation-test.mjs` 验证切换账户清除旧缓存、显式登出清除 IndexedDB。
+- 客户端 IP：nginx 覆盖 `X-Forwarded-For` 为 `CF-Connecting-IP`，Fastify `TRUST_PROXY=127.0.0.1`；已用伪造 XFF 验证不会写入审计。

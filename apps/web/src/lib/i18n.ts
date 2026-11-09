@@ -723,6 +723,8 @@ const en: Record<string, string> = {
   '新的笔记评论': 'New note comment',
   '新的分享评论': 'New share comment',
   '共享笔记被编辑': 'Shared note edited',
+  '退出并清除本机数据会删除本机离线缓存和未同步草稿，且无法恢复。确定继续？': 'Signing out and clearing this device removes offline caches and unsynced drafts. This cannot be undone. Continue?',
+  '退出并清除本机数据': 'Sign out and clear this device',
   '仍然无法登录？': 'Still unable to sign in?',
   '更多格式': 'More formatting',
   '还没有文件夹': 'No folders yet',

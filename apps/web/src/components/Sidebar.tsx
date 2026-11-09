@@ -608,6 +608,7 @@ export function Sidebar() {
               }
             >
               {(close) => (
+                <>
                 <MenuItem
                   danger
                   icon={<LogOut size={14} />}
@@ -619,6 +620,19 @@ export function Sidebar() {
                 >
                   {t('退出登录')}
                 </MenuItem>
+                <MenuItem
+                  danger
+                  icon={<Trash2 size={14} />}
+                  onClick={async () => {
+                    close();
+                    if (!window.confirm(t('退出并清除本机数据会删除本机离线缓存和未同步草稿，且无法恢复。确定继续？'))) return;
+                    await logout({ clearLocalData: true });
+                    navigate('/login');
+                  }}
+                >
+                  {t('退出并清除本机数据')}
+                </MenuItem>
+                </>
               )}
             </Dropdown>
           </div>

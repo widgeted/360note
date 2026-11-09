@@ -1,7 +1,16 @@
-import { del, get, set } from 'idb-keyval';
+import { clear, del, get, set } from 'idb-keyval';
 import type { Folder, Note, NoteSummary, Tag } from '@360note/shared';
 
 const PREFIX = 'nh:v1:';
+
+// Once local data is being cleared on logout/account switch, in-flight autosaves
+// must not repopulate IndexedDB before the next account logs in.
+let localWritesEnabled = true;
+
+export function setLocalWritesEnabled(enabled: boolean): void {
+  localWritesEnabled = enabled;
+}
+
 
 export interface WorkspaceSnapshot {
   notes: NoteSummary[];
@@ -44,6 +53,7 @@ function withOutboxLock<T>(task: () => Promise<T>): Promise<T> {
 }
 
 export async function cacheWorkspace(workspaceId: string, snapshot: Omit<WorkspaceSnapshot, 'cachedAt'>): Promise<void> {
+  if (!localWritesEnabled) return;
   try {
     await set(`${PREFIX}workspace:${workspaceId}`, { ...snapshot, cachedAt: Date.now() } satisfies WorkspaceSnapshot);
   } catch {
@@ -60,6 +70,7 @@ export async function readWorkspaceCache(workspaceId: string): Promise<Workspace
 }
 
 export async function cacheNote(note: Note): Promise<void> {
+  if (!localWritesEnabled) return;
   try {
     await set(`${PREFIX}note:${note.id}`, {
       note,
@@ -88,6 +99,7 @@ export async function removeCachedNote(noteId: string): Promise<void> {
 }
 
 export async function saveDraft(draft: Draft): Promise<void> {
+  if (!localWritesEnabled) return;
   try {
     await set(`${PREFIX}draft:${draft.noteId}`, draft);
   } catch {
@@ -120,6 +132,7 @@ export async function readOutbox(): Promise<OutboxItem[]> {
 }
 
 export async function enqueueOutbox(item: OutboxItem): Promise<void> {
+  if (!localWritesEnabled) return;
   await withOutboxLock(async () => {
     const items = await readOutbox();
     const existingIndex = items.findIndex((entry) => entry.noteId === item.noteId);
@@ -184,6 +197,7 @@ export async function cacheSize(): Promise<number> {
 }
 
 export async function updateCachedNote(note: Note): Promise<void> {
+  if (!localWritesEnabled) return;
   try {
     const existing = await readCachedNote(note.id);
     await set(`${PREFIX}note:${note.id}`, {
@@ -193,5 +207,29 @@ export async function updateCachedNote(note: Note): Promise<void> {
     } satisfies CachedNote);
   } catch {
     /* ignore */
+  }
+}
+
+
+/**
+ * Remove all locally cached note bodies, drafts, outbox entries and workspace
+ * snapshots. Theme/locale preferences are intentionally kept.
+ */
+export async function clearSensitiveLocalData(): Promise<void> {
+  localWritesEnabled = false;
+  try {
+    await clear();
+  } catch {
+    /* IndexedDB may be unavailable in private mode */
+  }
+  try {
+    const keysToRemove: string[] = ['nh-auth-cache', 'nh-workspace', 'nh-guest-name'];
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith('nh-editor-mode:')) keysToRemove.push(key);
+    }
+    for (const key of keysToRemove) localStorage.removeItem(key);
+  } catch {
+    /* ignore storage errors */
   }
 }

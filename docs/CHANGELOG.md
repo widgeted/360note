@@ -344,4 +344,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - 登录/注册/找回的验证码按钮与输入框高度统一；密码可见性按钮热区扩大到 30px。
 - 首页中文能力标题重新断行；英文安全标题改为 “not an afterthought”；品牌 logo 在首页/认证页略增大。
 - 提亮浅色主题的 tertiary/faint 文本与侧栏 muted 文本，改善 13px 文案对比度。
-- 新增 63 项生产安全回归，包含标签在更新/恢复后保留的回归检查。
+- 新增 65 项生产安全回归，包含标签在更新/恢复后保留的回归检查。
+
+## 2026-11-09 — 并发、TOTP、备份与本地缓存加固
+
+- 笔记保存改为事务内 `SELECT … FOR UPDATE` + `WHERE version = locked.version` 条件更新；并发保存只有一个提交，另一个返回 409。冲突响应包含当前版本。
+- 首次注册使用 PostgreSQL 事务级 advisory lock 串行化“用户数检查 + 创建”，并发首次注册只产生一个管理员。
+- TOTP 时间步使用 `totp_last_step < step` 原子消费；备用码使用 `used_at IS NULL` 原子 UPDATE。并发登录同一时间步/备用码只有一个成功。
+- 启用 2FA 也改为条件更新，避免并发启用覆盖备用码。
+- 邮箱验证码消费改为 `consumed_at IS NULL` 原子更新；邀请接受改为 `status='pending' AND expires_at > now()` 条件更新。
+- 备份 ZIP 解析增加条目数、单条目、解压总量、压缩比和结构校验；恶意备份在解压前被拒绝。
+- PDF 导出移除外部图片，避免 Chromium 被笔记内容诱导访问内网地址。
+- 退出登录新增“退出并清除本机数据”选项；切换账户自动清空上一账户的 IndexedDB 笔记、草稿、outbox 与 workspace 快照。
+- nginx 使用 Cloudflare 真实客户端 IP 覆盖 X-Forwarded-For，Fastify 仅信任本机代理，避免限流/审计 IP 伪造。

@@ -38,6 +38,7 @@ interface UploadedFile {
 const MAX_NOTES = 3000;
 const MAX_ZIP_BYTES = 400 * 1024 * 1024;
 const MAX_ENTRIES = 6000;
+const MAX_COMPRESSION_RATIO = 500;
 
 function attachmentMarker(key: string): string {
   return `360note-attachment://${key}`;
@@ -75,8 +76,12 @@ async function extractZip(zipPath: string, targetDir: string): Promise<Map<strin
     // Reject oversized entries from their headers before inflating them. A
     // small zip can declare gigabytes and otherwise exhaust server memory.
     const declared = Number(entry.header.size ?? 0);
+    const compressed = Number(entry.header.compressedSize ?? 0);
     if (declared > MAX_ZIP_BYTES || total + declared > MAX_ZIP_BYTES) {
       throw errors.badRequest('解压后的文件过大');
+    }
+    if (declared > 1024 * 1024 && (compressed === 0 || declared / compressed > MAX_COMPRESSION_RATIO)) {
+      throw errors.badRequest('压缩包压缩比异常');
     }
     const data = entry.getData();
     total += data.length;

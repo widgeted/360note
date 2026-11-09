@@ -94,6 +94,7 @@ interface AppState {
   setFocusMode: (focus: boolean) => void;
   bumpReload: () => void;
   clearConflict: () => void;
+  reset: () => void;
 }
 
 let flushing = false;
@@ -953,6 +954,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  reset: () => set({
+    workspaceId: null,
+    initializedWorkspace: null,
+    notes: [],
+    total: 0,
+    folders: [],
+    tags: [],
+    note: null,
+    loadingList: false,
+    loadingNote: false,
+    listError: null,
+    filter: 'all',
+    folderId: null,
+    tagId: null,
+    query: '',
+    sort: 'updated',
+    offline: typeof navigator !== 'undefined' ? !navigator.onLine : false,
+    syncState: 'idle',
+    syncMessage: null,
+    pendingCount: 0,
+    lastSavedAt: null,
+    sidebarMobileOpen: false,
+    contextOpen: false,
+    contextTab: 'info',
+    commandOpen: false,
+    focusMode: false,
+    reloadTick: get().reloadTick + 1,
+    conflictNoteId: null,
+    hasMore: false,
+    serverOffset: 0,
+  }),
   setSync: (syncState, syncMessage = null) => set({ syncState, syncMessage }),
   setOffline: (offline) => set({ offline, syncState: offline ? 'offline' : get().syncState, syncMessage: offline ? translate('离线') : null }),
   toggleSidebar: () => {

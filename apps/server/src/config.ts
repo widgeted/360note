@@ -45,7 +45,12 @@ export const config = {
   inviteCode: process.env.REGISTRATION_INVITE_CODE || '',
   sessionDays: Number(process.env.SESSION_DAYS || 30),
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES || 25 * 1024 * 1024),
-  trustProxy: bool(process.env.TRUST_PROXY, true),
+  trustProxy: (() => {
+    const value = (process.env.TRUST_PROXY || '').trim();
+    if (value === 'false' || value === '0') return false;
+    if (!value || value === 'true' || value === '1') return '127.0.0.1';
+    return value;
+  })(),
   ai: {
     enabled: bool(process.env.AI_ENABLED, false),
     baseUrl: process.env.AI_BASE_URL || '',

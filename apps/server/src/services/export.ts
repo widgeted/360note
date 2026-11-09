@@ -130,6 +130,11 @@ async function pdfFromHtml(html: string, title: string): Promise<Buffer> {
   }
 }
 
+/** Avoid server-side image fetches (SSRF) while rendering a PDF. */
+function stripExternalImages(html: string): string {
+  return html.replace(/<img\b[^>]*\bsrc="(?!data:)[^"]*"[^>]*>/gi, '');
+}
+
 export async function exportSingleNote(note: Note, format: 'md' | 'html' | 'pdf', reply: FastifyReply, app: FastifyInstance): Promise<void> {
   const attachments = await noteAttachments(note.id);
   const safeTitle = safeFilename(note.title || '未命名笔记');
@@ -221,7 +226,9 @@ export async function exportSingleNote(note: Note, format: 'md' | 'html' | 'pdf'
       .send(html);
   }
   try {
-    const pdf = await pdfFromHtml(html, note.title);
+    // The PDF renderer runs Chromium on the server. Only embedded data: images
+    // may be loaded; external URLs would let a note probe internal services.
+    const pdf = await pdfFromHtml(stripExternalImages(html), note.title);
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${safeTitle}.pdf`)}`)

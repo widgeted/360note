@@ -88,11 +88,19 @@ const SUMMARY_SELECT = `
   (SELECT count(*)::text FROM attachments a WHERE a.note_id = n.id AND a.deleted_at IS NULL) AS attachment_count
 `;
 
-export async function getNoteRow(noteId: string, client?: Queryable): Promise<NoteRow | null> {
-  return one<NoteRow>(`SELECT ${SUMMARY_SELECT} FROM notes n WHERE n.id = $1 AND n.deleted_at IS NULL`, [noteId], client);
+export async function getNoteRow(noteId: string, client?: Queryable, forUpdate = false): Promise<NoteRow | null> {
+  return one<NoteRow>(
+    `SELECT ${SUMMARY_SELECT} FROM notes n WHERE n.id = $1 AND n.deleted_at IS NULL${forUpdate ? ' FOR UPDATE OF n' : ''}`,
+    [noteId],
+    client,
+  );
 }
 
-export async function getFolderPath(folderId: string | null, workspaceId: string): Promise<FolderPathItem[]> {
+export async function getFolderPath(
+  folderId: string | null,
+  workspaceId: string,
+  client?: Queryable,
+): Promise<FolderPathItem[]> {
   if (!folderId) return [];
   const path: FolderPathItem[] = [];
   let current: string | null = folderId;
@@ -109,11 +117,12 @@ export async function getFolderPath(folderId: string | null, workspaceId: string
   return path;
 }
 
-export async function serializeNote(row: NoteRow, role: Role): Promise<Note> {
+export async function serializeNote(row: NoteRow, role: Role, client?: Queryable): Promise<Note> {
   const attachments = await many<AttachmentRow>(
     `SELECT id, note_id, filename, mime, size_bytes, width, height, ocr_status, created_at
      FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
     [row.id],
+    client,
   );
   const canEdit = ['editor', 'admin', 'owner'].includes(role);
   return {
@@ -121,7 +130,7 @@ export async function serializeNote(row: NoteRow, role: Role): Promise<Note> {
     contentMd: row.content_md,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
-    folderPath: await getFolderPath(row.folder_id, row.workspace_id),
+    folderPath: await getFolderPath(row.folder_id, row.workspace_id, client),
     attachments: attachments.map(mapAttachment),
     wordCount: wordCount(row.content_md),
     canEdit,
@@ -241,11 +250,16 @@ function deriveTitle(title: string | undefined, content: string): string {
   return line ? line.replace(/^[#>*+\-\d.\s]+/, '').slice(0, 160) : '未命名笔记';
 }
 
-async function validateFolder(folderId: string | null | undefined, workspaceId: string): Promise<string | null> {
+async function validateFolder(
+  folderId: string | null | undefined,
+  workspaceId: string,
+  client?: Queryable,
+): Promise<string | null> {
   if (!folderId) return null;
   const folder = await one<{ id: string; trashed_at: Date | null }>(
     'SELECT id, trashed_at FROM folders WHERE id = $1 AND workspace_id = $2',
     [folderId, workspaceId],
+    client,
   );
   if (!folder || folder.trashed_at) throw errors.badRequest('目标文件夹不存在');
   return folder.id;
@@ -411,37 +425,46 @@ export async function updateNote(input: {
   reason?: 'auto' | 'manual' | 'restore' | 'import' | 'conflict';
   touchOpened?: boolean;
 }): Promise<{ note: Note; linkUpdates: number }> {
-  const existing = await getNoteRow(input.noteId);
-  if (!existing) throw errors.notFound('笔记不存在');
-  const role = await requireWorkspace(input.userId, existing.workspace_id, 'write');
-  if (existing.trashed_at) throw errors.badRequest('请先恢复这篇笔记');
+  const initial = await getNoteRow(input.noteId);
+  if (!initial) throw errors.notFound('笔记不存在');
+  const role = await requireWorkspace(input.userId, initial.workspace_id, 'write');
+  if (initial.trashed_at) throw errors.badRequest('请先恢复这篇笔记');
 
-  if (input.baseVersion !== undefined && input.baseVersion !== existing.version) {
-    const current = await serializeNote(existing, role);
-    throw errors.conflict('这篇笔记已在其他设备更新', {
-      code: 'VERSION_CONFLICT',
-      current,
-      baseVersion: input.baseVersion,
-    });
-  }
+  const result = await transaction(async (client) => {
+    // Lock the note before reading its version. Concurrent saves queue on this
+    // row; the second one sees the first one's committed version and gets 409
+    // instead of silently overwriting it.
+    const locked = await getNoteRow(input.noteId, client, true);
+    if (!locked) throw errors.notFound('笔记不存在');
+    if (locked.trashed_at) throw errors.badRequest('请先恢复这篇笔记');
 
-  const folderId =
-    input.folderId === undefined ? existing.folder_id : await validateFolder(input.folderId, existing.workspace_id);
-  const title = input.title === undefined ? existing.title : (input.title.trim().slice(0, 500) || '未命名笔记');
-  let content = input.contentMd === undefined ? existing.content_md : input.contentMd;
-  content = stripTitleHeading(content, title);
-  const oldTitle = existing.title;
-  const reason = input.reason ?? 'auto';
-  const forceSnapshot = reason !== 'auto';
+    if (input.baseVersion !== undefined && input.baseVersion !== locked.version) {
+      throw errors.conflict('这篇笔记已在其他设备更新', {
+        code: 'VERSION_CONFLICT',
+        current: await serializeNote(locked, role, client),
+        baseVersion: input.baseVersion,
+      });
+    }
 
-  const updated = await transaction(async (client) => {
-    const version = existing.version + 1;
+    const folderId =
+      input.folderId === undefined
+        ? locked.folder_id
+        : await validateFolder(input.folderId, locked.workspace_id, client);
+    const title =
+      input.title === undefined ? locked.title : (input.title.trim().slice(0, 500) || '未命名笔记');
+    let content = input.contentMd === undefined ? locked.content_md : input.contentMd;
+    content = stripTitleHeading(content, title);
+    const oldTitle = locked.title;
+    const reason = input.reason ?? 'auto';
+    const forceSnapshot = reason !== 'auto';
+    const version = locked.version + 1;
+
     const row = await client.query<NoteRow>(
       `UPDATE notes SET title = $2, content_md = $3, excerpt = $4, folder_id = $5,
          is_favorite = COALESCE($6, is_favorite), is_pinned = COALESCE($7, is_pinned),
          version = $8, updated_by = $9, updated_at = now(),
          last_opened_at = CASE WHEN $10 THEN now() ELSE last_opened_at END
-       WHERE id = $1 RETURNING *`,
+       WHERE id = $1 AND version = $11 RETURNING *`,
       [
         input.noteId,
         title,
@@ -453,23 +476,37 @@ export async function updateNote(input: {
         version,
         input.userId,
         input.touchOpened ?? false,
+        locked.version,
       ],
     );
-    await setTags(client, input.noteId, existing.workspace_id, input.tagIds, input.tagNames);
-    await rebuildLinks(client, input.noteId, existing.workspace_id, content);
+    if (row.rowCount !== 1) {
+      const currentRow = await getNoteRow(input.noteId, client);
+      throw errors.conflict('这篇笔记已在其他设备更新', {
+        code: 'VERSION_CONFLICT',
+        current: currentRow ? await serializeNote(currentRow, role, client) : null,
+        baseVersion: input.baseVersion,
+      });
+    }
+
+    await setTags(client, input.noteId, locked.workspace_id, input.tagIds, input.tagNames);
+    await rebuildLinks(client, input.noteId, locked.workspace_id, content);
     await snapshotVersion(client, input.noteId, version, title, content, input.userId, reason, forceSnapshot);
-    return row.rows[0];
+
+    const fresh = await getNoteRow(input.noteId, client);
+    if (!fresh) throw errors.notFound('笔记不存在');
+    return {
+      note: await serializeNote(fresh, role, client),
+      oldTitle,
+      title,
+      workspaceId: locked.workspace_id,
+    };
   });
 
   let linkUpdates = 0;
-  if (oldTitle && title !== oldTitle) {
-    linkUpdates = await propagateTitleRename(existing.workspace_id, input.userId, oldTitle, title, input.noteId);
+  if (result.oldTitle && result.title !== result.oldTitle) {
+    linkUpdates = await propagateTitleRename(result.workspaceId, input.userId, result.oldTitle, result.title, input.noteId);
   }
-  // RETURNING * only contains note columns, not the aggregated tag JSON from
-  // SUMMARY_SELECT. Re-read the canonical row so clients keep their tags after
-  // every autosave instead of receiving an empty tag array.
-  const fresh = (await getNoteRow(input.noteId)) ?? updated;
-  return { note: await serializeNote(fresh, role), linkUpdates };
+  return { note: result.note, linkUpdates };
 }
 
 /** Rename wiki links that point at a renamed note. Runs after the note update. */

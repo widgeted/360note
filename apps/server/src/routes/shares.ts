@@ -62,12 +62,23 @@ async function shareByToken(token: string, forUpdate = false): Promise<ShareRow 
   );
 }
 
+function sharePasswordFingerprint(share: ShareRow): string {
+  return sha256(share.password_hash ?? '');
+}
+
 function checkAccess(request: FastifyRequest, share: ShareRow): boolean {
   if (!share.password_hash) return true;
   const raw = accessTokenFrom(request);
   if (!raw) return false;
-  const payload = verifyToken<{ sid: string }>(raw);
-  return Boolean(payload && payload.typ === 'share' && payload.sid === share.id);
+  const payload = verifyToken<{ sid: string; ph?: string }>(raw);
+  // Bind the access cookie to the current password hash: changing or removing
+  // the share password invalidates previously issued access tokens.
+  return Boolean(
+    payload &&
+      payload.typ === 'share' &&
+      payload.sid === share.id &&
+      payload.ph === sharePasswordFingerprint(share),
+  );
 }
 
 function ensureAccess(request: FastifyRequest, share: ShareRow): void {
@@ -242,7 +253,10 @@ export default async function shareRoutes(app: FastifyInstance) {
     if (!share.password_hash) return { ok: true, accessToken: null };
     const ok = await verifyPassword(body.password, share.password_hash);
     if (!ok) throw errors.badRequest('密码不正确');
-    const accessToken = signToken({ typ: 'share', sid: share.id }, 2 * 60 * 60);
+    const accessToken = signToken(
+      { typ: 'share', sid: share.id, ph: sharePasswordFingerprint(share) },
+      2 * 60 * 60,
+    );
     setShareCookie(reply, accessToken);
     return { ok: true, accessToken };
   });

@@ -32,4 +32,27 @@ sudo env NOTE360_ENV_FILE=/etc/360note/360note.env \
   /opt/node22/bin/node tests/manual/security-audit.mjs
 ```
 
-Expected result: `61 passed, 0 failed`.
+Expected result: `65 passed, 0 failed`.
+
+## Concurrency and resource-limit regressions
+
+```bash
+# One commit wins, the loser gets 409; TOTP step and backup code consume once.
+sudo env $(grep -v '^#' /etc/360note/360note.env | xargs) \
+  BASE_URL=http://127.0.0.1:8787 \
+  /opt/node22/bin/node tests/manual/concurrency-test.mjs
+
+# Creates a throwaway database and API, then races two first registrations.
+sudo env $(grep -v '^#' /etc/360note/360note.env | xargs) \
+  /opt/node22/bin/node tests/manual/first-admin-test.mjs
+
+# Creates malicious and valid ZIPs in memory; no server needed.
+/opt/node22/bin/node tests/manual/backup-limits-test.mjs
+
+# Browser cache isolation; requires demo/admin test credentials.
+CACHE_TEST_DEMO_EMAIL=... CACHE_TEST_DEMO_PASSWORD=... \
+CACHE_TEST_ADMIN_EMAIL=... CACHE_TEST_ADMIN_PASSWORD=... \
+/opt/node22/bin/node tests/manual/cache-isolation-test.mjs
+```
+
+Expected: all checks pass; no email is sent.

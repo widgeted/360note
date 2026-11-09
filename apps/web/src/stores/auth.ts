@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { User, Workspace } from '@360note/shared';
 import { api, ApiError } from '../lib/api';
 import { getLocale } from '../lib/i18n';
+import { clearSensitiveLocalData, setLocalWritesEnabled } from '../lib/offline';
+import { useAppStore } from './app';
 
 export interface InstanceInfo {
   version: string;
@@ -33,7 +35,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
   verifyTwoFactor: (challengeToken: string, code: string) => Promise<void>;
   register: (input: { email: string; displayName: string; password: string; inviteCode?: string; emailCode: string }) => Promise<RegisterResponse>;
-  logout: () => Promise<void>;
+  logout: (options?: { clearLocalData?: boolean }) => Promise<void>;
   refresh: () => Promise<void>;
   setUser: (user: User) => void;
   setWorkspaces: (workspaces: Workspace[]) => void;
@@ -41,6 +43,7 @@ interface AuthState {
 }
 
 const AUTH_CACHE_KEY = 'nh-auth-cache';
+const LAST_USER_KEY = 'nh-last-user-id';
 
 function cacheAuth(response: AuthResponse): void {
   try {
@@ -70,7 +73,25 @@ function clearCachedAuth(): void {
   }
 }
 
-function applyAuth(response: AuthResponse): void {
+async function applyAuth(response: AuthResponse): Promise<void> {
+  let previousUserId: string | null = null;
+  try {
+    previousUserId = localStorage.getItem(LAST_USER_KEY);
+  } catch {
+    /* ignore private mode */
+  }
+  // A different account must never see the previous account's note bodies,
+  // drafts or outbox. This also covers a first login on a shared browser.
+  if (!previousUserId || previousUserId !== response.user.id) {
+    await clearSensitiveLocalData();
+    useAppStore.getState().reset();
+  }
+  setLocalWritesEnabled(true);
+  try {
+    localStorage.setItem(LAST_USER_KEY, response.user.id);
+  } catch {
+    /* ignore */
+  }
   cacheAuth(response);
 }
 
@@ -84,11 +105,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   bootstrap: async () => {
     try {
       const response = await api.get<AuthResponse>('/api/auth/me');
-      cacheAuth(response);
+      await applyAuth(response);
       set({ user: response.user, workspaces: response.workspaces, instance: response.instance, status: 'authenticated', error: null });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         clearCachedAuth();
+        useAppStore.getState().reset();
         set({ user: null, workspaces: [], status: 'anonymous', error: null });
       } else {
         // Offline/PWA: keep the cached identity so local notes remain available.
@@ -117,7 +139,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if ('twoFactorRequired' in response && response.twoFactorRequired) {
       return { twoFactorRequired: true, challengeToken: response.challengeToken };
     }
-    applyAuth(response as AuthResponse);
+    await applyAuth(response as AuthResponse);
     set({
       user: (response as AuthResponse).user,
       workspaces: (response as AuthResponse).workspaces,
@@ -129,7 +151,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   verifyTwoFactor: async (challengeToken, code) => {
     const response = await api.post<AuthResponse>('/api/auth/login/2fa', { challengeToken, code });
-    applyAuth(response);
+    await applyAuth(response);
     set({ user: response.user, workspaces: response.workspaces, instance: response.instance, status: 'authenticated', error: null });
   },
 
@@ -138,25 +160,35 @@ export const useAuthStore = create<AuthState>((set) => ({
       ...input,
       locale: getLocale(),
     });
-    applyAuth(response);
+    await applyAuth(response);
     set({ user: response.user, workspaces: response.workspaces, instance: response.instance, status: 'authenticated', error: null });
     return response;
   },
 
-  logout: async () => {
+  logout: async (options) => {
     try {
       await api.post('/api/auth/logout');
     } catch {
       /* clear local state regardless */
     }
-    clearCachedAuth();
+    if (options?.clearLocalData) {
+      await clearSensitiveLocalData();
+      try {
+        localStorage.removeItem(LAST_USER_KEY);
+      } catch {
+        /* ignore */
+      }
+    } else {
+      clearCachedAuth();
+    }
+    useAppStore.getState().reset();
     set({ user: null, workspaces: [], status: 'anonymous', error: null });
   },
 
   refresh: async () => {
     try {
       const response = await api.get<AuthResponse>('/api/auth/me');
-      applyAuth(response);
+      await applyAuth(response);
       set({ user: response.user, workspaces: response.workspaces, instance: response.instance, status: 'authenticated' });
     } catch {
       /* leave state as is */

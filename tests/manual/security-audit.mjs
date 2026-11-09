@@ -32,6 +32,7 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
 const stamp = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+const TEST_CLIENT_IP = `198.51.100.${crypto.randomInt(1, 254)}`;
 const createdUserIds = [];
 const createdWorkspaceIds = [];
 
@@ -48,7 +49,7 @@ function check(name, condition, detail = '') {
 }
 
 async function request(pathname, options = {}) {
-  const headers = { ...(options.headers ?? {}) };
+  const headers = { ...(options.headers ?? {}), 'x-forwarded-for': TEST_CLIENT_IP };
   if (options.cookie) headers.cookie = options.cookie;
   if (options.csrf !== false && !['GET', 'HEAD'].includes(options.method ?? 'GET')) {
     headers['x-360note-csrf'] = '1';
@@ -104,6 +105,26 @@ async function createUser(label, password = 'Audit-Pass-2026!') {
     row.id,
   ]);
   return { ...row, password, personalWorkspaceId: workspace.rows[0].id };
+}
+
+async function cleanup() {
+  try {
+    const attachmentRows = await pool.query(
+      `SELECT a.storage_key FROM attachments a JOIN notes n ON n.id = a.note_id WHERE n.workspace_id = ANY($1::uuid[])`,
+      [createdWorkspaceIds],
+    );
+    for (const row of attachmentRows.rows) {
+      await fs.rm(path.join(DATA_DIR, 'attachments', row.storage_key), { force: true }).catch(() => {});
+    }
+    await pool.query('DELETE FROM audit_logs WHERE actor_id = ANY($1::uuid[])', [createdUserIds]);
+    await pool.query('DELETE FROM notifications WHERE user_id = ANY($1::uuid[])', [createdUserIds]);
+    await pool.query('DELETE FROM login_attempts WHERE email LIKE $1', [`sec-%${stamp}%`]);
+    await pool.query('DELETE FROM email_codes WHERE email LIKE $1', [`sec-%${stamp}%`]);
+    await pool.query('DELETE FROM workspaces WHERE id = ANY($1::uuid[])', [createdWorkspaceIds]);
+    await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [createdUserIds]);
+  } catch (error) {
+    console.error('cleanup failed', error);
+  }
 }
 
 async function main() {
@@ -344,13 +365,30 @@ async function main() {
     headers: { 'x-share-access': unlock.json.accessToken },
   });
   check('unlocked share exposes its content', unlockedRead.status === 200 && unlockedRead.json?.hasAccess === true);
+  const changedPassword = await request(`/api/shares/${guardedShare.json.share.id}`, {
+    method: 'PATCH',
+    cookie: cookieA,
+    body: { password: 'audit-pass-2' },
+  });
+  check('owner can change a share password', changedPassword.status === 200);
+  const oldTokenAfterChange = await request(`/api/public/shares/${guardedToken}`, {
+    headers: { 'x-share-access': unlock.json.accessToken },
+  });
+  check(
+    'changing the share password invalidates old access cookies',
+    oldTokenAfterChange.status === 200 && oldTokenAfterChange.json?.hasAccess === false,
+  );
+  const unlockAgain = await request(`/api/public/shares/${guardedToken}/unlock`, {
+    method: 'POST',
+    body: { password: 'audit-pass-2' },
+  });
   const guestComment = await request(`/api/public/shares/${guardedToken}/comments`, {
     method: 'POST',
-    headers: { 'x-share-access': unlock.json.accessToken },
+    headers: { 'x-share-access': unlockAgain.json.accessToken },
     body: { guestName: 'Audit guest', body: 'Guest comment from security audit' },
   });
   check('comment share allows a guest comment after unlock', guestComment.status === 200);
-  const bShareAccess = await request(`/api/notes/${noteId}`, { cookie: cookieB, headers: { 'x-share-access': unlock.json.accessToken } });
+  const bShareAccess = await request(`/api/notes/${noteId}`, { cookie: cookieB, headers: { 'x-share-access': unlockAgain.json.accessToken } });
   check('share access does not grant private note API access', bShareAccess.status === 404 || bShareAccess.status === 403);
 
   const past = new Date(Date.now() - 60_000).toISOString();
@@ -510,19 +548,7 @@ async function main() {
   });
   check('search handles SQL metacharacters without an error', injection.status === 200);
 
-  // ---- cleanup ----
-  const attachmentRows = await pool.query(
-    `SELECT a.storage_key FROM attachments a JOIN notes n ON n.id = a.note_id WHERE n.workspace_id = ANY($1::uuid[])`,
-    [createdWorkspaceIds],
-  );
-  for (const row of attachmentRows.rows) {
-    await fs.rm(path.join(DATA_DIR, 'attachments', row.storage_key), { force: true }).catch(() => {});
-  }
-  await pool.query('DELETE FROM audit_logs WHERE actor_id = ANY($1::uuid[])', [createdUserIds]);
-  await pool.query('DELETE FROM login_attempts WHERE email LIKE $1', [`sec-%${stamp}%`]);
-  await pool.query('DELETE FROM email_codes WHERE email LIKE $1', [`sec-%${stamp}%`]);
-  await pool.query('DELETE FROM workspaces WHERE id = ANY($1::uuid[])', [createdWorkspaceIds]);
-  await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [createdUserIds]);
+  await cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);
   await pool.end();
@@ -531,6 +557,7 @@ async function main() {
 
 main().catch(async (error) => {
   console.error('AUDIT ERROR', error);
+  await cleanup();
   await pool.end().catch(() => {});
   process.exit(1);
 });

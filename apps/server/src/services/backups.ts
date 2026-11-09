@@ -101,7 +101,15 @@ interface BackupDocument {
   comments: BackupComment[];
 }
 
-export interface BackupPreview {
+/** Hard limits for attacker-controlled backup archives. */
+export const BACKUP_LIMITS = {
+  maxEntries: 5000,
+  maxEntryBytes: 64 * 1024 * 1024,
+  maxTotalBytes: 512 * 1024 * 1024,
+  maxCompressionRatio: 500,
+} as const;
+
+interface BackupPreview {
   format: '360note-backup';
   version: number;
   createdAt: string;
@@ -377,6 +385,76 @@ export async function listBackups(workspaceId: string, userId: string) {
   }));
 }
 
+function inspectBackupZip(zip: AdmZip): void {
+  let entries: AdmZip.IZipEntry[];
+  try {
+    entries = zip.getEntries();
+  } catch {
+    throw errors.badRequest('备份文件已损坏');
+  }
+  if (entries.length > BACKUP_LIMITS.maxEntries) {
+    throw errors.badRequest('备份文件包含过多条目');
+  }
+  let total = 0;
+  for (const entry of entries) {
+    const size = entry.header.size;
+    const compressed = entry.header.compressedSize;
+    if (!Number.isFinite(size) || size < 0 || !Number.isFinite(compressed) || compressed < 0) {
+      throw errors.badRequest('备份文件已损坏');
+    }
+    if (size > BACKUP_LIMITS.maxEntryBytes) {
+      throw errors.badRequest('备份文件中的单个文件过大');
+    }
+    total += size;
+    if (total > BACKUP_LIMITS.maxTotalBytes) {
+      throw errors.badRequest('备份文件解压后过大');
+    }
+    if (size > 1024 * 1024 && (compressed === 0 || size / compressed > BACKUP_LIMITS.maxCompressionRatio)) {
+      throw errors.badRequest('备份文件压缩比异常');
+    }
+  }
+}
+
+function readEntryData(entry: AdmZip.IZipEntry): Buffer {
+  const data = entry.getData();
+  if (data.length > BACKUP_LIMITS.maxEntryBytes) {
+    throw errors.badRequest('备份文件中的单个文件过大');
+  }
+  return data;
+}
+
+function validateBackupDocument(document: BackupDocument): void {
+  if (
+    !document ||
+    typeof document !== 'object' ||
+    !document.workspace ||
+    typeof document.workspace.id !== 'string' ||
+    typeof document.workspace.name !== 'string' ||
+    !document.counts ||
+    typeof document.counts !== 'object' ||
+    !Array.isArray(document.folders) ||
+    !Array.isArray(document.tags) ||
+    !Array.isArray(document.notes) ||
+    !Array.isArray(document.noteTags) ||
+    !Array.isArray(document.attachments) ||
+    !Array.isArray(document.versions) ||
+    !Array.isArray(document.comments)
+  ) {
+    throw errors.badRequest('备份文件内容无法解析');
+  }
+  for (const collection of [
+    document.folders,
+    document.tags,
+    document.notes,
+    document.noteTags,
+    document.attachments,
+    document.versions,
+    document.comments,
+  ]) {
+    if (collection.length > 100_000) throw errors.badRequest('备份文件包含过多条目');
+  }
+}
+
 function readBackupZip(buffer: Buffer): { zip: AdmZip; manifest: Record<string, unknown>; document: BackupDocument } {
   let zip: AdmZip;
   try {
@@ -384,20 +462,23 @@ function readBackupZip(buffer: Buffer): { zip: AdmZip; manifest: Record<string, 
   } catch {
     throw errors.badRequest('备份文件已损坏');
   }
+  inspectBackupZip(zip);
   const manifestEntry = zip.getEntry('manifest.json');
   const documentEntry = zip.getEntry('workspace.json');
   if (!manifestEntry || !documentEntry) throw errors.badRequest('不是有效的 360note 备份文件');
   let manifest: Record<string, unknown>;
   let document: BackupDocument;
   try {
-    manifest = JSON.parse(manifestEntry.getData().toString('utf8'));
-    document = JSON.parse(documentEntry.getData().toString('utf8'));
-  } catch {
+    manifest = JSON.parse(readEntryData(manifestEntry).toString('utf8'));
+    document = JSON.parse(readEntryData(documentEntry).toString('utf8'));
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AppError') throw error;
     throw errors.badRequest('备份文件内容无法解析');
   }
   if (manifest.format !== '360note-backup' || document.format !== '360note-backup') {
     throw errors.badRequest('备份格式不受支持');
   }
+  validateBackupDocument(document);
   return { zip, manifest, document };
 }
 
@@ -527,7 +608,7 @@ async function restoreReplace(input: {
   for (const attachment of document.attachments) {
     const entry = zip.getEntry(attachment.zipPath);
     if (!entry) continue;
-    const data = entry.getData();
+    const data = readEntryData(entry);
     const storageKey = attachmentStorageKey(input.workspaceId, attachment.id);
     await saveAttachment(storageKey, data);
     newStorageKeys.add(storageKey);
@@ -590,7 +671,7 @@ async function backupToParsedImport(input: {
       await fs.mkdir(dir, { recursive: true });
       const filename = safeFilename(attachment.filename);
       const storedPath = path.join(dir, `${key}-${filename}`);
-      await fs.writeFile(storedPath, entry.getData(), { mode: 0o600 });
+      await fs.writeFile(storedPath, readEntryData(entry), { mode: 0o600 });
       attachments.push({
         key,
         filename,

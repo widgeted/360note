@@ -50,6 +50,32 @@ async function workspacesFor(userId: string) {
   }));
 }
 
+/**
+ * Consume a TOTP time step exactly once. Two concurrent requests with the same
+ * code race on this conditional UPDATE: only the first gets a row back.
+ */
+async function consumeTotpStep(userId: string, step: number): Promise<boolean> {
+  const row = await one<{ id: string }>(
+    `UPDATE users SET totp_last_step = $2
+     WHERE id = $1 AND totp_enabled = true
+       AND (totp_last_step IS NULL OR totp_last_step < $2)
+     RETURNING id`,
+    [userId, step],
+  );
+  return Boolean(row);
+}
+
+/** Consume a backup code exactly once, without a read-then-write race. */
+async function consumeBackupCode(userId: string, normalizedCode: string): Promise<boolean> {
+  const row = await one<{ id: string }>(
+    `UPDATE totp_backup_codes SET used_at = now()
+     WHERE user_id = $1 AND used_at IS NULL AND code_hash = $2
+     RETURNING id`,
+    [userId, sha256(normalizedCode)],
+  );
+  return Boolean(row);
+}
+
 function authPayload(user: DbUser, workspaces: Awaited<ReturnType<typeof workspacesFor>>) {
   return {
     user: publicUser(user),
@@ -127,12 +153,19 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const recoveryKey = generateRecoveryKey();
     const passwordHash = await hashPassword(body.password);
-    const firstUser = count === 0;
     const displayName = body.displayName.trim();
 
     let user: DbUser;
+    let firstUser = false;
     try {
-      user = await transaction(async (client) => {
+      const created = await transaction(async (client) => {
+        // Serialize account creation. Without this lock two concurrent first
+        // registrations both see count=0 and both become instance admins.
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext('360note:registration'))`);
+        const countRow = await client.query<{ count: string }>(
+          'SELECT count(*)::text AS count FROM users WHERE deleted_at IS NULL',
+        );
+        const isFirstUser = Number(countRow.rows[0]?.count ?? 0) === 0;
         const row = await client.query<DbUser>(
           `INSERT INTO users (email, display_name, password_hash, role, avatar_color, recovery_key_hash, email_verified_at, prefs)
            VALUES ($1, $2, $3, $4, $5, $6, now(), $7::jsonb) RETURNING *`,
@@ -140,24 +173,26 @@ export default async function authRoutes(app: FastifyInstance) {
             body.email,
             displayName,
             passwordHash,
-            firstUser ? 'admin' : 'user',
+            isFirstUser ? 'admin' : 'user',
             avatarColor(body.email),
             hashRecoveryKey(recoveryKey),
             JSON.stringify({ locale: body.locale?.toLowerCase().startsWith('en') ? 'en' : 'zh-CN' }),
           ],
         );
-        const created = row.rows[0];
+        const createdUser = row.rows[0];
         const workspaceName = body.locale?.startsWith('zh') ? '我的空间' : 'My space';
         const workspace = await client.query<{ id: string }>(
           `INSERT INTO workspaces (name, kind, owner_id) VALUES ($1, 'personal', $2) RETURNING id`,
-          [workspaceName, created.id],
+          [workspaceName, createdUser.id],
         );
         await client.query(
           `INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`,
-          [workspace.rows[0].id, created.id],
+          [workspace.rows[0].id, createdUser.id],
         );
-        return created;
+        return { user: createdUser, firstUser: isFirstUser };
       });
+      user = created.user;
+      firstUser = created.firstUser;
     } catch (error) {
       if ((error as { code?: string }).code === '23505') throw errors.conflict('这个邮箱已注册');
       throw error;
@@ -222,10 +257,14 @@ export default async function authRoutes(app: FastifyInstance) {
 
     if (!user || !passwordOk) {
       if (user) {
-        const failed = user.failed_logins + 1;
+        // Atomic increment: concurrent failed attempts must not undercount and
+        // bypass the 10-attempt lockout.
         await one(
-          `UPDATE users SET failed_logins = $2, locked_until = CASE WHEN $2 >= 10 THEN now() + interval '15 minutes' ELSE locked_until END WHERE id = $1 RETURNING id`,
-          [user.id, failed],
+          `UPDATE users
+           SET failed_logins = failed_logins + 1,
+               locked_until = CASE WHEN failed_logins + 1 >= 10 THEN now() + interval '15 minutes' ELSE locked_until END
+           WHERE id = $1 RETURNING id`,
+          [user.id],
         );
       }
       throw errors.unauthorized('邮箱或密码不正确');
@@ -277,24 +316,11 @@ export default async function authRoutes(app: FastifyInstance) {
     let usedBackup = false;
     if (/^\d{6}$/.test(body.code.replace(/\s/g, ''))) {
       const result = verifyTotp(secret, body.code);
-      if (result.valid && result.step !== null && (!user.totp_last_step || result.step > user.totp_last_step)) {
-        valid = true;
-        await one('UPDATE users SET totp_last_step = $2 WHERE id = $1 RETURNING id', [user.id, result.step]);
-      }
+      if (result.valid && result.step !== null) valid = await consumeTotpStep(user.id, result.step);
     } else {
       const normalized = body.code.replace(/[^0-9]/g, '');
-      const codes = await query<{ id: string; code_hash: string }>(
-        'SELECT id, code_hash FROM totp_backup_codes WHERE user_id = $1 AND used_at IS NULL',
-        [user.id],
-      );
-      for (const row of codes.rows) {
-        if (safeEqual(row.code_hash, sha256(normalized))) {
-          await one('UPDATE totp_backup_codes SET used_at = now() WHERE id = $1 RETURNING id', [row.id]);
-          valid = true;
-          usedBackup = true;
-          break;
-        }
-      }
+      valid = await consumeBackupCode(user.id, normalized);
+      usedBackup = valid;
     }
     if (!valid) throw errors.unauthorized('验证码不正确或已使用');
     await one('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = now() WHERE id = $1 RETURNING id', [user.id]);
@@ -370,6 +396,7 @@ export default async function authRoutes(app: FastifyInstance) {
       if ((error as { code?: string }).code === '23505') throw errors.conflict('这个邮箱已注册');
       throw error;
     }
+    await revokeAllSessions(auth.user.id, auth.session?.id);
     await audit({
       actorId: auth.user.id,
       action: 'account.email.update',
@@ -519,10 +546,13 @@ export default async function authRoutes(app: FastifyInstance) {
     if (!result.valid) throw errors.badRequest('验证码不正确');
     const codes = generateBackupCodes();
     await transaction(async (client) => {
-      await client.query(
-        'UPDATE users SET totp_enabled = true, totp_last_step = $2, updated_at = now() WHERE id = $1',
+      const enabled = await client.query<{ id: string }>(
+        `UPDATE users SET totp_enabled = true, totp_last_step = $2, updated_at = now()
+         WHERE id = $1 AND totp_enabled = false AND totp_secret_enc IS NOT NULL
+         RETURNING id`,
         [auth.user.id, result.step],
       );
+      if (enabled.rowCount !== 1) throw errors.badRequest('请先开始设置两步验证');
       await client.query('DELETE FROM totp_backup_codes WHERE user_id = $1', [auth.user.id]);
       for (const code of codes) {
         await client.query('INSERT INTO totp_backup_codes (user_id, code_hash) VALUES ($1, $2)', [
@@ -544,20 +574,9 @@ export default async function authRoutes(app: FastifyInstance) {
     let valid = false;
     if (/^\d{6}$/.test(body.code.replace(/\s/g, ''))) {
       const result = verifyTotp(secret, body.code);
-      valid = result.valid;
+      if (result.valid && result.step !== null) valid = await consumeTotpStep(auth.user.id, result.step);
     } else {
-      const normalized = body.code.replace(/[^0-9]/g, '');
-      const codes = await query<{ id: string; code_hash: string }>(
-        'SELECT id, code_hash FROM totp_backup_codes WHERE user_id = $1 AND used_at IS NULL',
-        [auth.user.id],
-      );
-      for (const row of codes.rows) {
-        if (safeEqual(row.code_hash, sha256(normalized))) {
-          await one('UPDATE totp_backup_codes SET used_at = now() WHERE id = $1 RETURNING id', [row.id]);
-          valid = true;
-          break;
-        }
-      }
+      valid = await consumeBackupCode(auth.user.id, body.code.replace(/[^0-9]/g, ''));
     }
     if (!valid) throw errors.badRequest('验证码不正确');
     await one(

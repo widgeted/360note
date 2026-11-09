@@ -83,6 +83,7 @@ export default function App() {
     const onOffline = () => useAppStore.getState().setOffline(true);
     const onUnauthorized = () => {
       localStorage.removeItem('nh-auth-cache');
+      useAppStore.getState().reset();
       useAuthStore.setState({ user: null, workspaces: [], status: 'anonymous' });
     };
     window.addEventListener('online', onOnline);
