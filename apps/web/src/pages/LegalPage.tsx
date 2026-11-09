@@ -1,7 +1,6 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import { getLocale, useT } from '../lib/i18n';
-import { LogoLockup } from '../components/Logo';
+import { SiteHeader } from '../components/SiteHeader';
+import { SiteFooter } from '../components/SiteFooter';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
@@ -10,15 +9,13 @@ export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
   useDocumentTitle(t(kind === 'privacy' ? '隐私政策' : '服务条款'));
   return (
     <div className="legal-page">
-      <div className="legal-nav">
-        <Link to="/" aria-label={en ? '360note' : '360笔记'}><LogoLockup /></Link>
-        <Link to="/" className="btn btn-ghost btn-sm"><ArrowLeft size={13} /> {t('返回首页')}</Link>
-      </div>
+      <SiteHeader />
       <div className="legal-body">
         {kind === 'privacy' ? (
           en ? <PrivacyEn /> : <PrivacyZh />
         ) : en ? <TermsEn /> : <TermsZh />}
       </div>
+      <SiteFooter />
     </div>
   );
 }
@@ -84,7 +81,7 @@ function PrivacyZh() {
         <p>如果发生影响你数据的安全事件，我们会在应用内通知受影响的账户，必要时也会通过账户邮箱联系你，并说明影响范围、已采取的措施与建议操作。</p>
 
         <h2>9. 联系我们</h2>
-        <p>本实例由域名所有者运营。你可以通过 noreply@360note.com 提出隐私问题。我们只会发送账户与安全相关的邮件，不会发送营销邮件。</p>
+        <p>本实例由域名所有者运营。你可以通过 contact@360note.com 提出隐私问题。我们只会发送账户与安全相关的邮件，不会发送营销邮件。</p>
 
         <h2>10. 变更</h2>
         <p>当这份政策发生重大变化时，我们会在应用内提示，并更新生效日期。继续使用即表示你接受更新后的政策。</p>

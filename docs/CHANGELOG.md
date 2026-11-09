@@ -3,6 +3,38 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.14] — 2026-11-09
+
+站点页头统一、按钮悬停与联系邮箱修正。
+
+### Changed
+
+- 新增共享 `SiteHeader` / `SiteFooter`：首页、关于页、隐私政策、服务条款使用同一套站点导航与页脚，不再各自维护独立头部。
+- 新增 React `/about` 页面并复用主站 header/footer；旧 `/about.html` 仅保留到 `/about` 的重定向。
+- 公开联系邮箱从 `noreply@360note.com` 改为 `contact@360note.com`（页脚、关于、找回密码、隐私政策）。
+
+### Fixed
+
+- 绿色主按钮作为链接时，`a:hover` 覆盖文字颜色，导致悬停后文字与背景同色“消失”。主按钮/危险按钮/soft 按钮 hover 现在显式保持可读文字色。
+- 移除不再使用的独立 about.html 内联样式与 legal-nav。
+
+## [0.1.13] — 2026-11-09
+
+空间图标输入框改为正方形。
+
+### Fixed
+
+- 设置 → 空间 → 当前空间：图标输入框改为 36×36px 正方形，与 36px 输入/按钮高度对齐，不再横向占位。
+
+## [0.1.12] — 2026-11-09
+
+分享页 header 去噪。
+
+### Changed
+
+- 移除公开分享页 header 中没有实际信息的“安全分享”标签；header 只保留品牌和“创建你的 360笔记”CTA。
+- 删除不再使用的 `public-header-meta` 样式。
+
 ## [0.1.11] — 2026-11-09
 
 分享清理、磨砂头部与空间设置布局。

@@ -85,15 +85,6 @@
   gap: 18px;
 }
 
-.public-header-meta {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
 .public-header-cta {
   margin-left: auto;
   font-size: 13px;
@@ -460,19 +451,28 @@
   background: var(--paper-50);
 }
 
-.legal-nav {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 22px 26px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .legal-body {
   max-width: 720px;
   margin: 0 auto;
-  padding: 32px 26px 100px;
+  padding: 48px 26px 100px;
+}
+
+.about-lead {
+  margin-bottom: 30px;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--text-soft);
+}
+
+.about-note {
+  margin-top: 34px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-tertiary);
 }
 
 .legal-body .prose {

@@ -84,6 +84,10 @@ const en: Record<string, string> = {
   '外观': 'Appearance',
   '编辑器': 'Editor',
   '安全': 'Security',
+  '联系': 'Contact',
+  '法律': 'Legal',
+  '产品': 'Product',
+  '功能': 'Features',
   '数据与备份': 'Data & backup',
   '团队与空间': 'Team & spaces',
   'API 与集成': 'API & integrations',
@@ -1353,7 +1357,6 @@ const en: Record<string, string> = {
   '评论会通知笔记作者': 'Comments notify the note author',
   '任何拥有此链接的人都可以编辑。每次保存都会生成历史版本。': 'Anyone with this link can edit. Every save creates a historical version.',
   '目录': 'Contents',
-  '安全分享': 'Secure share',
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

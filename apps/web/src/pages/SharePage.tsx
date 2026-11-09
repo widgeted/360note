@@ -401,16 +401,9 @@ function PublicHeader({ minimal = false }: { minimal?: boolean }) {
           <LogoLockup />
         </Link>
         {!minimal && (
-          <>
-            <div className="public-header-meta">
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <ShieldCheck size={11} /> {t('安全分享')}
-              </span>
-            </div>
-            <Link to="/register" className="btn btn-secondary btn-sm public-header-cta">
-              {t('创建你的 360笔记')} <ArrowLeft size={12} style={{ transform: 'rotate(180deg)' }} />
-            </Link>
-          </>
+          <Link to="/register" className="btn btn-secondary btn-sm public-header-cta">
+            {t('创建你的 360笔记')} <ArrowLeft size={12} style={{ transform: 'rotate(180deg)' }} />
+          </Link>
         )}
       </div>
     </header>

@@ -19,7 +19,8 @@ import {
   Users,
 } from 'lucide-react';
 import { getLocale } from '../lib/i18n';
-import { LogoLockup } from '../components/Logo';
+import { SiteHeader } from '../components/SiteHeader';
+import { SiteFooter } from '../components/SiteFooter';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const copy = {
@@ -149,23 +150,7 @@ export default function LandingPage() {
   const c = zh ? copy.zh : copy.en;
   return (
     <div className="landing">
-      <header className="landing-nav">
-        <div className="landing-nav-inner">
-          <Link to="/" className="landing-brand" aria-label={zh ? '360笔记' : '360note'}>
-            <LogoLockup />
-          </Link>
-          <nav className="landing-links" aria-label={zh ? '主导航' : 'Main navigation'}>
-            <a href="#features">{c.nav[0]}</a>
-            <a href="#security">{c.nav[1]}</a>
-            <a href="/about.html">{c.nav[2]}</a>
-          </nav>
-          <div className="landing-actions">
-            <a className="landing-lang" href={c.langHref}>{c.langSwitch}</a>
-            <Link className="btn btn-ghost btn-sm landing-login" to="/login">{c.login}</Link>
-            <Link className="btn btn-primary btn-sm" to="/register">{c.start}</Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main>
         <section className="landing-hero">
@@ -329,36 +314,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="landing-footer">
-        <div className="landing-footer-inner">
-          <div className="landing-footer-brand">
-            <LogoLockup />
-            <p>{zh ? '一个安静、快速、本地优先的笔记空间。' : 'A calm, local-first notebook for ideas and knowledge.'}</p>
-          </div>
-          <div className="landing-footer-cols">
-            <div>
-              <h4>{c.footerProduct}</h4>
-              <a href="#features">{c.footerLinks[0]}</a>
-              <a href="#security">{c.footerLinks[1]}</a>
-              <a href="/about.html">{c.footerLinks[2]}</a>
-            </div>
-            <div>
-              <h4>{c.footerLegal}</h4>
-              <Link to="/privacy">{c.footerLinks[3]}</Link>
-              <Link to="/terms">{c.footerLinks[4]}</Link>
-              <Link to="/login">{c.footerLinks[5]}</Link>
-            </div>
-            <div>
-              <h4>{c.footerContact}</h4>
-              <a href="mailto:noreply@360note.com">noreply@360note.com</a>
-            </div>
-          </div>
-        </div>
-        <div className="landing-footer-bottom">
-          <span>© {new Date().getFullYear()} {zh ? '360笔记' : '360note'}</span>
-          <span>{c.footerNote}</span>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import RecoverPage from './pages/RecoverPage';
 import SharePage from './pages/SharePage';
 import InvitePage from './pages/InvitePage';
 import LegalPage from './pages/LegalPage';
+import AboutPage from './pages/AboutPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AppPage from './pages/AppPage';
 import ClipPage from './pages/ClipPage';
@@ -112,6 +113,8 @@ export default function App() {
         <Route path="/s/:token" element={<SharePage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/about.html" element={<Navigate to="/about" replace />} />
         <Route path="/clip" element={<Protected><ClipPage /></Protected>} />
         <Route path="/new" element={<Protected><Navigate to="/app/new" replace /></Protected>} />
         <Route path="/search" element={<Protected><SearchShortcut /></Protected>} />

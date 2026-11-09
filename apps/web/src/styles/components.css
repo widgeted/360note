@@ -89,6 +89,10 @@
 }
 
 /* Buttons */
+a.btn {
+  text-decoration: none;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -120,6 +124,11 @@
 
 .btn-primary:hover:not(:disabled) {
   background: var(--blue-strong);
+  color: #fff;
+}
+
+[data-theme='dark'] .btn-primary:hover:not(:disabled) {
+  color: #04130c;
 }
 
 [data-theme='dark'] .btn-primary {
@@ -156,6 +165,7 @@
 
 .btn-soft:hover:not(:disabled) {
   background: color-mix(in srgb, var(--blue-soft) 70%, var(--blue) 10%);
+  color: var(--blue);
 }
 
 .btn-danger {
@@ -165,6 +175,7 @@
 
 .btn-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--red) 85%, #000);
+  color: #fff;
 }
 
 .btn-danger-ghost {
@@ -1357,19 +1368,25 @@
 }
 
 .setting-inline-form .field-icon {
-  flex: 0 0 64px;
-  min-width: 64px;
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
 }
 
 .setting-inline-form .field-icon .input {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
   text-align: center;
   font-size: 18px;
 }
 
 @media (max-width: 640px) {
   .setting-inline-form .field-icon {
-    flex: 0 0 64px;
-    min-width: 64px;
+    flex: 0 0 36px;
+    width: 36px;
+    min-width: 36px;
   }
 }
 

@@ -17,6 +17,9 @@ const themes = ['light', 'dark'];
 const paths = [
   '/',
   '/login',
+  '/about',
+  '/privacy',
+  '/terms',
   '/app',
   '/app/settings/security',
   '/app/settings/team',

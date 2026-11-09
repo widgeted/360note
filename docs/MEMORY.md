@@ -550,3 +550,13 @@ apps/web/src/styles/tokens.css        设计 token
 - `.public-header` / `.page-topbar` 使用 `color-mix(..., 68%, transparent)` + `backdrop-filter: blur(18px) saturate(1.2)` + 轻阴影；设置页 topbar 改为 absolute overlay，settings-nav/content 加 header 高度内边距，内容可从 header 下穿过。
 - `.public-header-cta { margin-left:auto }`，移动端 CTA 右对齐。
 - 空间概览用 `.space-overview-row` 等类：图标顶部对齐、类型图标紧跟名称、切换按钮右侧；`.field-icon` 宽 64px。
+
+## 2026-11-09 · v0.1.12 分享页去噪
+
+- “安全分享”只是重复的安全口号，不提供状态或操作；移除该标签和 `.public-header-meta`，header 保留品牌 + 创建账户 CTA。
+
+## 2026-11-09 · v0.1.14 站点页头统一与按钮悬停
+
+- 绿色按钮文字消失根因：`<Link class="btn btn-primary">` 上 `.btn-primary` 只设基础 color，`a:hover` 优先级更高，把文字改成深绿。修复：`.btn-primary:hover`/`.btn-danger:hover` 显式设置颜色，并加 dark 覆盖。
+- 新增 `components/SiteHeader.tsx`、`SiteFooter.tsx`，首页/About/Legal 共用；新增 `/about` React 页面，`about.html` 仅保留 meta refresh 到 `/about`。
+- 公开联系邮箱统一为 `contact@360note.com`（页脚、关于、恢复账户、隐私政策）。

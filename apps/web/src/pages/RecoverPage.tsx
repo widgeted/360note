@@ -189,7 +189,7 @@ export default function RecoverPage() {
       <p className="auth-legal">
         {mode === 'key' ? t('没有恢复密钥？') : t('仍然无法登录？')}
         <br />
-        <Link to="/register">{t('创建一个新账户')}</Link> · <a href="mailto:noreply@360note.com">{t('联系我们')}</a>
+        <Link to="/register">{t('创建一个新账户')}</Link> · <a href="mailto:contact@360note.com">{t('联系我们')}</a>
       </p>
     </AuthLayout>
   );

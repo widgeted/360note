@@ -139,10 +139,6 @@
   .public-header-inner {
     padding: 0 20px;
   }
-
-  .public-header-meta {
-    display: none;
-  }
 }
 
 @media (max-width: 760px) {
