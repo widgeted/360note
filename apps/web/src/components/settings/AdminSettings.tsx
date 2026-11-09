@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Ban, Database, Download, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -49,6 +49,7 @@ export default function AdminSettings() {
   const [auditOffset, setAuditOffset] = useState(0);
   const [auditLoading, setAuditLoading] = useState(false);
   const [ipBlocks, setIpBlocks] = useState<Array<{ id: string; ip: string; reason: string | null; createdAt: string }>>([]);
+  const [shares, setShares] = useState<Array<{ id: string; noteTitle: string; workspaceName: string; ownerEmail: string | null; permission: string; hasPassword: boolean; expiresAt: string | null; viewCount: number; url: string }>>([]);
   const [blockIp, setBlockIp] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
@@ -66,6 +67,7 @@ export default function AdminSettings() {
     api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch(() => {});
     void loadAudit(0);
     void refreshIpBlocks();
+    api.get<{ shares: typeof shares }>('/api/admin/shares').then((res) => setShares(res.shares)).catch(() => {});
   }, []);
 
   async function refreshIpBlocks() {
@@ -296,6 +298,31 @@ export default function AdminSettings() {
           </table>
         </div>
         <p className="setting-note" style={{ marginTop: 8 }}>{t('管理员可以查看账户元数据、空间/笔记/附件数量、会话与审计日志，并可调整角色或强制退出设备。不会提供读取用户笔记正文的后门；正文只在其授权的空间内可访问。')}</p>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-head">
+          <span className="settings-section-title">{t('分享链接')}</span>
+          <span className="settings-section-desc">{shares.length}</span>
+        </div>
+        <p className="setting-note">{t('只展示已生成的有效分享链接，用于排查公开内容。公开链接可直接打开；需要密码的链接仍需密码，管理员不能绕过。管理员不会看到笔记正文。')}</p>
+        <div className="admin-share-list">
+          {shares.length === 0 ? <div className="context-empty">{t('暂无有效分享')}</div> : shares.map((share) => (
+            <div className="admin-share-row" key={share.id}>
+              <span className="admin-share-note" title={share.noteTitle}>{share.noteTitle}</span>
+              <span className="admin-share-owner" title={share.ownerEmail ?? ''}>{share.ownerEmail ?? '—'}</span>
+              <span>{share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}</span>
+              <span>{share.hasPassword ? t('需要密码') : t('公开')}</span>
+              <span>{share.expiresAt ? formatFullDate(share.expiresAt) : t('永不过期')}</span>
+              <span>{share.viewCount}</span>
+              {!share.hasPassword ? (
+                <a href={share.url} target="_blank" rel="noopener noreferrer">{t('打开')} <ExternalLink size={11} /></a>
+              ) : (
+                <span className="setting-note">{t('受密码保护')}</span>
+              )}
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="settings-section">

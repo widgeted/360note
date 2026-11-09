@@ -12,8 +12,8 @@ import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite }
 import { getNoteForUser } from '../services/notes.js';
 import { createBackupDocument } from '../services/backups.js';
 import { deleteBackupFile, readBackup, safeFilename, saveBackup } from '../lib/storage.js';
-import { randomToken, sha256 } from '../lib/crypto.js';
-import { normalizeLocale, sendUserExportEmail } from '../lib/mailer.js';
+import { decryptString, randomToken, sha256 } from '../lib/crypto.js';
+import { isReservedMailAddress, normalizeLocale, sendUserExportEmail } from '../lib/mailer.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
   async function requireAdmin(userId: string): Promise<void> {
@@ -271,6 +271,11 @@ export default async function adminRoutes(app: FastifyInstance) {
        VALUES ($1, $2, $3, $4, $5) RETURNING id`,
       [id, sha256(token), filename, auth.user.id, expiresAt],
     );
+    if (isReservedMailAddress(target.email)) {
+      await deleteBackupFile(filename).catch(() => {});
+      await query('DELETE FROM user_export_links WHERE id = $1', [row!.id]);
+      return { emailed: false, message: '该用户邮箱为保留测试域名，未发送导出链接' };
+    }
     try {
       await sendUserExportEmail({
         to: target.email,
@@ -301,6 +306,47 @@ export default async function adminRoutes(app: FastifyInstance) {
       .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.filename.replace(/\.nhbackup$/, '.zip'))}`)
       .header('Cache-Control', 'no-store')
       .send(data);
+  });
+
+  app.get('/api/admin/shares', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const rows = await many<{
+      id: string;
+      token_cipher: string;
+      permission: string;
+      password_hash: string | null;
+      expires_at: Date | null;
+      created_at: Date;
+      view_count: number;
+      note_title: string;
+      workspace_name: string;
+      owner_email: string;
+    }>(
+      `SELECT s.id, s.token_cipher, s.permission, s.password_hash, s.expires_at, s.created_at, s.view_count,
+        n.title AS note_title, w.name AS workspace_name, u.email AS owner_email
+       FROM share_links s
+       JOIN notes n ON n.id = s.note_id
+       JOIN workspaces w ON w.id = n.workspace_id
+       LEFT JOIN users u ON u.id = s.created_by
+       WHERE s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > now())
+         AND n.deleted_at IS NULL AND n.trashed_at IS NULL AND w.deleted_at IS NULL
+       ORDER BY s.created_at DESC LIMIT 200`,
+    );
+    return {
+      shares: rows.map((row) => ({
+        id: row.id,
+        noteTitle: row.note_title,
+        workspaceName: row.workspace_name,
+        ownerEmail: row.owner_email,
+        permission: row.permission,
+        hasPassword: Boolean(row.password_hash),
+        expiresAt: row.expires_at?.toISOString() ?? null,
+        createdAt: row.created_at.toISOString(),
+        viewCount: row.view_count,
+        url: `${config.publicOrigin}/s/${decryptString(row.token_cipher, `share:${row.id}`)}`,
+      })),
+    };
   });
 
   app.get('/api/admin/settings', async (request) => {

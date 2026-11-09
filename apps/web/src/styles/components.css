@@ -2443,3 +2443,61 @@ a.btn {
 .admin-users-table thead th:last-child {
   background: var(--paper-50);
 }
+
+.admin-share-list {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.admin-share-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) minmax(120px, 1fr) 70px 84px 130px 50px 80px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.admin-share-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-share-note,
+.admin-share-owner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-share-note {
+  color: var(--text);
+  font-weight: 560;
+}
+
+.admin-share-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .admin-share-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+
+  .admin-share-row > span:nth-child(3),
+  .admin-share-row > span:nth-child(4),
+  .admin-share-row > span:nth-child(5),
+  .admin-share-row > span:nth-child(6) {
+    display: none;
+  }
+}
