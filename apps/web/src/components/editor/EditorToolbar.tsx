@@ -67,7 +67,7 @@ export function EditorToolbar({
     }),
   });
 
-  const headingLabel = state?.heading1 ? 'H1' : state?.heading2 ? 'H2' : state?.heading3 ? 'H3' : t('正文');
+  const headingLabel = state?.heading1 ? 'H1' : state?.heading2 ? 'H2' : state?.heading3 ? 'H3' : isMobile ? '¶' : t('正文');
 
   return (
     <div className="editor-toolbar-wrap">

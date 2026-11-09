@@ -2042,20 +2042,3 @@ a.btn {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
 }
-
-
-@media (max-width: 640px) {
-  .banner {
-    flex-wrap: wrap;
-  }
-
-  .banner > div:not(.banner-actions),
-  .banner > p,
-  .banner-body {
-    flex: 1 1 calc(100% - 26px);
-  }
-
-  .banner-actions {
-    width: 100%;
-  }
-}

@@ -18,6 +18,17 @@ for(const width of [1440,390]){
   await page.fill('#login-email', EMAIL); await page.fill('#login-password', PASSWORD);
   await page.click('button[type=submit]'); await page.waitForURL('**/app'); await page.waitForTimeout(600);
   await page.locator('.note-item').first().click(); await page.waitForTimeout(700);
+  if (width === 390) {
+    const toolbar = await page.evaluate(() => {
+      const bar = document.querySelector('.editor-toolbar');
+      const label = bar?.querySelector('.tool-btn-text')?.textContent?.trim();
+      const rows = new Set([...bar.querySelectorAll('.tool-btn')].map((el) => Math.round(el.getBoundingClientRect().top)));
+      return { label, rows: rows.size, height: bar.getBoundingClientRect().height };
+    });
+    assert.equal(toolbar.label, '¶', 'mobile paragraph control must stay compact');
+    assert.equal(toolbar.rows, 1, 'mobile toolbar controls must stay on one row');
+    assert.ok(toolbar.height <= 42, `mobile toolbar should stay one row high, got ${toolbar.height}`);
+  }
   await page.evaluate(()=>{
     const host=document.querySelector('.editor-shell'); if(!host) return;
     const wrap=document.createElement('div'); wrap.id='audit-banner-host'; wrap.style.padding='10px 18px 0';
@@ -27,12 +38,13 @@ for(const width of [1440,390]){
   const data=await page.evaluate(()=>{
     const b=document.querySelector('#audit-banner-host .banner'); const close=b.querySelector('.banner-close'); const btn=b.querySelector('.btn');
     const br=b.getBoundingClientRect(), cr=close.getBoundingClientRect(), rr=btn.getBoundingClientRect();
-    return {banner:{l:br.left,r:br.right,w:br.width,b:br.bottom},close:{l:cr.left,r:cr.right,t:cr.top,b:cr.bottom},button:{l:rr.left,r:rr.right,t:rr.top,b:rr.bottom},doc:document.documentElement.scrollWidth,vw:innerWidth};
+    return {banner:{l:br.left,r:br.right,t:br.top,w:br.width,b:br.bottom},close:{l:cr.left,r:cr.right,t:cr.top,b:cr.bottom},button:{l:rr.left,r:rr.right,t:rr.top,b:rr.bottom},doc:document.documentElement.scrollWidth,vw:innerWidth};
   });
   console.log(width,JSON.stringify(data));
   assert.ok(data.doc<=width+1);
   assert.ok(Math.abs(data.close.r-data.banner.r)<=16, 'close should sit at the right edge');
   assert.ok(data.button.l<data.close.l, 'action button should be left of close');
+  assert.ok(data.close.t<=data.banner.t+18, 'close must stay on the banner row, not below the text');
   await page.screenshot({path:`/tmp/opencode/banner-${width}.png`});
   await page.keyboard.press('Control+s'); await page.waitForTimeout(400);
   const toast=await page.evaluate(()=>{const t=document.querySelector('.toast'); if(!t) return null; const s=getComputedStyle(t),c=t.querySelector('.toast-close'); const tr=t.getBoundingClientRect(),cr=c.getBoundingClientRect(); return {bg:s.backgroundColor,radius:s.borderRadius,border:s.borderColor,closeRight:cr.right,toastRight:tr.right,doc:document.documentElement.scrollWidth};});

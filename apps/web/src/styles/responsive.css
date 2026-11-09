@@ -201,12 +201,11 @@
   }
 
   .editor-toolbar {
-    height: auto;
+    height: var(--toolbar-height);
     min-height: var(--toolbar-height);
-    flex-wrap: wrap;
-    overflow-x: visible;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     padding: 5px 8px;
-    row-gap: 2px;
   }
 
   .editor-toolbar .toolbar-divider {

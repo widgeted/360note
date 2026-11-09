@@ -369,6 +369,7 @@
 - `tests/manual/editor-ux-regression.mjs`：新笔记空标题聚焦与时间戳 fallback；图片上传就地进度、失败原因、重试/移除，占位文本不写入正文。
 - `tests/manual/feedback-ui-regression.mjs`：编辑器提示条操作与关闭按钮右对齐，Toast 使用统一 surface/8px 圆角。
 - `tests/manual/site-pages-regression.mjs`：主按钮 hover 文字可读；`/about`、`/privacy`、`/terms` 共用主站 header/footer；旧 `/about.html` 跳转到 `/about`；公开联系邮箱为 contact@360note.com。
+- `tests/manual/note-refresh-regression.mjs`：从列表重新打开同一篇笔记时，编辑器必须显示服务端最新版本。
 - `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式“退出并清除本机数据”清空 IndexedDB 与 auth/workspace 键。
 - `updateNote` 使用行锁 + `WHERE version = locked.version` 条件更新，事务内校验 `baseVersion`。
 - 首次注册使用 `pg_advisory_xact_lock` 串行化“用户数 + 插入”事务。

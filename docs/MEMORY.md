@@ -560,3 +560,9 @@ apps/web/src/styles/tokens.css        设计 token
 - 绿色按钮文字消失根因：`<Link class="btn btn-primary">` 上 `.btn-primary` 只设基础 color，`a:hover` 优先级更高，把文字改成深绿。修复：`.btn-primary:hover`/`.btn-danger:hover` 显式设置颜色，并加 dark 覆盖。
 - 新增 `components/SiteHeader.tsx`、`SiteFooter.tsx`，首页/About/Legal 共用；新增 `/about` React 页面，`about.html` 仅保留 meta refresh 到 `/about`。
 - 公开联系邮箱统一为 `contact@360note.com`（页脚、关于、恢复账户、隐私政策）。
+
+## 2026-11-09 · v0.1.15 移动端工具栏与内容刷新
+
+- 移动端 `.editor-toolbar` 改回单行 `flex-wrap:nowrap; overflow-x:auto`；正文类型按钮显示 `¶`，避免 “Paragraph” 挤走更多格式 “…” 。
+- 删除 mobile banner 的 `actions width:100%` 规则；`.banner-actions` 保持在右侧，关闭按钮不再掉到下一行。
+- `openNote` 不再只是按 id 早退：比较最新服务端 note 的 version/title/contentMd，有变化则写回并 bump `reloadTick`；EditorPane 的 reload effect 更新编辑器正文。解决列表更新但内容页旧的问题。

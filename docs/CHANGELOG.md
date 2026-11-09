@@ -3,6 +3,21 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.15] — 2026-11-09
+
+移动端工具栏、提示条与笔记内容刷新。
+
+### Fixed
+
+- 移动端编辑器正文类型按钮不再显示长文本 “Paragraph/正文”，改为紧凑的 ¶；工具栏保持单行，更多格式 “…” 不再被挤到第二行。
+- 移动端提示条恢复单行操作布局：关闭按钮固定在提示条最右侧，不再被 100% 宽度的操作区推到下方。
+- 从笔记列表重新打开当前笔记时，会对比最新版本号/标题/正文并刷新编辑器，解决列表已更新但内容页仍是旧内容的问题。
+
+### Added
+
+- `tests/manual/note-refresh-regression.mjs`：列表重开笔记后必须显示服务端最新正文。
+- 提示条回归新增移动端单行/关闭按钮位置断言。
+
 ## [0.1.14] — 2026-11-09
 
 站点页头统一、按钮悬停与联系邮箱修正。

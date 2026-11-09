@@ -443,8 +443,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openNote: async (noteId, options) => {
-    const current = get().note;
-    if (current?.id === noteId && !isLocalNote(noteId)) return;
     set({ loadingNote: !options?.silent, sidebarMobileOpen: false });
     const cached = await readCachedNote(noteId);
     if (cached) {
@@ -457,9 +455,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return;
     }
+    const shown = get().note;
     try {
       const response = await api.get<{ note: Note }>(`/api/notes/${noteId}`);
-      set({ note: response.note, loadingNote: false, conflictNoteId: null });
+      const changed =
+        Boolean(shown && shown.id === response.note.id) &&
+        (shown!.version !== response.note.version ||
+          shown!.title !== response.note.title ||
+          shown!.contentMd !== response.note.contentMd);
+      set({
+        note: response.note,
+        loadingNote: false,
+        conflictNoteId: null,
+        ...(changed ? { reloadTick: get().reloadTick + 1 } : {}),
+      });
       await cacheNote(response.note);
       set({ notes: upsertSummary(get().notes, response.note) });
       void api.post(`/api/notes/${noteId}/open`).catch(() => {});
