@@ -20,6 +20,7 @@ import {
 } from '../lib/offline';
 import { toast } from './toast';
 import { translate } from '../lib/i18n';
+import { untitledNoteTitle } from '../lib/utils';
 import { mergeText } from '../lib/merge';
 
 export type NoteFilter = 'all' | 'recent' | 'favorites' | 'trash' | 'folder' | 'tag';
@@ -56,6 +57,7 @@ interface AppState {
   focusMode: boolean;
   reloadTick: number;
   conflictNoteId: string | null;
+  freshNoteId: string | null;
   hasMore: boolean;
   serverOffset: number;
 
@@ -209,6 +211,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusMode: false,
   reloadTick: 0,
   conflictNoteId: null,
+  freshNoteId: null,
   hasMore: false,
   serverOffset: 0,
 
@@ -501,7 +504,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   createNote: async (input) => {
     const { workspaceId, folders, tags } = get();
     if (!workspaceId) return null;
-    const title = input?.title?.trim() || translate('未命名笔记');
+    const title = input?.title?.trim() || untitledNoteTitle();
     const contentMd = input?.contentMd ?? '';
     const folderId = input?.folderId ?? null;
     try {
@@ -524,6 +527,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncState: 'saved',
         lastSavedAt: Date.now(),
         conflictNoteId: null,
+        freshNoteId: note.id,
       });
       await cacheNote(note);
       await persistSnapshot(get());
@@ -576,6 +580,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncState: 'offline',
         syncMessage: translate('离线编辑'),
         pendingCount: get().pendingCount + 1,
+        freshNoteId: note.id,
       });
       await updateCachedNote(note);
       await saveDraft({
@@ -982,6 +987,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     focusMode: false,
     reloadTick: get().reloadTick + 1,
     conflictNoteId: null,
+    freshNoteId: null,
     hasMore: false,
     serverOffset: 0,
   }),

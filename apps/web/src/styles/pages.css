@@ -942,3 +942,10 @@
     background: none !important;
   }
 }
+
+@media (max-width: 640px) {
+  .share-action-copy,
+  .share-action-print {
+    display: none;
+  }
+}

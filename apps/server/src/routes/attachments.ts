@@ -28,6 +28,9 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     }
     if (!buffer.length) throw errors.badRequest('文件为空');
     const mime = sniffMime(buffer, part.filename, part.mimetype);
+    if (/^image\/(heic|heif|tiff|bmp)$/i.test(mime)) {
+      throw errors.badRequest('不支持 HEIC/HEIF 等图片格式。请使用 PNG、JPEG、WebP、GIF 或 AVIF。');
+    }
     const filename = safeFilename(part.filename);
     let width: number | null = null;
     let height: number | null = null;

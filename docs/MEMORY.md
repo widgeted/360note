@@ -531,3 +531,14 @@ apps/web/src/styles/tokens.css        设计 token
 - `ShareDialog` 已有分享项改为 `.share-item` 卡片：30px 链接图标、权限/密码行、三行 meta（创建/到期/浏览量），移动端操作按钮独占一行。
 - 移动端同类修复：团队成员行操作下移、邀请表单纵向全宽、审计日志改为纵向四行。
 - 安全审计新增“分享 token 为紧凑 96 位形式”，总数 66。
+
+## 2026-11-09 · v0.1.10 编辑器反馈与上传
+
+- 顶部 `.banner` 从 grid 改 flex：`.banner-body` 伸展、`.banner-actions` 右对齐，关闭按钮 `.banner-close` 永远最后；EditorPane 的冲突/草稿/保存失败/回收站/外部更新/语音提示统一。
+- Toast 改为 `--surface-raised` + 8px 圆角 + 彩色图标块，去掉独立深色皮肤。
+- 图片上传：`TipTapEditor` 新增 `UploadPlaceholder` atom 节点（进度/失败/重试/移除）；XHR 上传进度；`htmlToMarkdown` 移除占位节点，避免写进正文；HEIC/HEIF 与超限在上传前拒绝。
+- 新笔记：store `freshNoteId` 让编辑器首次打开为空标题并聚焦；`untitledNoteTitle()` 用 14 位时间戳生成 fallback，服务端空标题也使用带时间戳的 fallback。
+- 公开分享页移动端 `.share-action-copy/.share-action-print { display:none }`；已有分享到期+浏览同行。
+- 761–900px 设置导航 4 列网格，消除 768px 横向滚动。
+
+- 已有分享最终布局：`.share-item-top` 内 URL 为主文本（省略号 + title）、右侧 `.share-item-actions` 复制/删除；`.share-item-meta` 依次为权限标签、创建时间、到期+浏览同行。

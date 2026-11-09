@@ -239,6 +239,12 @@ export async function getNoteForUser(noteId: string, userId: string): Promise<{ 
   return { note: await serializeNote(row, role), role, row };
 }
 
+function untitledTitle(): string {
+  const date = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `未命名笔记 ${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
 function deriveTitle(title: string | undefined, content: string): string {
   if (title && title.trim()) return title.trim().slice(0, 500);
   const heading = content.match(/^#\s+(.+)$/m);
@@ -247,7 +253,7 @@ function deriveTitle(title: string | undefined, content: string): string {
     .split('\n')
     .map((value) => value.trim())
     .find((value) => value.length > 0);
-  return line ? line.replace(/^[#>*+\-\d.\s]+/, '').slice(0, 160) : '未命名笔记';
+  return line ? line.replace(/^[#>*+\-\d.\s]+/, '').slice(0, 160) : untitledTitle();
 }
 
 async function validateFolder(
@@ -451,7 +457,7 @@ export async function updateNote(input: {
         ? locked.folder_id
         : await validateFolder(input.folderId, locked.workspace_id, client);
     const title =
-      input.title === undefined ? locked.title : (input.title.trim().slice(0, 500) || '未命名笔记');
+      input.title === undefined ? locked.title : (input.title.trim().slice(0, 500) || untitledTitle());
     let content = input.contentMd === undefined ? locked.content_md : input.contentMd;
     content = stripTitleHeading(content, title);
     const oldTitle = locked.title;

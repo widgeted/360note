@@ -14,6 +14,13 @@ export function initials(name: string): string {
   return trimmed.slice(0, 1).toUpperCase();
 }
 
+export function untitledNoteTitle(createdAt: string | Date = new Date()): string {
+  const date = new Date(createdAt);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  return translate('未命名笔记 {date}', { date: stamp });
+}
+
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
   if (bytes < 1024) return `${bytes} B`;

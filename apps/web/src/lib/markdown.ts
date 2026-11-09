@@ -71,8 +71,10 @@ turndown.addRule('taskListItems', {
 
 export function htmlToMarkdown(html: string): string {
   if (!html || html === '<p></p>') return '';
+  const withoutPlaceholders = new DOMParser().parseFromString(html, 'text/html');
+  withoutPlaceholders.querySelectorAll('[data-upload-placeholder]').forEach((element) => element.remove());
   return turndown
-    .turndown(html)
+    .turndown(withoutPlaceholders.body.innerHTML)
     // Turndown escapes brackets in inline text. Wiki links are deliberate
     // syntax, not prose punctuation, so restore them after conversion.
     .replace(/\\\[\\\[([^\]]+?)\\\]\\\]/g, '[[$1]]')

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
-import { Extension } from '@tiptap/core';
+import { Extension, Node, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
@@ -13,6 +13,7 @@ import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
   Bold,
@@ -124,6 +125,75 @@ export interface SlashItem {
   run: () => void;
 }
 
+const UploadPlaceholder = Node.create<{
+  retry: (id: string) => void;
+  remove: (id: string) => void;
+}>({
+  name: 'uploadPlaceholder',
+  group: 'block',
+  atom: true,
+  selectable: false,
+  draggable: false,
+
+  addOptions() {
+    return { retry: () => {}, remove: () => {} };
+  },
+
+  addAttributes() {
+    return {
+      uploadId: { default: null },
+      filename: { default: '' },
+      progress: { default: 0 },
+      error: { default: null },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-upload-placeholder]' }];
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    const failed = Boolean(node.attrs.error);
+    const progress = Math.max(0, Math.min(100, Number(node.attrs.progress) || 0));
+    const pending = !failed && progress === 0;
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        'data-upload-placeholder': 'true',
+        class: failed ? 'editor-upload is-error' : 'editor-upload',
+      }),
+      ['div', { class: 'editor-upload-head' },
+        ['span', { class: 'editor-upload-name' }, node.attrs.filename || translate('图片')],
+        ['span', { class: 'editor-upload-pct' }, failed ? translate('失败') : pending ? translate('准备中') : `${progress}%`],
+      ],
+      ['div', { class: 'editor-upload-track' },
+        ['div', { class: pending ? 'editor-upload-fill is-indeterminate' : 'editor-upload-fill', style: pending ? undefined : `width:${failed ? 100 : progress}%` }],
+      ],
+      failed
+        ? ['div', { class: 'editor-upload-error' }, String(node.attrs.error)]
+        : ['div', { class: 'editor-upload-hint' }, translate('正在上传，请稍候')],
+      failed
+        ? ['div', { class: 'editor-upload-actions' },
+            ['button', { type: 'button', class: 'btn btn-secondary btn-sm', 'data-upload-retry': String(node.attrs.uploadId) }, translate('重试')],
+            ['button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-upload-remove': String(node.attrs.uploadId) }, translate('移除')],
+          ]
+        : ['div', { class: 'editor-upload-hint' }, translate('上传完成后会自动插入')],
+    ];
+  },
+});
+
+export interface EditorHandle {
+  editor: Editor;
+  insertFiles: (files: File[]) => void;
+}
+
+export interface UploadedAttachment {
+  id: string;
+  filename: string;
+  mime: string;
+  url: string;
+}
+
 export function TipTapEditor({
   noteId,
   initialMarkdown,
@@ -141,18 +211,22 @@ export function TipTapEditor({
   editable: boolean;
   spellcheck: boolean;
   onChange: (markdown: string) => void;
-  onReady: (editor: Editor | null) => void;
+  onReady: (handle: EditorHandle | null) => void;
   onWikiOpen: () => void;
-  uploadFile: (file: File) => Promise<{ url: string; mime: string; filename: string; id: string } | null>;
+  uploadFile: (file: File, onProgress?: (percent: number) => void) => Promise<UploadedAttachment>;
 }) {
   const t = useT();
   const onChangeRef = useRef(onChange);
   const onReadyRef = useRef(onReady);
   const wikiRef = useRef(onWikiOpen);
   const uploadRef = useRef(uploadFile);
+  const editorRef = useRef<Editor | null>(null);
+  const insertFilesRef = useRef<(files: File[]) => void>(() => {});
+  const retryUploadRef = useRef<(id: string) => void>(() => {});
+  const removeUploadRef = useRef<(id: string) => void>(() => {});
+  const uploadFilesRef = useRef(new Map<string, File>());
   const [slash, setSlash] = useState<{ left: number; top: number; bottom: number } | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
-  const [uploading, setUploading] = useState(false);
   onChangeRef.current = onChange;
   onReadyRef.current = onReady;
   wikiRef.current = onWikiOpen;
@@ -176,6 +250,10 @@ export function TipTapEditor({
         includeChildren: true,
       }),
       Image.configure({ allowBase64: false, inline: false }),
+      UploadPlaceholder.configure({
+        retry: (id) => retryUploadRef.current(id),
+        remove: (id) => removeUploadRef.current(id),
+      }),
       TableKit.configure({ table: { resizable: true } }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -205,15 +283,30 @@ export function TipTapEditor({
         const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.size > 0);
         if (!files.length) return false;
         event.preventDefault();
-        void handleFiles(files);
+        insertFilesRef.current(files);
         return true;
       },
       handleDrop(_view, event) {
         const files = Array.from((event as DragEvent).dataTransfer?.files ?? []).filter((file) => file.size > 0);
         if (!files.length) return false;
         event.preventDefault();
-        void handleFiles(files);
+        const current = editorRef.current;
+        const position = current?.view.posAtCoords({ left: (event as DragEvent).clientX, top: (event as DragEvent).clientY });
+        if (position && current) current.commands.setTextSelection(position.pos);
+        insertFilesRef.current(files);
         return true;
+      },
+      handleDOMEvents: {
+        click(_view, event) {
+          const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-upload-retry],[data-upload-remove]');
+          if (!target) return false;
+          event.preventDefault();
+          const retry = target.getAttribute('data-upload-retry');
+          const remove = target.getAttribute('data-upload-remove');
+          if (retry) retryUploadRef.current(retry);
+          if (remove) removeUploadRef.current(remove);
+          return true;
+        },
       },
     },
     onUpdate: ({ editor }) => {
@@ -221,27 +314,99 @@ export function TipTapEditor({
     },
   });
 
-  async function handleFiles(files: File[]) {
-    if (!editor) return;
-    setUploading(true);
-    try {
-      for (const file of files) {
-        const result = await uploadRef.current(file);
-        if (!result) continue;
-        if (result.mime.startsWith('image/')) {
-          editor.chain().focus().setImage({ src: result.url, alt: result.filename, title: result.filename }).run();
-        } else {
-          editor.chain().focus().insertContent(`[${result.filename}](${result.url})`).run();
-        }
+  function findUpload(id: string): { node: ProseMirrorNode; pos: number } | null {
+    const current = editorRef.current;
+    if (!current) return null;
+    let found: { node: ProseMirrorNode; pos: number } | null = null;
+    current.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'uploadPlaceholder' && node.attrs.uploadId === id) {
+        found = { node, pos };
+        return false;
       }
-    } finally {
-      setUploading(false);
+      return true;
+    });
+    return found;
+  }
+
+  function updateUpload(id: string, attrs: Record<string, unknown>): void {
+    const current = editorRef.current;
+    const found = findUpload(id);
+    if (!current || !found) return;
+    current.view.dispatch(
+      current.state.tr.setNodeMarkup(found.pos, undefined, { ...found.node.attrs, ...attrs }),
+    );
+  }
+
+  function removeUpload(id: string): void {
+    const current = editorRef.current;
+    const found = findUpload(id);
+    uploadFilesRef.current.delete(id);
+    if (!current || !found) return;
+    current.chain().focus().deleteRange({ from: found.pos, to: found.pos + found.node.nodeSize }).run();
+  }
+
+  function replaceUpload(id: string, result: UploadedAttachment): void {
+    const current = editorRef.current;
+    const found = findUpload(id);
+    uploadFilesRef.current.delete(id);
+    if (!current || !found) return;
+    const content = result.mime.startsWith('image/')
+      ? { type: 'image', attrs: { src: result.url, alt: result.filename, title: result.filename } }
+      : { type: 'text', text: result.filename, marks: [{ type: 'link', attrs: { href: result.url } }] };
+    current.chain().focus()
+      .insertContentAt({ from: found.pos, to: found.pos + found.node.nodeSize }, content, { updateSelection: true })
+      .run();
+  }
+
+  async function runUpload(id: string, file: File): Promise<void> {
+    try {
+      const result = await uploadRef.current(file, (percent) => {
+        updateUpload(id, { progress: Math.max(0, Math.min(99, Math.round(percent))) });
+      });
+      updateUpload(id, { progress: 100 });
+      replaceUpload(id, result);
+    } catch (error) {
+      updateUpload(id, {
+        progress: 100,
+        error: (error as Error).message || translate('上传失败'),
+      });
     }
   }
 
+  function insertUpload(file: File): void {
+    const current = editorRef.current;
+    if (!current) return;
+    const id = crypto.randomUUID();
+    uploadFilesRef.current.set(id, file);
+    current.chain().focus().insertContent({
+      type: 'uploadPlaceholder',
+      attrs: { uploadId: id, filename: file.name, progress: 0, error: null },
+    }).run();
+    void runUpload(id, file);
+  }
+
+  function insertFiles(files: File[]): void {
+    for (const file of files) insertUpload(file);
+  }
+
+  function retryUpload(id: string): void {
+    const file = uploadFilesRef.current.get(id);
+    if (!file) return;
+    updateUpload(id, { progress: 0, error: null });
+    void runUpload(id, file);
+  }
+
+  insertFilesRef.current = insertFiles;
+  retryUploadRef.current = retryUpload;
+  removeUploadRef.current = removeUpload;
+
   useEffect(() => {
-    onReadyRef.current(editor ?? null);
-    return () => onReadyRef.current(null);
+    editorRef.current = editor ?? null;
+    onReadyRef.current(editor ? { editor, insertFiles: (files) => insertFilesRef.current(files) } : null);
+    return () => {
+      editorRef.current = null;
+      onReadyRef.current(null);
+    };
   }, [editor]);
 
   useEffect(() => {
@@ -373,11 +538,6 @@ export function TipTapEditor({
   return (
     <div style={{ position: 'relative' }}>
       <EditorContent editor={editor} />
-      {uploading && (
-        <div style={{ position: 'absolute', right: 8, top: 8, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px', borderRadius: 6, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 13, color: 'var(--text-tertiary)' }}>
-          <span className="spinner" style={{ width: 12, height: 12 }} /> {t('正在上传…')}
-        </div>
-      )}
       {slash && (
         <div
           className="slash-menu"

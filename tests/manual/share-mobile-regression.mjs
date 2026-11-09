@@ -15,7 +15,7 @@ const PASSWORD = process.env.NH_TEST_PASSWORD;
 if (!EMAIL || !PASSWORD) throw new Error('NH_TEST_EMAIL / NH_TEST_PASSWORD are required');
 
 const browser = await chromium.launch({ headless: true });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', isMobile: true, hasTouch: true });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', isMobile: true, hasTouch: true, extraHTTPHeaders: { 'x-forwarded-for': `198.51.100.${Math.floor(Math.random() * 180) + 20}` } });
 const page = await ctx.newPage();
 let createdShare = null;
 let noteId = null;
@@ -59,39 +59,51 @@ try {
   await page.waitForTimeout(600);
 
   const metrics = await page.evaluate(() => {
-    const item = document.querySelector('.share-item');
-    const icon = item.querySelector('.share-item-icon');
+    const item = [...document.querySelectorAll('.share-item')].find((element) => !element.classList.contains('is-revoked'));
+    const url = item.querySelector('.share-item-url');
+    const top = item.querySelector('.share-item-top');
     const meta = item.querySelector('.share-item-meta');
     const actions = item.querySelector('.share-item-actions');
+    const tags = meta.querySelector('.share-item-meta-tags');
     const ir = item.getBoundingClientRect();
+    const ur = url.getBoundingClientRect();
     const ar = actions?.getBoundingClientRect();
     const mr = meta.getBoundingClientRect();
     return {
       viewport: window.innerWidth,
       documentWidth: document.documentElement.scrollWidth,
-      item: { width: ir.width, scrollWidth: item.scrollWidth, clientWidth: item.clientWidth },
-      icon: { width: icon.getBoundingClientRect().width, height: icon.getBoundingClientRect().height },
+      item: { width: ir.width, right: ir.right, scrollWidth: item.scrollWidth, clientWidth: item.clientWidth },
+      url: { text: url.textContent, href: url.getAttribute('href'), width: ur.width, top: ur.top, fontSize: getComputedStyle(url).fontSize },
+      urlIsFirst: item.firstElementChild === top && top.firstElementChild === url,
+      actionCount: actions?.querySelectorAll('button').length ?? 0,
+      actions: ar ? { top: Math.round(ar.top), bottom: Math.round(ar.bottom), width: Math.round(ar.width), right: ar.right } : null,
       metaLines: [...meta.children].map((el) => {
         const r = el.getBoundingClientRect();
-        return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height) };
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height), isTags: el === tags };
       }),
-      actions: ar ? { top: Math.round(ar.top), bottom: Math.round(ar.bottom), width: Math.round(ar.width) } : null,
+      inlineMeta: [...(meta.querySelector('.share-item-meta-line')?.children ?? [])].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), height: Math.round(r.height) };
+      }),
+      metaTop: Math.round(mr.top),
       metaBottom: Math.round(mr.bottom),
     };
   });
 
   assert.ok(metrics.documentWidth <= metrics.viewport + 1, 'share dialog must not cause horizontal overflow');
   assert.ok(metrics.item.scrollWidth <= metrics.item.clientWidth + 2, 'share card content must fit');
-  assert.ok(metrics.icon.width >= 30 && metrics.icon.height >= 30, 'link icon must be at least 30px');
-  assert.equal(metrics.metaLines.length, 3, 'created, expiry and views must be separate rows');
-  assert.ok(metrics.metaLines[1].top >= metrics.metaLines[0].bottom - 1, 'metadata rows must stack');
-  assert.ok(metrics.metaLines[2].top >= metrics.metaLines[1].bottom - 1, 'metadata rows must stack');
-  if (metrics.actions) {
-    assert.ok(metrics.actions.top >= metrics.metaBottom - 1, 'actions must sit below the metadata on mobile');
-    assert.ok(metrics.actions.width > metrics.item.width * 0.8, 'actions row should use the full card width');
-  }
+  assert.equal(metrics.urlIsFirst, true, 'the share URL must be the first, primary element');
+  assert.match(metrics.url.text, /^https?:\/\//, 'share URL must be visible as text');
+  assert.ok(metrics.url.href && metrics.url.width > 80, 'share URL must be a usable link');
+  assert.equal(metrics.url.fontSize, '13.5px');
+  assert.equal(metrics.actionCount, 2, 'copy and delete actions must be present');
+  assert.ok(metrics.actions && metrics.actions.right <= metrics.item.right + 1, 'actions must sit on the right');
+  assert.ok(metrics.actions.top < metrics.metaTop, 'actions must align with the URL row, above metadata');
+  assert.equal(metrics.metaLines.length, 3, 'permission, created and expiry/views lines must be separate');
+  assert.equal(metrics.inlineMeta.length, 2, 'expiry and views must share a row');
+  assert.equal(metrics.inlineMeta[0].top, metrics.inlineMeta[1].top, 'expiry and views must align on one row');
 
-  console.log('PASS  mobile share card: 30px link icon, stacked metadata and full-width action row');
+  console.log('PASS  mobile share card: URL first, metadata below, copy/delete on the right');
 } finally {
   if (createdShare) {
     await page.request.delete(`${BASE}/api/shares/${createdShare.id}`, { headers: { 'x-360note-csrf': '1' } }).catch(() => {});

@@ -594,73 +594,78 @@
 .toast {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 20px;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
   align-items: start;
   column-gap: 10px;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--ink-900);
-  color: #efede7;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: var(--shadow-lg);
+  min-height: 46px;
+  padding: 11px 12px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-md);
   animation: rise-in 220ms var(--ease) both;
   font-size: 13px;
   line-height: 1.5;
 }
 
 .toast-icon {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  color: #a8e6c9;
-  margin-top: 2px;
+  border-radius: 6px;
+  background: var(--blue-soft);
+  color: var(--blue);
 }
 
 .toast.success .toast-icon {
-  color: #7fd0b3;
+  background: var(--green-soft);
+  color: var(--green);
 }
 
 .toast.error .toast-icon {
-  color: #f19aa4;
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .toast.warning .toast-icon {
-  color: #e8c17f;
+  background: var(--amber-soft);
+  color: var(--amber);
 }
 
 .toast-body {
-  flex: 1;
   min-width: 0;
+  padding-top: 2px;
 }
 
 .toast-title {
   font-weight: 600;
   letter-spacing: -0.01em;
+  color: var(--text);
 }
 
 .toast-text {
   margin-top: 2px;
-  color: rgba(239, 237, 231, 0.65);
+  color: var(--text-tertiary);
   font-size: 13px;
 }
 
 .toast-close {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-tertiary);
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
   margin: 0;
   justify-self: end;
 }
 
 .toast-close:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  background: var(--surface-hover);
 }
 
 /* Command palette */
@@ -832,10 +837,9 @@
 
 /* Banners */
 .banner {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  align-items: start;
-  column-gap: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -848,14 +852,41 @@
 .banner > svg {
   width: 16px;
   height: 16px;
+  flex: none;
   margin-top: 2px;
   color: var(--text-tertiary);
 }
 
-.banner > div,
-.banner > p {
+.banner > div:not(.banner-actions),
+.banner > p,
+.banner-body {
+  flex: 1;
   min-width: 0;
-  grid-column: 2;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.banner-close {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--text-tertiary);
+}
+
+.banner-close:hover {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
 }
 
 .banner + .settings-section {
@@ -892,12 +923,6 @@
 
 .banner strong {
   font-weight: 630;
-}
-
-.banner-actions {
-  display: flex;
-  gap: 7px;
-  margin-top: 7px;
 }
 
 /* Account profile: fields and the action share one column and one rhythm. */
@@ -1385,10 +1410,7 @@
 }
 
 .share-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 11px 12px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -1399,30 +1421,57 @@
   opacity: 0.62;
 }
 
-.share-item-icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  margin-top: 1px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--paper-150);
-  color: var(--text-tertiary);
-}
-
-.share-item-body {
-  flex: 1;
+.share-item-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
-.share-item-badges {
+.share-item-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--blue-strong);
+  text-decoration: none;
+}
+
+.share-item-url:hover {
+  text-decoration: underline;
+}
+
+.share-item-url.is-missing {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.share-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.share-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.share-item-meta-tags {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  min-height: 20px;
+  margin-bottom: 1px;
 }
 
 .share-item-note {
@@ -1433,21 +1482,19 @@
   color: var(--text-tertiary);
 }
 
-.share-item-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--text-tertiary);
-}
-
-.share-item-meta > span {
+.share-item-meta > span,
+.share-item-meta-line > span {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
+}
+
+.share-item-meta-line {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 14px;
 }
 
 .share-item-meta svg {
@@ -1455,33 +1502,14 @@
   margin-top: 1px;
 }
 
-.share-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-}
-
 @media (max-width: 640px) {
-  .share-item {
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    padding: 12px;
-  }
-
-  .share-item-body {
-    flex-basis: calc(100% - 40px);
-  }
-
-  .share-item-actions {
-    width: 100%;
-    justify-content: flex-end;
-    padding-top: 8px;
-    border-top: 1px solid var(--line-soft);
-  }
-
   .share-item-actions .btn {
     min-height: 32px;
+  }
+
+  .share-item-actions .btn:last-child {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }
 
@@ -1932,4 +1960,21 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
+}
+
+
+@media (max-width: 640px) {
+  .banner {
+    flex-wrap: wrap;
+  }
+
+  .banner > div:not(.banner-actions),
+  .banner > p,
+  .banner-body {
+    flex: 1 1 calc(100% - 26px);
+  }
+
+  .banner-actions {
+    width: 100%;
+  }
 }

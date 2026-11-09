@@ -11,7 +11,7 @@ const EMAIL = process.env.NH_TEST_EMAIL;
 const PASSWORD = process.env.NH_TEST_PASSWORD;
 if (!EMAIL || !PASSWORD) throw new Error('NH_TEST_EMAIL / NH_TEST_PASSWORD are required');
 const browser=await chromium.launch({headless:true});
-const ctx=await browser.newContext({viewport:{width:1440,height:980},locale:'zh-CN'});
+const ctx=await browser.newContext({viewport:{width:1440,height:980},locale:'zh-CN',extraHTTPHeaders:{'x-forwarded-for':`198.51.100.${Math.floor(Math.random()*180)+20}`}});
 const page=await ctx.newPage();
 await page.goto(`${BASE}/login`,{waitUntil:'networkidle'});
 await page.fill('#login-email', EMAIL); await page.fill('#login-password', PASSWORD);

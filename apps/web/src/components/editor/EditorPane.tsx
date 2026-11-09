@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Editor } from '@tiptap/react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -42,6 +41,7 @@ import {
   formatFullDate,
   formatRelativeShort,
   shortcutLabel,
+  untitledNoteTitle,
   wordCount,
 } from '../../lib/utils';
 import { api, downloadBlob } from '../../lib/api';
@@ -52,7 +52,7 @@ import { Dropdown, MenuItem } from '../Dropdown';
 import { ConfirmDialog, Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 import { EditorToolbar } from './EditorToolbar';
-import { TipTapEditor } from './TipTapEditor';
+import { TipTapEditor, type EditorHandle, type UploadedAttachment } from './TipTapEditor';
 import { ShareDialog } from './ShareDialog';
 import { SummaryDialog } from './SummaryDialog';
 
@@ -117,7 +117,8 @@ export function EditorPane({
     setModeState(next);
   }
   const [richSeed, setRichSeed] = useState(0);
-  const [editor, setEditor] = useState<Editor | null>(null);
+  const [editorHandle, setEditorHandle] = useState<EditorHandle | null>(null);
+  const editor = editorHandle?.editor ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -150,15 +151,20 @@ export function EditorPane({
 
   useEffect(() => {
     if (!note) return;
-    setTitle(note.title);
+    const fresh = useAppStore.getState().freshNoteId === note.id;
+    setTitle(fresh ? '' : note.title);
     const normalized = stripDuplicateTitle(note.contentMd, note.title);
     setContent(normalized);
     contentRef.current = normalized;
-    titleValueRef.current = note.title;
+    titleValueRef.current = fresh ? '' : note.title;
     baseVersionRef.current = note.version;
     dirtyRef.current = false;
     setRichSeed((value) => value + 1);
     setExternalReload(false);
+    if (fresh) {
+      useAppStore.setState({ freshNoteId: null });
+      requestAnimationFrame(() => titleRef.current?.focus());
+    }
     let active = true;
     readDraft(note.id).then((stored) => {
       if (!active || !stored) return;
@@ -270,9 +276,10 @@ export function EditorPane({
       try {
         const currentTitle = titleValueRef.current;
         const currentContent = contentRef.current;
+        const effectiveTitle = currentTitle.trim() || untitledNoteTitle(note.createdAt);
         dirtyRef.current = false;
         const result = await saveNote({
-          title: currentTitle,
+          title: effectiveTitle,
           contentMd: currentContent,
           baseVersion: baseVersionRef.current,
           reason,
@@ -415,50 +422,58 @@ export function EditorPane({
     setDraft(null);
   }
 
-  async function uploadAttachment(file: File) {
-    if (!note || readOnly) return null;
+  function uploadAttachment(file: File, onProgress?: (percent: number) => void): Promise<UploadedAttachment> {
+    if (!note || readOnly) return Promise.reject(new Error(t('当前无法上传附件')));
     if (isLocalNote(note.id) || !navigator.onLine) {
-      toast('warning', t('离线时无法上传附件'), t('正文可以离线编辑，附件会在联网后恢复上传。'));
-      return null;
+      return Promise.reject(new Error(t('离线时无法上传附件；联网后会恢复上传。')));
     }
-    try {
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const unsupported = ['image/heic', 'image/heif', 'image/tiff', 'image/bmp'];
+    if (unsupported.includes(file.type) || ['heic', 'heif', 'tif', 'tiff', 'bmp'].includes(extension)) {
+      return Promise.reject(new Error(t('不支持 HEIC/HEIF 等图片格式，请使用 PNG、JPEG、WebP、GIF 或 AVIF')));
+    }
+    if (instance?.maxUploadBytes && file.size > instance.maxUploadBytes) {
+      return Promise.reject(new Error(t('文件超过 {size} MB 的上传限制', { size: Math.round(instance.maxUploadBytes / 1024 / 1024) })));
+    }
+    return new Promise((resolve, reject) => {
       const form = new FormData();
       form.append('file', file);
-      const response = await fetch(`/api/notes/${note.id}/attachments`, {
-        method: 'POST',
-        body: form,
-        headers: { 'X-360note-CSRF': '1' },
-        credentials: 'same-origin',
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? t('上传失败'));
-      }
-      const data = (await response.json()) as {
-        attachment: { id: string; filename: string; mime: string; url?: string };
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `/api/notes/${note.id}/attachments`);
+      xhr.withCredentials = true;
+      xhr.responseType = 'json';
+      xhr.timeout = 10 * 60 * 1000;
+      xhr.setRequestHeader('X-360note-CSRF', '1');
+      let lastProgress = -1;
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        const percent = Math.round((event.loaded / event.total) * 100);
+        if (percent === lastProgress) return;
+        lastProgress = percent;
+        onProgress?.(percent);
       };
-      void reloadNote();
-      return {
-        id: data.attachment.id,
-        filename: data.attachment.filename,
-        mime: data.attachment.mime,
-        url: data.attachment.url ?? `/api/attachments/${data.attachment.id}/content`,
+      xhr.onload = () => {
+        const data = xhr.response as {
+          attachment?: { id: string; filename: string; mime: string; url?: string };
+          error?: { message?: string };
+        } | null;
+        if (xhr.status >= 200 && xhr.status < 300 && data?.attachment) {
+          void reloadNote();
+          resolve({
+            id: data.attachment.id,
+            filename: data.attachment.filename,
+            mime: data.attachment.mime,
+            url: data.attachment.url ?? `/api/attachments/${data.attachment.id}/content`,
+          });
+          return;
+        }
+        reject(new Error(data?.error?.message || t('上传失败（{status}）', { status: xhr.status })));
       };
-    } catch (error) {
-      toast('error', t('上传失败'), (error as Error).message);
-      return null;
-    }
-  }
-
-  async function handleToolbarImage(file: File) {
-    const result = await uploadAttachment(file);
-    if (!result) return;
-    if (!editor) return;
-    if (result.mime.startsWith('image/')) {
-      editor.chain().focus().setImage({ src: result.url, alt: result.filename, title: result.filename }).run();
-    } else {
-      editor.chain().focus().insertContent(`[${result.filename}](${result.url})`).run();
-    }
+      xhr.onerror = () => reject(new Error(t('网络错误，上传未完成')));
+      xhr.ontimeout = () => reject(new Error(t('上传超时，请重试')));
+      xhr.onabort = () => reject(new Error(t('上传已取消')));
+      xhr.send(form);
+    });
   }
 
   function openLinkDialog() {
@@ -679,10 +694,12 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-warning" style={{ maxWidth: 900, margin: '0 auto' }}>
             <RotateCcw size={15} />
-            <div style={{ flex: 1 }}>
+            <div className="banner-body">
               <strong>{t('这篇笔记在回收站中')}</strong> · {t('恢复后才能继续编辑。')}
             </div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void restoreNote(note.id)}>{t('恢复')}</button>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void restoreNote(note.id)}>{t('恢复')}</button>
+            </div>
           </div>
         </div>
       )}
@@ -698,8 +715,12 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-info" style={{ maxWidth: 900, margin: '0 auto' }}>
             <Check size={15} />
-            <div style={{ flex: 1 }}>{t('已加载其他设备合并后的最新内容。')}</div>
-            <button type="button" className="icon-btn icon-btn-sm" onClick={() => setExternalReload(false)}><X size={13} /></button>
+            <div className="banner-body">{t('已加载其他设备合并后的最新内容。')}</div>
+            <div className="banner-actions">
+              <button type="button" className="icon-btn icon-btn-sm banner-close" onClick={() => setExternalReload(false)} aria-label={t('关闭提示')}>
+                <X size={14} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -707,11 +728,13 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-warning" style={{ maxWidth: 900, margin: '0 auto' }}>
             <AlertTriangle size={15} />
-            <div style={{ flex: 1 }}>
+            <div className="banner-body">
               <strong>{t('发现未保存的草稿')}</strong> · {formatRelativeShort(new Date(draft.updatedAt).toISOString())}
             </div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>{t('恢复草稿')}</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>{t('丢弃')}</button>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>{t('恢复草稿')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>{t('丢弃')}</button>
+            </div>
           </div>
         </div>
       )}
@@ -719,10 +742,15 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-warning" style={{ maxWidth: 900, margin: '0 auto' }}>
             <AlertTriangle size={15} />
-            <div style={{ flex: 1 }}>{t('检测到冲突，本地内容已保存到版本历史。当前显示的是服务器上的版本。')}</div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { clearConflict(); setContextTab('history'); }}>
-              {t('查看历史版本')}
-            </button>
+            <div className="banner-body">{t('检测到冲突，本地内容已保存到版本历史。当前显示的是服务器上的版本。')}</div>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => { clearConflict(); setContextTab('history'); }}>
+                {t('查看历史版本')}
+              </button>
+              <button type="button" className="icon-btn icon-btn-sm banner-close" onClick={clearConflict} aria-label={t('关闭提示')}>
+                <X size={14} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -730,9 +758,11 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-error" style={{ maxWidth: 900, margin: '0 auto' }}>
             <AlertTriangle size={15} />
-            <div style={{ flex: 1 }}>{t('保存失败')}{syncMessage ? ` · ${syncMessage}` : ''}<div className="setting-note" style={{ marginTop: 2 }}>{t('当前正文和草稿已保存在这台设备，可重试或先复制正文。')}</div></div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void saveNowRef.current('manual')}>{t('重试')}</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void copyText(contentRef.current)}>{t('复制正文')}</button>
+            <div className="banner-body">{t('保存失败')}{syncMessage ? ` · ${syncMessage}` : ''}<div className="setting-note" style={{ marginTop: 2 }}>{t('当前正文和草稿已保存在这台设备，可重试或先复制正文。')}</div></div>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void saveNowRef.current('manual')}>{t('重试')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void copyText(contentRef.current)}>{t('复制正文')}</button>
+            </div>
           </div>
         </div>
       )}
@@ -750,7 +780,7 @@ export function EditorPane({
           editor={editor}
           onLink={openLinkDialog}
           onWiki={() => setShowWiki(true)}
-          onImage={(file) => void handleToolbarImage(file)}
+          onImage={(file) => editorHandle?.insertFiles([file])}
         />
       )}
 
@@ -771,7 +801,7 @@ export function EditorPane({
             onBlur={() => {
               if (dirtyRef.current) void saveNowRef.current('auto');
             }}
-            placeholder={t('未命名笔记')}
+            placeholder={untitledNoteTitle(note.createdAt)}
             rows={1}
             readOnly={readOnly}
             aria-label={t('标题')}
@@ -812,7 +842,7 @@ export function EditorPane({
               editable={!readOnly}
               spellcheck={user?.prefs?.spellcheck !== false}
               onChange={applyContent}
-              onReady={setEditor}
+              onReady={setEditorHandle}
               onWikiOpen={() => setShowWiki(true)}
               uploadFile={uploadAttachment}
             />
@@ -977,7 +1007,10 @@ export function EditorPane({
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 50 }} className="animate-rise">
           <div className="banner banner-info" style={{ boxShadow: 'var(--shadow-md)', background: 'var(--surface-raised)' }}>
             <Mic size={15} />
-            <div>{t('正在聆听…')} <button type="button" className="btn btn-ghost btn-sm" onClick={() => voiceRef.current?.stop()}>{t('点击停止')}</button></div>
+            <div className="banner-body">{t('正在聆听…')}</div>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => voiceRef.current?.stop()}>{t('点击停止')}</button>
+            </div>
           </div>
         </div>
       )}

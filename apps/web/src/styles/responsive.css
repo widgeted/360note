@@ -526,6 +526,30 @@
   }
 }
 
+@media (min-width: 761px) and (max-width: 900px) {
+  .settings-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    align-items: stretch;
+    padding: 9px 12px;
+    overflow: visible;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .settings-nav-group {
+    display: contents;
+  }
+
+  .settings-nav-item {
+    width: 100%;
+    height: 38px;
+    justify-content: center;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 900px) {
   .security-grid {
     grid-template-columns: 1fr !important;

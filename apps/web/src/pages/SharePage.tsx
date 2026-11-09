@@ -270,10 +270,10 @@ export default function SharePage() {
                   <span>{t('更新于')} {formatRelative(share.note.updatedAt)}</span>
                 </div>
                 <div className="public-actions">
-                  <button type="button" className="icon-btn icon-btn-sm" onClick={() => void copyShareLink()} aria-label={t('复制链接')} title={copiedLink ? t('已复制') : t('复制链接')}>
+                  <button type="button" className="icon-btn icon-btn-sm share-action-copy" onClick={() => void copyShareLink()} aria-label={t('复制链接')} title={copiedLink ? t('已复制') : t('复制链接')}>
                     {copiedLink ? <Check size={14} /> : <Copy size={14} />}
                   </button>
-                  <button type="button" className="icon-btn icon-btn-sm" onClick={() => window.print()} aria-label={t('打印')} title={t('打印')}>
+                  <button type="button" className="icon-btn icon-btn-sm share-action-print" onClick={() => window.print()} aria-label={t('打印')} title={t('打印')}>
                     <Printer size={14} />
                   </button>
                   {share.permission === 'edit' && (
