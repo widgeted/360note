@@ -603,3 +603,9 @@ apps/web/src/styles/tokens.css        设计 token
 - 历史版本改为 `.version-accordion` 折叠，预览内联；自动快照 5 分钟阈值仍由 `snapshotVersion` 控制，最多 60 条。
 - 顶部 share 改 icon-btn + `.share-active` 绿色；新增 EditorTagBar，标签使用 `.tag-token`/`.tag-hash`；Sidebar/ContextPanel 标签图标统一为字面 `#`。
 - Admin stats 增加运行状态；users 增加聚合计数、角色修改、强制退会话；新增 docs/ADMIN.md。
+
+## 2026-11-09 · 测试邮件事故与红线
+
+- 事故：security-audit 使用 `@invalid.local` 注册临时用户，注册后的欢迎邮件/邮箱变更邮件进入生产 SMTP，向不存在的地址发送了测试邮件。
+- 修复：`mailer.ts` 新增 `isReservedMailAddress()`，在 SMTP 前拦截 `.invalid`/`.test`/`.example`/`.invalid.local`/`localhost` 等保留域名；新增 `mailer.test.ts`。
+- 红线写入 `tests/manual/README.md`、`docs/QUALITY.md`、`docs/OPERATIONS.md`：测试只使用保留域名，真实投递只允许 access@126.com 或操作者明确提供的地址。

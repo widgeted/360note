@@ -89,8 +89,11 @@ export default async function adminRoutes(app: FastifyInstance) {
       note_count: string;
       storage_bytes: string;
       session_count: string;
+      sharing_disabled: boolean;
+      disabled_at: Date | null;
     }>(
       `SELECT u.id, u.email, u.display_name, u.role, u.totp_enabled, u.last_login_at, u.created_at,
+        u.sharing_disabled, u.disabled_at,
         (SELECT count(*) FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
           WHERE m.user_id = u.id AND w.deleted_at IS NULL)::text AS workspace_count,
         (SELECT count(*) FROM notes n JOIN workspace_members m ON m.workspace_id = n.workspace_id
@@ -113,6 +116,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         noteCount: Number(row.note_count),
         storageBytes: Number(row.storage_bytes),
         sessionCount: Number(row.session_count),
+        sharingDisabled: row.sharing_disabled,
+        disabledAt: row.disabled_at?.toISOString() ?? null,
       })),
     };
   });
@@ -145,6 +150,70 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (id === auth.user.id) throw errors.badRequest('请在账户安全页退出自己的其他设备');
     await query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
     await audit({ actorId: auth.user.id, action: 'admin.user.sessions', targetType: 'user', targetId: id, ip: clientIp(request) });
+    return { ok: true };
+  });
+
+  app.patch('/api/admin/users/:id/restrictions', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const body = parse(
+      z.object({
+        sharingDisabled: z.boolean().optional(),
+        disabled: z.boolean().optional(),
+      }),
+      request.body,
+    );
+    if (id === auth.user.id && body.disabled) throw errors.badRequest('不能停用自己的管理员账户');
+    const user = await one<{ id: string }>('SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);
+    if (!user) throw errors.notFound('用户不存在');
+    if (body.sharingDisabled !== undefined) {
+      await query('UPDATE users SET sharing_disabled = $2, updated_at = now() WHERE id = $1', [id, body.sharingDisabled]);
+      if (body.sharingDisabled) {
+        await query('UPDATE share_links SET revoked_at = now() WHERE created_by = $1 AND revoked_at IS NULL', [id]);
+      }
+    }
+    if (body.disabled !== undefined) {
+      await query('UPDATE users SET disabled_at = CASE WHEN $2 THEN now() ELSE NULL END, updated_at = now() WHERE id = $1', [id, body.disabled]);
+      if (body.disabled) {
+        await query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
+        await query('UPDATE share_links SET revoked_at = now() WHERE created_by = $1 AND revoked_at IS NULL', [id]);
+      }
+    }
+    await audit({ actorId: auth.user.id, action: 'admin.user.restrictions', targetType: 'user', targetId: id, meta: body, ip: clientIp(request) });
+    return { ok: true };
+  });
+
+  app.get('/api/admin/ip-blocks', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const rows = await many<{ id: string; ip: string; reason: string | null; created_at: Date }>(
+      'SELECT id, ip, reason, created_at FROM registration_ip_blocks ORDER BY created_at DESC LIMIT 500',
+    );
+    return {
+      blocks: rows.map((row) => ({ id: row.id, ip: row.ip, reason: row.reason, createdAt: row.created_at.toISOString() })),
+    };
+  });
+
+  app.post('/api/admin/ip-blocks', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const body = parse(z.object({ ip: z.string().trim().min(3).max(64), reason: z.string().trim().max(200).optional() }), request.body);
+    const row = await one<{ id: string }>(
+      `INSERT INTO registration_ip_blocks (ip, reason, created_by) VALUES ($1, $2, $3)
+       ON CONFLICT (ip) DO UPDATE SET reason = EXCLUDED.reason RETURNING id`,
+      [body.ip, body.reason ?? null, auth.user.id],
+    );
+    await audit({ actorId: auth.user.id, action: 'admin.ip.block', targetType: 'ip', targetId: body.ip, meta: { reason: body.reason ?? null }, ip: clientIp(request) });
+    return { id: row!.id };
+  });
+
+  app.delete('/api/admin/ip-blocks/:id', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await query('DELETE FROM registration_ip_blocks WHERE id = $1', [id]);
+    await audit({ actorId: auth.user.id, action: 'admin.ip.unblock', targetType: 'ip', targetId: id, ip: clientIp(request) });
     return { ok: true };
   });
 
@@ -260,6 +329,13 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/api/admin/audit', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
+    const params = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      request.query,
+    );
     const rows = await many<{
       id: string;
       action: string;
@@ -273,9 +349,14 @@ export default async function adminRoutes(app: FastifyInstance) {
     }>(
       `SELECT a.*, u.display_name AS actor_name, w.name AS workspace_name
        FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id LEFT JOIN workspaces w ON w.id = a.workspace_id
-       ORDER BY a.created_at DESC LIMIT 200`,
+       ORDER BY a.created_at DESC LIMIT $1 OFFSET $2`,
+      [params.limit, params.offset],
     );
+    const total = await one<{ count: string }>('SELECT count(*)::text AS count FROM audit_logs');
     return {
+      total: Number(total?.count ?? 0),
+      limit: params.limit,
+      offset: params.offset,
       entries: rows.map((row) => ({
         id: Number(row.id),
         action: row.action,

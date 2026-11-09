@@ -4,7 +4,7 @@ import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { auditActionLabel } from '../../lib/audit';
-import { formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
+import { cn, formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { toast } from '../../stores/toast';
 import { useAuthStore } from '../../stores/auth';
 
@@ -34,6 +34,8 @@ interface AdminUser {
   noteCount: number;
   storageBytes: number;
   sessionCount: number;
+  sharingDisabled: boolean;
+  disabledAt: string | null;
 }
 
 export default function AdminSettings() {
@@ -42,6 +44,12 @@ export default function AdminSettings() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditOffset, setAuditOffset] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [ipBlocks, setIpBlocks] = useState<Array<{ id: string; ip: string; reason: string | null; createdAt: string }>>([]);
+  const [blockIp, setBlockIp] = useState('');
+  const [blockReason, setBlockReason] = useState('');
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
   const [runtime, setRuntime] = useState<{ uptimeSeconds: number; memoryBytes: number; nodeVersion: string } | null>(null);
   const [retention, setRetention] = useState(30);
@@ -55,8 +63,60 @@ export default function AdminSettings() {
       setRetention(res.instance?.backupRetentionDays ?? 30);
     }).catch(() => {});
     api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch(() => {});
-    api.get<{ entries: AuditEntry[] }>('/api/admin/audit').then((res) => setAudit(res.entries)).catch(() => {});
+    void loadAudit(0);
+    void refreshIpBlocks();
   }, []);
+
+  async function refreshIpBlocks() {
+    const response = await api.get<{ blocks: Array<{ id: string; ip: string; reason: string | null; createdAt: string }> }>('/api/admin/ip-blocks');
+    setIpBlocks(response.blocks);
+  }
+
+  async function addIpBlock() {
+    if (!blockIp.trim()) return;
+    try {
+      await api.post('/api/admin/ip-blocks', { ip: blockIp.trim(), reason: blockReason.trim() || undefined });
+      setBlockIp('');
+      setBlockReason('');
+      await refreshIpBlocks();
+      toast('success', t('已加入注册限制'));
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
+    }
+  }
+
+  async function removeIpBlock(id: string) {
+    try {
+      await api.delete(`/api/admin/ip-blocks/${id}`);
+      await refreshIpBlocks();
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
+    }
+  }
+
+  async function setRestriction(member: AdminUser, patch: { sharingDisabled?: boolean; disabled?: boolean }) {
+    try {
+      await api.patch(`/api/admin/users/${member.id}/restrictions`, patch);
+      await refreshUsers();
+      toast('success', t('用户限制已更新'));
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
+    }
+  }
+
+  async function loadAudit(offset: number) {
+    setAuditLoading(true);
+    try {
+      const response = await api.get<{ entries: AuditEntry[]; total: number }>(`/api/admin/audit?limit=50&offset=${offset}`);
+      setAudit(response.entries);
+      setAuditTotal(response.total);
+      setAuditOffset(offset);
+    } catch (error) {
+      toast('error', t('加载失败'), (error as Error).message);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
 
   async function saveRetention() {
     setSaving(true);
@@ -173,15 +233,24 @@ export default function AdminSettings() {
                       <option value="admin">{t('管理员')}</option>
                     </select>
                     {member.totpEnabled && <span className="badge badge-green" style={{ marginLeft: 5 }}>2FA</span>}
+                    {member.disabledAt && <span className="badge badge-red" style={{ marginLeft: 5 }}>{t('已停用')}</span>}
                   </td>
                   <td>{member.workspaceCount} / {member.noteCount}</td>
                   <td>{formatBytes(member.storageBytes)}</td>
                   <td>{member.sessionCount}</td>
                   <td>{member.lastLoginAt ? formatRelativeShort(member.lastLoginAt) : '—'}</td>
                   <td>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeUserSessions(member)} disabled={member.sessionCount === 0 || member.id === currentUser?.id}>
-                      {t('退出设备')}
-                    </button>
+                    <div className="admin-user-actions">
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void setRestriction(member, { sharingDisabled: !member.sharingDisabled })} disabled={member.id === currentUser?.id || Boolean(member.disabledAt)}>
+                        {member.sharingDisabled ? t('允许分享') : t('禁止分享')}
+                      </button>
+                      <button type="button" className={cn('btn btn-ghost btn-sm', member.disabledAt && 'btn-danger')} onClick={() => void setRestriction(member, { disabled: !member.disabledAt })} disabled={member.id === currentUser?.id}>
+                        {member.disabledAt ? t('启用账号') : t('停用账号')}
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeUserSessions(member)} disabled={member.sessionCount === 0 || member.id === currentUser?.id}>
+                        {t('退出设备')}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -193,18 +262,57 @@ export default function AdminSettings() {
 
       <section className="settings-section">
         <div className="settings-section-head">
-          <span className="settings-section-title">{t('全局审计')}</span>
-          <span className="settings-section-desc">{t('最近 200 条')}</span>
+          <span className="settings-section-title">{t('注册 IP 限制')}</span>
+          <span className="settings-section-desc">{ipBlocks.length}</span>
         </div>
-        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface)' }}>
-          {audit.slice(0, 60).map((entry) => (
-            <div key={entry.id} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderBottom: '1px solid var(--line-soft)', fontSize: 13 }}>
-              <span style={{ width: 130, flex: 'none', color: 'var(--text-tertiary)' }}>{formatFullDate(entry.createdAt)}</span>
-              <span style={{ width: 90, flex: 'none', color: 'var(--text-secondary)' }}>{entry.actorName ?? t('系统')}</span>
-              <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{auditActionLabel(t, entry.action)}</span>
-              <span style={{ color: 'var(--text-tertiary)' }}>{entry.ip}</span>
+        <p className="setting-note">{t('禁止这些 IP 注册新账号。已有账号的登录不受影响；邮箱可以更换，网络限制更直接。')}</p>
+        <div className="setting-inline-form" style={{ marginTop: 10 }}>
+          <div className="field"><label>IP</label><input className="input" value={blockIp} onChange={(event) => setBlockIp(event.target.value)} placeholder="203.0.113.10" /></div>
+          <div className="field"><label>{t('原因（可选）')}</label><input className="input" value={blockReason} onChange={(event) => setBlockReason(event.target.value)} /></div>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void addIpBlock()} disabled={!blockIp.trim()}>{t('添加限制')}</button>
+        </div>
+        <div className="admin-ip-list">
+          {ipBlocks.length === 0 ? <div className="context-empty">{t('暂无 IP 限制')}</div> : ipBlocks.map((block) => (
+            <div className="admin-ip-row" key={block.id}>
+              <span className="mono">{block.ip}</span>
+              <span>{block.reason || '—'}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void removeIpBlock(block.id)}>{t('解除')}</button>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-head">
+          <span className="settings-section-title">{t('日志')}</span>
+          <span className="settings-section-desc">{t('共 {n} 条', { n: auditTotal })}</span>
+        </div>
+        <div className="admin-log-list">
+          {auditLoading ? (
+            <div className="loading-row"><span className="spinner" /> {t('加载中…')}</div>
+          ) : audit.length === 0 ? (
+            <div className="context-empty">{t('暂无记录')}</div>
+          ) : (
+            audit.map((entry) => (
+              <div key={entry.id} className="admin-log-row">
+                <span className="admin-log-time">{formatFullDate(entry.createdAt)}</span>
+                <span className="admin-log-actor" title={entry.actorName ?? t('系统')}>{entry.actorName ?? t('系统')}</span>
+                <span className="admin-log-action">{auditActionLabel(t, entry.action)}</span>
+                <span className="admin-log-ip" title={entry.ip ?? ''}>{entry.ip ?? '—'}</span>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="admin-log-pager">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadAudit(Math.max(0, auditOffset - 50))} disabled={auditLoading || auditOffset === 0}>
+            {t('上一页')}
+          </button>
+          <span className="setting-note">
+            {t('第 {page} 页', { page: Math.floor(auditOffset / 50) + 1 })}
+          </span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadAudit(auditOffset + 50)} disabled={auditLoading || auditOffset + 50 >= auditTotal}>
+            {t('下一页')}
+          </button>
         </div>
       </section>
     </>

@@ -989,8 +989,11 @@ kbd {
 
 .editor-page {
   max-width: 812px;
+  min-height: 100%;
   margin: 0 auto;
   padding: 46px 56px 80px;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-page.wide {

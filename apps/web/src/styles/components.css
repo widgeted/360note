@@ -2189,8 +2189,8 @@ a.btn {
 }
 
 .editor-tag-section {
-  margin-top: 38px;
-  padding-top: 14px;
+  margin-top: auto;
+  padding-top: 18px;
   border-top: 1px solid var(--line-soft);
 }
 
@@ -2236,7 +2236,7 @@ a.btn {
 
 @media (max-width: 640px) {
   .editor-tag-section {
-    margin-top: 30px;
+    padding-top: 16px;
   }
 }
 
@@ -2260,4 +2260,142 @@ a.btn {
 
 .admin-users-table {
   min-width: 820px;
+}
+
+.tag-token-edit {
+  padding-right: 5px;
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+}
+
+.tag-token-edit input {
+  width: 110px;
+  min-width: 70px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.context-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.admin-log-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.admin-log-row {
+  display: grid;
+  grid-template-columns: 140px 150px minmax(0, 1fr) 110px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+
+.admin-log-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-log-time {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.admin-log-actor,
+.admin-log-action,
+.admin-log-ip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-log-actor {
+  color: var(--text-secondary);
+  font-weight: 560;
+}
+
+.admin-log-action {
+  color: var(--text-secondary);
+}
+
+.admin-log-ip {
+  color: var(--text-tertiary);
+}
+
+.admin-log-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 640px) {
+  .admin-log-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+
+  .admin-log-time,
+  .admin-log-action,
+  .admin-log-ip {
+    grid-column: 1 / -1;
+  }
+
+  .admin-log-actor {
+    font-weight: 600;
+  }
+}
+
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+.admin-ip-list {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.admin-ip-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.admin-ip-row:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-ip-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-ip-row > span:nth-child(2) {
+    grid-column: 1 / -1;
+    color: var(--text-tertiary);
+  }
 }

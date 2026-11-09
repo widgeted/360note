@@ -353,6 +353,13 @@
 - PR/提交信息说明“为什么”，不仅是“改了什么”。
 - 重要决策/踩坑当天写入 MEMORY；版本变更写 CHANGELOG。
 
+## 邮件安全红线
+
+- **禁止**向任意不存在的地址、示例地址或临时生成的地址发送测试邮件。
+- 测试账号统一使用保留域名（`@invalid.local`、`.invalid`、`.test`、`.example`）；`sendMail` 在 SMTP 前直接拦截这些域名。
+- 真实投递测试只允许发送到 `access@126.com` 或操作者明确提供的地址。
+- 此规则适用于单元、手动、集成、Playwright 与生产审计脚本；任何绕过 `sendMail` 拦截的测试脚本都视为缺陷。
+
 ## 生产安全回归（2026-11-08）
 
 `tests/manual/security-audit.mjs` 覆盖 66 项检查：未登录边界、CSRF、跨个人空间读写/列表/搜索/导出/备份、团队 owner/admin/editor/viewer 权限、邀请接受、分享链接（公开/密码/评论/撤销/过期）、附件权限、API 令牌范围与撤销、邮箱验证码错误/尝试上限、找回密码、修改邮箱、实例管理员边界、SQL 元字符。当前结果：**66 passed, 0 failed**。
@@ -374,6 +381,7 @@
 - `tests/manual/context-drawer-regression.mjs`：移动端右侧信息抽屉只占内容宽度，左侧保留模糊的笔记可见区域，默认打开“信息”而不是自动展开版本历史。
 - `tests/manual/toolbar-mobile-regression.mjs`：移动端格式工具栏单行横向滚动、无折叠“…”菜单、34px 触控目标、末尾清除格式为红色。
 - `tests/manual/note-stability-regression.mjs`：收藏/置顶/标签等元数据更新不消耗笔记版本；编辑中修改元数据后保存不出现冲突或“其他设备”提示。
+- `tests/manual/admin-restrictions-regression.mjs`：禁止分享、停用/启用账号、注册 IP 限制与日志分页；结束后恢复账号并删除临时数据。
 - `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式“退出并清除本机数据”清空 IndexedDB 与 auth/workspace 键。
 - `updateNote` 使用行锁 + `WHERE version = locked.version` 条件更新，事务内校验 `baseVersion`。
 - 首次注册使用 `pg_advisory_xact_lock` 串行化“用户数 + 插入”事务。

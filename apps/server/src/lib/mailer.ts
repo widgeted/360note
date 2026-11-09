@@ -37,6 +37,30 @@ function fromHeader(): string {
   return config.mail.fromName ? `${config.mail.fromName} <${address}>` : address;
 }
 
+const RESERVED_MAIL_DOMAINS = new Set([
+  'example.com',
+  'example.net',
+  'example.org',
+  'example.edu',
+  'localhost',
+  'invalid',
+  'test',
+]);
+
+/**
+ * Never send SMTP messages to reserved/test domains. Tests historically
+ * created throwaway @invalid.local accounts; those must never leave the box.
+ */
+export function isReservedMailAddress(address: string): boolean {
+  const domain = address.trim().toLowerCase().split('@').pop() ?? '';
+  if (!domain) return true;
+  if (domain === 'invalid.local' || domain.endsWith('.invalid.local')) return true;
+  if (domain.endsWith('.invalid') || domain.endsWith('.test') || domain.endsWith('.example') || domain.endsWith('.localhost')) {
+    return true;
+  }
+  return RESERVED_MAIL_DOMAINS.has(domain);
+}
+
 export async function sendMail(options: {
   to: string;
   subject: string;

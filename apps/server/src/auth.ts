@@ -41,7 +41,7 @@ async function resolveBearer(request: FastifyRequest): Promise<AuthContext | nul
     revoked_at: Date | null;
   }>('SELECT id, user_id, scopes, expires_at, revoked_at FROM api_tokens WHERE token_hash = $1', [tokenHash]);
   if (!row || row.revoked_at || (row.expires_at && row.expires_at < new Date())) return null;
-  const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL', [row.user_id]);
+  const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL', [row.user_id]);
   if (!user) return null;
   void query('UPDATE api_tokens SET last_used_at = now() WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval \'1 minute\')', [row.id]).catch(() => {});
   return { user, session: null, tokenId: row.id, tokenScopes: row.scopes ?? [] };
@@ -56,7 +56,7 @@ async function resolveSession(request: FastifyRequest): Promise<AuthContext | nu
     [tokenHash],
   );
   if (!row) return null;
-  const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL', [row.user_id]);
+  const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL', [row.user_id]);
   if (!user) return null;
   void query(
     `UPDATE sessions SET last_seen_at = now() WHERE id = $1 AND last_seen_at < now() - interval '5 minutes'`,

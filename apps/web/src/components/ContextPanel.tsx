@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Check,
@@ -62,6 +62,7 @@ export function ContextPanel() {
   const [tagOpen, setTagOpen] = useState(false);
   const [tagQuery, setTagQuery] = useState('');
   const [addTagLoading, setAddTagLoading] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const [confirmAttachment, setConfirmAttachment] = useState<string | null>(null);
 
   const folderPath = useMemo(() => {
@@ -126,12 +127,17 @@ export function ContextPanel() {
   const availableTags = tags.filter((tag) => !note.tags.some((entry) => entry.id === tag.id));
   const tagResults = availableTags.filter((tag) => !tagQuery.trim() || tag.name.toLowerCase().includes(tagQuery.trim().toLowerCase())).slice(0, 8);
 
+  function focusTagInput() {
+    window.setTimeout(() => tagInputRef.current?.focus(), 20);
+  }
+
   async function addTag(tagId: string) {
+    if (!note) return;
     setAddTagLoading(true);
     try {
-      await updateNoteMeta({ tagIds: [...note!.tags.map((tag) => tag.id), tagId] });
-      setTagOpen(false);
+      await updateNoteMeta({ tagIds: [...note.tags.map((tag) => tag.id), tagId] });
       setTagQuery('');
+      focusTagInput();
     } finally {
       setAddTagLoading(false);
     }
@@ -139,17 +145,23 @@ export function ContextPanel() {
 
   async function createAndAddTag() {
     const name = tagQuery.trim();
-    if (!name || !note) return;
+    if (!name || !note) {
+      if (!name) setTagOpen(false);
+      return;
+    }
+    const existing = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      await addTag(existing.id);
+      return;
+    }
     setAddTagLoading(true);
     try {
       const response = await api.post<{ tag: { id: string; name: string; color: string | null } }>('/api/tags', {
-        workspaceId: note!.workspaceId,
+        workspaceId: note.workspaceId,
         name,
       });
       await useAppStore.getState().refreshTags();
-      await updateNoteMeta({ tagIds: [...note!.tags.map((tag) => tag.id), response.tag.id] });
-      setTagOpen(false);
-      setTagQuery('');
+      await addTag(response.tag.id);
     } catch (error) {
       toast('error', t('创建标签失败'), (error as Error).message);
     } finally {
@@ -255,9 +267,6 @@ export function ContextPanel() {
             <div className="context-section">
               <div className="context-section-title">
                 <span>{t('标签')}</span>
-                <button type="button" className="context-add-tag" onClick={() => setTagOpen((value) => !value)}>
-                  <Plus size={11} /> {t('添加')}
-                </button>
               </div>
               <div className="context-tag-list">
                 {note.tags.length === 0 && !tagOpen && <span className="setting-note">{t('还没有标签')}</span>}
@@ -270,34 +279,52 @@ export function ContextPanel() {
                     </button>
                   </span>
                 ))}
+                {tagOpen ? (
+                  <span className="tag-token tag-token-edit">
+                    <span className="tag-hash">#</span>
+                    <input
+                      ref={tagInputRef}
+                      value={tagQuery}
+                      onChange={(event) => setTagQuery(event.target.value)}
+                      placeholder={t('添加标签')}
+                      aria-label={t('添加标签')}
+                      disabled={addTagLoading}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          void createAndAddTag();
+                        }
+                        if (event.key === 'Escape') {
+                          setTagOpen(false);
+                          setTagQuery('');
+                        }
+                      }}
+                      onBlur={() => {
+                        if (tagQuery.trim()) void createAndAddTag();
+                        else setTagOpen(false);
+                      }}
+                    />
+                  </span>
+                ) : (
+                  <button type="button" className="tag-token tag-token-add" onClick={() => { setTagOpen(true); focusTagInput(); }}>
+                    <span className="tag-hash">#</span> {t('添加标签')}
+                  </button>
+                )}
               </div>
-              {tagOpen && (
-                <div style={{ marginTop: 8, border: '1px solid var(--line)', borderRadius: 7, background: 'var(--surface)', padding: 6 }}>
-                  <input
-                    className="input input-sm"
-                    value={tagQuery}
-                    onChange={(event) => setTagQuery(event.target.value)}
-                    placeholder={t('搜索或创建标签…')}
-                    autoFocus
-                    style={{ marginBottom: 5 }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        if (tagResults[0]) void addTag(tagResults[0].id);
-                        else void createAndAddTag();
-                      }
-                    }}
-                  />
+              {tagOpen && tagResults.length > 0 && (
+                <div className="context-tag-suggestions">
                   {tagResults.map((tag) => (
-                    <button key={tag.id} type="button" className="menu-item" onClick={() => void addTag(tag.id)} disabled={addTagLoading} style={{ fontSize: 13 }}>
+                    <button
+                      key={tag.id}
+                      type="button"
+                      className="tag-token tag-token-select"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => void addTag(tag.id)}
+                      disabled={addTagLoading}
+                    >
                       <span className="tag-hash">#</span> {tag.name}
                     </button>
                   ))}
-                  {tagQuery.trim() && !tagResults.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase()) && (
-                    <button type="button" className="menu-item" onClick={() => void createAndAddTag()} disabled={addTagLoading} style={{ fontSize: 13 }}>
-                      <Plus size={12} /> {t('创建“{name}”', { name: tagQuery.trim() })}
-                    </button>
-                  )}
                 </div>
               )}
             </div>

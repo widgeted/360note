@@ -23,7 +23,8 @@ Do **not** run `backup-test`, `ui-qa`, or destructive scripts against a producti
 `security-audit.mjs` creates temporary users/workspaces directly in the database,
 exercises workspace isolation, team roles, invitations, share links, attachment
 access, API token scopes, CSRF, email codes and email change, then removes all
-temporary data. It never sends email.
+temporary data. It uses only `@invalid.local` addresses; the mailer refuses
+reserved/test domains, so no SMTP message leaves the server.
 
 ```bash
 sudo env NOTE360_ENV_FILE=/etc/360note/360note.env \
@@ -32,7 +33,7 @@ sudo env NOTE360_ENV_FILE=/etc/360note/360note.env \
   /opt/node22/bin/node tests/manual/security-audit.mjs
 ```
 
-Expected result: `65 passed, 0 failed`.
+Expected result: `66 passed, 0 failed`.
 
 ## Concurrency and resource-limit regressions
 
@@ -56,3 +57,11 @@ CACHE_TEST_ADMIN_EMAIL=... CACHE_TEST_ADMIN_PASSWORD=... \
 ```
 
 Expected: all checks pass; no email is sent.
+
+## Email safety rule
+
+- Never send test email to arbitrary, unverified or invented addresses.
+- Test users must use reserved domains (`@invalid.local`, `.invalid`, `.test`).
+- `sendMail` blocks reserved domains before SMTP; do not bypass this guard.
+- For a real delivery check, use only `access@126.com` or an address the operator explicitly supplies.
+- These rules are mandatory and apply to every manual, integration and browser test.

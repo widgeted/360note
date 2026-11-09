@@ -94,6 +94,13 @@ openssl rand -base64 32  # NOTE360_MASTER_KEY（必须 32 字节）
 - `OCR_ENABLED=true`（已安装 OCR 时）
 - `NODE_ENV=production`
 
+### 邮件发送红线
+
+- 测试期间**禁止**向不存在或未经验证的地址发送任何邮件。
+- 测试用户必须使用保留域名（`@invalid.local`、`.invalid`、`.test`、`.example`）；服务端 `sendMail` 会拦截这些域名。
+- 真实投递检查只允许 `access@126.com` 或操作者明确提供的地址。
+- 不得通过直接调用 SMTP、绕过 `mailer.ts` 或修改测试地址来规避该规则。
+
 **主密钥必须离线备份**（例如密码管理器）。丢失主密钥 = 加密附件与备份无法恢复。
 
 ### 2.5 部署代码

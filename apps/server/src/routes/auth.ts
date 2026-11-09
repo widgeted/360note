@@ -103,6 +103,10 @@ export default async function authRoutes(app: FastifyInstance) {
       }),
       request.body,
     );
+    if (body.purpose === 'register') {
+      const blocked = await one<{ id: string }>('SELECT id FROM registration_ip_blocks WHERE ip = $1', [clientIp(request)]);
+      if (blocked) throw errors.forbidden('此网络暂不允许注册新账户');
+    }
     const existing = await one<{ id: string }>(
       'SELECT id FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL',
       [body.email],
@@ -138,6 +142,9 @@ export default async function authRoutes(app: FastifyInstance) {
     config: { rateLimit: { max: 8, timeWindow: '1 hour' } },
   }, async (request, reply) => {
     const body = parse(registerSchema, request.body);
+    const registrationIp = clientIp(request);
+    const blockedIp = await one<{ id: string }>('SELECT id FROM registration_ip_blocks WHERE ip = $1', [registrationIp]);
+    if (blockedIp) throw errors.forbidden('此网络暂不允许注册新账户');
     const count = await userCount();
     if (count > 0 && config.registrationMode === 'invite') {
       if (!config.inviteCode || body.inviteCode !== config.inviteCode) {
@@ -277,6 +284,10 @@ export default async function authRoutes(app: FastifyInstance) {
       throw errors.tooMany('登录尝试过多，请稍后再试');
     }
 
+    if (user.disabled_at) {
+      throw errors.forbidden('账户已被管理员停用，请联系 contact@360note.com');
+    }
+
     if (user.totp_enabled) {
       const challengeToken = signToken({ typ: '2fa', uid: user.id }, 300);
       await audit({ actorId: user.id, action: 'auth.login.password', ip, meta: { stage: '2fa_required' } });
@@ -312,8 +323,8 @@ export default async function authRoutes(app: FastifyInstance) {
     const body = parse(z.object({ challengeToken: z.string().min(1), code: z.string().min(6).max(12) }), request.body);
     const challenge = verifyToken<{ uid: string }>(body.challengeToken);
     if (!challenge || challenge.typ !== '2fa') throw errors.unauthorized('验证已过期，请重新登录');
-    const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL', [challenge.uid]);
-    if (!user || !user.totp_enabled || !user.totp_secret_enc) throw errors.unauthorized();
+    const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL', [challenge.uid]);
+    if (!user || user.disabled_at || !user.totp_enabled || !user.totp_secret_enc) throw errors.unauthorized();
     const secret = decryptString(user.totp_secret_enc, `totp:${user.id}`);
     let valid = false;
     let usedBackup = false;

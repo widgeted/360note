@@ -15,6 +15,8 @@ export interface DbUser {
   locked_until: Date | null;
   last_login_at: Date | null;
   prefs: Record<string, unknown>;
+  sharing_disabled: boolean;
+  disabled_at: Date | null;
   encryption_enabled: boolean;
   encryption_salt: string | null;
   enc_wrapped_pass: string | null;

@@ -115,6 +115,13 @@ export default async function shareRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const { note } = await getNoteForUser(id, auth.user.id);
+    const restrictions = await one<{ sharing_disabled: boolean; disabled_at: Date | null }>(
+      'SELECT sharing_disabled, disabled_at FROM users WHERE id = $1',
+      [auth.user.id],
+    );
+    if (restrictions?.sharing_disabled || restrictions?.disabled_at) {
+      throw errors.forbidden('分享功能已被管理员停用');
+    }
     if (!note.canShare) throw errors.forbidden('没有分享权限');
     if (note.trashedAt) throw errors.badRequest('请先恢复这篇笔记再创建分享');
     if (note.encrypted) throw errors.badRequest('端到端加密笔记不能创建公开分享');
