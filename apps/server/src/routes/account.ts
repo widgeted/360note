@@ -40,6 +40,7 @@ export default async function accountRoutes(app: FastifyInstance) {
       : [];
 
     // Preserve shared team content: only the account, not other members' notes, should disappear.
+    const exportFiles = await many<{ filename: string }>('SELECT filename FROM user_export_links WHERE user_id = $1', [auth.user.id]);
     const memberships = await many<{ workspace_id: string; owner_id: string }>(
       `SELECT wm.workspace_id, w.owner_id FROM workspace_members wm
        JOIN workspaces w ON w.id = wm.workspace_id
@@ -70,6 +71,7 @@ export default async function accountRoutes(app: FastifyInstance) {
     await Promise.all([
       ...storageKeys.map((row) => deleteAttachment(row.storage_key).catch(() => {})),
       ...backupFiles.map((row) => deleteBackupFile(row.filename).catch(() => {})),
+      ...exportFiles.map((row) => deleteBackupFile(row.filename).catch(() => {})),
     ]);
     await audit({ actorId: null, action: 'account.delete', targetType: 'user', targetId: auth.user.id, meta: { email: auth.user.email }, ip: clientIp(request) });
     clearSessionCookie(reply);

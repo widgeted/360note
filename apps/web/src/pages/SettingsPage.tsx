@@ -10,10 +10,11 @@ import {
   Users,
 } from 'lucide-react';
 import { useT } from '../lib/i18n';
+import { useScrollFade } from '../lib/useScrollFade';
+import { cn } from '../lib/utils';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
-import { cn } from '../lib/utils';
 import AccountSettings from '../components/settings/AccountSettings';
 import AppearanceSettings from '../components/settings/AppearanceSettings';
 import EditorSettings from '../components/settings/EditorSettings';
@@ -41,6 +42,7 @@ const SECTIONS = [
 
 export default function SettingsPage({ section }: { section: string }) {
   const t = useT();
+  const navFade = useScrollFade<HTMLElement>();
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
@@ -74,7 +76,7 @@ export default function SettingsPage({ section }: { section: string }) {
         </button>
       </header>
       <div className="settings-layout">
-        <nav className="settings-nav" aria-label={t('设置')}>
+        <nav ref={navFade.ref} className={cn('settings-nav', navFade.className)} aria-label={t('设置')}>
           {groups.map((group) => (
             <div className="settings-nav-group" key={group}>
               <div className="settings-nav-label">{t(group)}</div>

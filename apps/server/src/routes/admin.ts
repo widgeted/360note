@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import AdmZip from 'adm-zip';
 import { z } from 'zod';
 import { many, one, query } from '../db.js';
 import { clientIp, requireAuth } from '../auth.js';
@@ -9,6 +10,10 @@ import { getAiConfig, getSetting, saveAiConfig, setSetting } from '../services/s
 import { config } from '../config.js';
 import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite } from '../services/offsite.js';
 import { getNoteForUser } from '../services/notes.js';
+import { createBackupDocument } from '../services/backups.js';
+import { deleteBackupFile, readBackup, safeFilename, saveBackup } from '../lib/storage.js';
+import { randomToken, sha256 } from '../lib/crypto.js';
+import { normalizeLocale, sendUserExportEmail } from '../lib/mailer.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
   async function requireAdmin(userId: string): Promise<void> {
@@ -215,6 +220,87 @@ export default async function adminRoutes(app: FastifyInstance) {
     await query('DELETE FROM registration_ip_blocks WHERE id = $1', [id]);
     await audit({ actorId: auth.user.id, action: 'admin.ip.unblock', targetType: 'ip', targetId: id, ip: clientIp(request) });
     return { ok: true };
+  });
+
+  app.post('/api/admin/users/:id/export', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const target = await one<{ id: string; email: string; display_name: string; prefs: Record<string, unknown> }>(
+      'SELECT id, email, display_name, prefs FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [id],
+    );
+    if (!target) throw errors.notFound('用户不存在');
+    const workspaces = await many<{ id: string; name: string }>(
+      `SELECT w.id, w.name FROM workspaces w JOIN workspace_members m ON m.workspace_id = w.id
+       WHERE m.user_id = $1 AND w.owner_id = $1 AND w.deleted_at IS NULL ORDER BY w.created_at`,
+      [id],
+    );
+    if (!workspaces.length) throw errors.badRequest('该用户没有可导出的自有空间');
+
+    // Remove expired export files before creating another one.
+    const expired = await many<{ id: string; filename: string }>('SELECT id, filename FROM user_export_links WHERE expires_at < now()');
+    for (const row of expired) {
+      await deleteBackupFile(row.filename).catch(() => {});
+      await query('DELETE FROM user_export_links WHERE id = $1', [row.id]);
+    }
+
+    const archive = new AdmZip();
+    archive.addFile('README.txt', Buffer.from(
+      '360note user data export\n\nThis archive contains one .nhbackup per workspace owned by the account. Keep it private.\n',
+      'utf8',
+    ));
+    const used = new Set<string>();
+    for (const workspace of workspaces) {
+      const { buffer, name } = await createBackupDocument(workspace.id);
+      let entry = safeFilename(name);
+      let index = 2;
+      while (used.has(entry)) {
+        entry = safeFilename(name.replace(/\.nhbackup$/, `-${index}.nhbackup`));
+        index += 1;
+      }
+      used.add(entry);
+      archive.addFile(entry, buffer);
+    }
+    const filename = `user-export-${id}-${Date.now()}.nhbackup`;
+    await saveBackup(filename, archive.toBuffer());
+    const token = randomToken(24);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const row = await one<{ id: string }>(
+      `INSERT INTO user_export_links (user_id, token_hash, filename, created_by, expires_at)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [id, sha256(token), filename, auth.user.id, expiresAt],
+    );
+    try {
+      await sendUserExportEmail({
+        to: target.email,
+        displayName: target.display_name,
+        url: `${config.publicOrigin}/api/user-exports/${token}`,
+        expiresAt: expiresAt.toISOString(),
+        locale: normalizeLocale(target.prefs?.locale),
+      });
+    } catch (error) {
+      await deleteBackupFile(filename).catch(() => {});
+      await query('DELETE FROM user_export_links WHERE id = $1', [row!.id]);
+      throw errors.badRequest(`导出文件已生成，但邮件发送失败：${(error as Error).message}`);
+    }
+    await audit({ actorId: auth.user.id, action: 'admin.user.export', targetType: 'user', targetId: id, ip: clientIp(request) });
+    return { emailed: true, expiresAt: expiresAt.toISOString() };
+  });
+
+  app.get('/api/user-exports/:token', async (request, reply) => {
+    const { token } = parse(z.object({ token: z.string().min(20) }), request.params);
+    const row = await one<{ id: string; filename: string; expires_at: Date }>(
+      'SELECT id, filename, expires_at FROM user_export_links WHERE token_hash = $1',
+      [sha256(token)],
+    );
+    if (!row || row.expires_at < new Date()) throw errors.notFound('下载链接不存在或已过期');
+    const data = await readBackup(row.filename);
+    return reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.filename.replace(/\.nhbackup$/, '.zip'))}`)
+      .header('Cache-Control', 'no-store')
+      .send(data);
   });
 
   app.get('/api/admin/settings', async (request) => {

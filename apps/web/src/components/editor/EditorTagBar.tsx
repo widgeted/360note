@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { useAppStore } from '../../stores/app';
 import { useT } from '../../lib/i18n';
 import { api } from '../../lib/api';
+import { useScrollFade } from '../../lib/useScrollFade';
+import { cn } from '../../lib/utils';
 import { toast } from '../../stores/toast';
 
 export function EditorTagBar() {
@@ -15,6 +17,7 @@ export function EditorTagBar() {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollFade = useScrollFade<HTMLDivElement>();
 
   if (!note) return null;
 
@@ -77,7 +80,7 @@ export function EditorTagBar() {
 
   return (
     <div className="editor-tag-section">
-      <div className="editor-tag-bar" aria-label={t('标签')}>
+      <div ref={scrollFade.ref} className={cn('editor-tag-bar', scrollFade.className)} aria-label={t('标签')}>
         {note.tags.map((tag) => (
           <span className="tag-token" key={tag.id}>
             <span className="tag-hash">#</span>

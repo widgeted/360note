@@ -212,6 +212,41 @@ export async function sendWorkspaceInviteEmail(options: {
   await sendMail({ to, subject, text, html: renderMailLayout(locale, zh ? '加入空间' : 'Join workspace', bodyHtml) });
 }
 
+export async function sendUserExportEmail(options: {
+  to: string;
+  displayName: string;
+  url: string;
+  expiresAt: string;
+  locale: MailLocale;
+}): Promise<void> {
+  const { to, displayName, url, expiresAt, locale } = options;
+  const zh = locale === 'zh';
+  const brand = zh ? '360笔记' : '360note';
+  const subject = zh ? `${brand} 数据导出下载链接` : `Your ${brand} data export`;
+  const safeUrl = escapeHtml(url);
+  const text = zh
+    ? `${displayName}，管理员为你准备了一份数据导出。
+
+请在有效期内下载：${url}
+
+有效期至：${expiresAt}
+如果这不是你期待的邮件，请忽略。`
+    : `${displayName}, an administrator prepared a data export for you.
+
+Download it before it expires: ${url}
+
+Expires: ${expiresAt}
+If you were not expecting this, you can ignore this email.`;
+  const bodyHtml = zh
+    ? `<p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#44443f;">${escapeHtml(displayName)}，管理员为你准备了一份数据导出。</p>
+       <p style="margin:0 0 22px 0;"><a href="${safeUrl}" style="display:inline-block;background:#157a52;color:#fffefa;text-decoration:none;font-size:14px;font-weight:600;padding:11px 18px;border-radius:6px;">下载数据</a></p>
+       <p style="margin:0;font-size:13px;line-height:1.7;color:#67655f;">有效期至 ${escapeHtml(expiresAt)}。如果这不是你期待的邮件，请忽略。</p>`
+    : `<p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#44443f;">${escapeHtml(displayName)}, an administrator prepared a data export for you.</p>
+       <p style="margin:0 0 22px 0;"><a href="${safeUrl}" style="display:inline-block;background:#157a52;color:#fffefa;text-decoration:none;font-size:14px;font-weight:600;padding:11px 18px;border-radius:6px;">Download data</a></p>
+       <p style="margin:0;font-size:13px;line-height:1.7;color:#67655f;">Expires ${escapeHtml(expiresAt)}. If you were not expecting this, you can ignore this email.</p>`;
+  await sendMail({ to, subject, text, html: renderMailLayout(locale, zh ? '数据导出' : 'Data export', bodyHtml) });
+}
+
 export async function sendEmailChangedEmail(to: string, newEmail: string, locale: MailLocale): Promise<void> {
   const zh = locale === 'zh';
   const brand = zh ? '360笔记' : '360note';

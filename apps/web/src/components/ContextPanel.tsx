@@ -269,7 +269,6 @@ export function ContextPanel() {
                 <span>{t('标签')}</span>
               </div>
               <div className="context-tag-list">
-                {note.tags.length === 0 && !tagOpen && <span className="setting-note">{t('还没有标签')}</span>}
                 {note.tags.map((tag) => (
                   <span className="tag-token" key={tag.id}>
                     <span className="tag-hash">#</span>

@@ -2399,3 +2399,47 @@ a.btn {
     color: var(--text-tertiary);
   }
 }
+
+/* Horizontal scroll affordance: fade the edge that still has content. */
+.scroll-fade-left {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%);
+}
+
+.scroll-fade-right {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
+}
+
+.scroll-fade-left.scroll-fade-right {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+}
+
+.admin-users-table th {
+  white-space: nowrap;
+}
+
+.admin-users-table td {
+  white-space: nowrap;
+}
+
+.admin-users-table td:nth-child(2) {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep the user-management action menu reachable while the table scrolls. */
+.admin-users-table th:last-child,
+.admin-users-table td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+  box-shadow: -8px 0 12px color-mix(in srgb, var(--ink-1000) 4%, transparent);
+  z-index: 1;
+}
+
+.admin-users-table thead th:last-child {
+  background: var(--paper-50);
+}

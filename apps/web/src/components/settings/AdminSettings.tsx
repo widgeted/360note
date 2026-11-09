@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Activity, Database, HardDrive, Save, Server, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Ban, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { auditActionLabel } from '../../lib/audit';
 import { cn, formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { toast } from '../../stores/toast';
+import { Dropdown, MenuItem } from '../Dropdown';
 import { useAuthStore } from '../../stores/auth';
 
 interface Stats {
@@ -101,6 +102,16 @@ export default function AdminSettings() {
       toast('success', t('用户限制已更新'));
     } catch (error) {
       toast('error', t('操作失败'), (error as Error).message);
+    }
+  }
+
+  async function exportUserData(member: AdminUser) {
+    try {
+      const response = await api.post<{ emailed: boolean; message?: string }>(`/api/admin/users/${member.id}/export`);
+      if (response.emailed) toast('success', t('导出链接已发送到该用户邮箱'));
+      else toast('warning', t('邮件未配置，导出文件未发送'), response.message);
+    } catch (error) {
+      toast('error', t('导出失败'), (error as Error).message);
     }
   }
 
@@ -240,17 +251,44 @@ export default function AdminSettings() {
                   <td>{member.sessionCount}</td>
                   <td>{member.lastLoginAt ? formatRelativeShort(member.lastLoginAt) : '—'}</td>
                   <td>
-                    <div className="admin-user-actions">
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void setRestriction(member, { sharingDisabled: !member.sharingDisabled })} disabled={member.id === currentUser?.id || Boolean(member.disabledAt)}>
-                        {member.sharingDisabled ? t('允许分享') : t('禁止分享')}
-                      </button>
-                      <button type="button" className={cn('btn btn-ghost btn-sm', member.disabledAt && 'btn-danger')} onClick={() => void setRestriction(member, { disabled: !member.disabledAt })} disabled={member.id === currentUser?.id}>
-                        {member.disabledAt ? t('启用账号') : t('停用账号')}
-                      </button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeUserSessions(member)} disabled={member.sessionCount === 0 || member.id === currentUser?.id}>
-                        {t('退出设备')}
-                      </button>
-                    </div>
+                    <Dropdown
+                      width={210}
+                      trigger={
+                        <button type="button" className="icon-btn icon-btn-sm" aria-label={t('更多操作')} title={t('更多操作')}>
+                          <MoreHorizontal size={14} />
+                        </button>
+                      }
+                    >
+                      {(close) => (
+                        <>
+                          <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportUserData(member); }}>
+                            {t('导出数据给用户')}
+                          </MenuItem>
+                          <MenuItem
+                            icon={<Share2 size={14} />}
+                            disabled={member.id === currentUser?.id || Boolean(member.disabledAt)}
+                            onClick={() => { close(); void setRestriction(member, { sharingDisabled: !member.sharingDisabled }); }}
+                          >
+                            {member.sharingDisabled ? t('允许分享') : t('禁止分享')}
+                          </MenuItem>
+                          <MenuItem
+                            icon={<Ban size={14} />}
+                            danger={!member.disabledAt}
+                            disabled={member.id === currentUser?.id}
+                            onClick={() => { close(); void setRestriction(member, { disabled: !member.disabledAt }); }}
+                          >
+                            {member.disabledAt ? t('启用账号') : t('停用账号')}
+                          </MenuItem>
+                          <MenuItem
+                            icon={<LogOut size={14} />}
+                            disabled={member.sessionCount === 0 || member.id === currentUser?.id}
+                            onClick={() => { close(); void revokeUserSessions(member); }}
+                          >
+                            {t('退出设备')}
+                          </MenuItem>
+                        </>
+                      )}
+                    </Dropdown>
                   </td>
                 </tr>
               ))}

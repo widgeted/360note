@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useT } from '../../lib/i18n';
 import { useIsMobile } from '../../lib/useMediaQuery';
+import { useScrollFade } from '../../lib/useScrollFade';
 import { cn, shortcutLabel } from '../../lib/utils';
 import { Dropdown, MenuItem } from '../Dropdown';
 
@@ -44,6 +45,7 @@ export function EditorToolbar({
 }) {
   const t = useT();
   const isMobile = useIsMobile();
+  const scrollFade = useScrollFade<HTMLDivElement>();
   const fileRef = useRef<HTMLInputElement>(null);
   const state = useEditorState({
     editor,
@@ -71,7 +73,7 @@ export function EditorToolbar({
 
   return (
     <div className="editor-toolbar-wrap">
-      <div className="editor-toolbar" role="toolbar" aria-label={t('格式工具栏')}>
+      <div ref={scrollFade.ref} className={cn('editor-toolbar', scrollFade.className)} role="toolbar" aria-label={t('格式工具栏')}>
         <div className="toolbar-group">
           <button type="button" className="tool-btn" onClick={() => editor.chain().focus().undo().run()} disabled={!state?.canUndo} title={`${t('撤销')} ${shortcutLabel('Mod+Z')}`} aria-label={t('撤销')}>
             <Undo2 size={15} />
