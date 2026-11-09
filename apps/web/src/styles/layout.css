@@ -1721,6 +1721,7 @@ kbd {
 
 /* Shared shell for settings / secondary pages inside app */
 .page-shell {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -1730,13 +1731,22 @@ kbd {
 }
 
 .page-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
   height: var(--header-height);
-  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 22px;
   border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-50);
+  background: color-mix(in srgb, var(--paper-50) 68%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink-1000) 6%, transparent);
 }
 
 .page-topbar h1 {

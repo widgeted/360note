@@ -99,6 +99,16 @@ try {
               bad.push({ className: String(element.className).slice(0, 50), scrollWidth: element.scrollWidth, clientWidth: element.clientWidth });
             }
           }
+          const space = document.querySelector('.space-overview-row');
+          if (space) {
+            const mark = space.querySelector('.space-overview-mark').getBoundingClientRect();
+            const name = space.querySelector('.space-overview-name').getBoundingClientRect();
+            const kind = space.querySelector('.workspace-kind-icon').getBoundingClientRect();
+            if (mark.top > name.top + 4) bad.push({ className: 'space-overview-mark', reason: 'not top-aligned' });
+            if (kind.left > name.right + 40) bad.push({ className: 'space-kind-icon', reason: 'pushed too far right' });
+          }
+          const icon = document.querySelector('.field-icon .input')?.getBoundingClientRect();
+          if (icon && icon.width > 70) bad.push({ className: 'field-icon', reason: `width ${icon.width}` });
           return { documentWidth: document.documentElement.scrollWidth, bad };
         });
         if (rows.documentWidth > width + 1 || rows.bad.length) problems.push({ width, theme, path: 'team rows', ...rows });

@@ -92,6 +92,16 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
     }
   }
 
+  async function deleteRevoked(id: string) {
+    try {
+      await api.delete(`/api/shares/${id}/permanent`);
+      setShares((current) => current.filter((share) => share.id !== id));
+      toast('success', t('已删除撤销记录'));
+    } catch (error) {
+      toast('error', t('删除失败'), (error as Error).message);
+    }
+  }
+
   const activeShares = shares.filter((share) => !share.revokedAt);
 
   return (
@@ -219,22 +229,28 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
                       ) : (
                         <span className="share-item-url is-missing">{t('链接不可用')}</span>
                       )}
-                      {!share.revokedAt && (
-                        <div className="share-item-actions">
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void copy(share)}>
-                            {copied === share.id ? <Check size={13} /> : <Copy size={13} />} {copied === share.id ? t('已复制') : t('复制')}
+                      <div className="share-item-actions">
+                        {!share.revokedAt ? (
+                          <>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void copy(share)}>
+                              {copied === share.id ? <Check size={13} /> : <Copy size={13} />} {copied === share.id ? t('已复制') : t('复制')}
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn btn-sm ${revokeId === share.id ? 'btn-danger' : 'btn-ghost'}`}
+                              onClick={() => void revoke(share.id)}
+                              title={t('撤销')}
+                              aria-label={revokeId === share.id ? t('再次点击确认') : t('撤销')}
+                            >
+                              <Trash2 size={13} /> {revokeId === share.id ? t('再次点击确认') : ''}
+                            </button>
+                          </>
+                        ) : (
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => void deleteRevoked(share.id)} title={t('删除记录')} aria-label={t('删除记录')}>
+                            <Trash2 size={13} /> {t('删除记录')}
                           </button>
-                          <button
-                            type="button"
-                            className={`btn btn-sm ${revokeId === share.id ? 'btn-danger' : 'btn-ghost'}`}
-                            onClick={() => void revoke(share.id)}
-                            title={t('撤销')}
-                            aria-label={revokeId === share.id ? t('再次点击确认') : t('撤销')}
-                          >
-                            <Trash2 size={13} /> {revokeId === share.id ? t('再次点击确认') : ''}
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                     <div className="share-item-meta">
                       <div className="share-item-meta-tags">

@@ -542,3 +542,11 @@ apps/web/src/styles/tokens.css        设计 token
 - 761–900px 设置导航 4 列网格，消除 768px 横向滚动。
 
 - 已有分享最终布局：`.share-item-top` 内 URL 为主文本（省略号 + title）、右侧 `.share-item-actions` 复制/删除；`.share-item-meta` 依次为权限标签、创建时间、到期+浏览同行。
+
+## 2026-11-09 · v0.1.11 分享清理与磨砂头部
+
+- 新增 `DELETE /api/shares/:id/permanent`，仅允许删除已撤销分享；ShareDialog 撤销行显示“删除记录”。
+- 移动端 `.modal` 去掉 bottom radius 0，统一 `--radius-lg`。
+- `.public-header` / `.page-topbar` 使用 `color-mix(..., 68%, transparent)` + `backdrop-filter: blur(18px) saturate(1.2)` + 轻阴影；设置页 topbar 改为 absolute overlay，settings-nav/content 加 header 高度内边距，内容可从 header 下穿过。
+- `.public-header-cta { margin-left:auto }`，移动端 CTA 右对齐。
+- 空间概览用 `.space-overview-row` 等类：图标顶部对齐、类型图标紧跟名称、切换按钮右侧；`.field-icon` 宽 64px。

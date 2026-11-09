@@ -958,7 +958,7 @@
   width: 210px;
   flex: none;
   border-right: 1px solid var(--line-soft);
-  padding: 20px 12px;
+  padding: calc(20px + var(--header-height)) 12px 20px;
   background: var(--paper-50);
   overflow-y: auto;
 }
@@ -1016,6 +1016,7 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  padding-top: var(--header-height);
 }
 
 .settings-inner {
@@ -1306,6 +1307,69 @@
   .audit-ip {
     grid-column: 1 / -1;
     font-size: 12px;
+  }
+}
+
+.space-overview-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+}
+
+.space-overview-mark {
+  margin-top: 1px;
+}
+
+.space-overview-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.space-overview-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.space-overview-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.space-overview-meta {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.space-overview-action {
+  flex: none;
+  align-self: center;
+}
+
+.setting-inline-form .field-icon {
+  flex: 0 0 64px;
+  min-width: 64px;
+}
+
+.setting-inline-form .field-icon .input {
+  text-align: center;
+  font-size: 18px;
+}
+
+@media (max-width: 640px) {
+  .setting-inline-form .field-icon {
+    flex: 0 0 64px;
+    min-width: 64px;
   }
 }
 

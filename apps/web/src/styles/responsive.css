@@ -96,7 +96,7 @@
     border-bottom: 1px solid var(--line-soft);
     display: flex;
     gap: 4px;
-    padding: 10px 14px;
+    padding: calc(10px + var(--header-height)) 14px 10px;
     overflow-x: auto;
     flex: none;
   }
@@ -325,8 +325,7 @@
 
   .modal {
     max-height: calc(100dvh - 24px);
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+    border-radius: var(--radius-lg);
     max-width: 100%;
     animation: rise-in 220ms var(--ease) both;
   }
@@ -504,7 +503,7 @@
     gap: 5px;
     align-items: stretch;
     max-height: none;
-    padding: 9px 12px;
+    padding: calc(9px + var(--header-height)) 12px 9px;
     overflow: visible;
     border-bottom: 1px solid var(--line-soft);
   }
@@ -532,7 +531,7 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
     align-items: stretch;
-    padding: 9px 12px;
+    padding: calc(9px + var(--header-height)) 12px 9px;
     overflow: visible;
     border-bottom: 1px solid var(--line-soft);
   }

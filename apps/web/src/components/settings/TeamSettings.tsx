@@ -267,9 +267,9 @@ export default function TeamSettings() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {workspaces.map((entry) => (
-            <div key={entry.id} className="setting-card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10 }}>
+            <div key={entry.id} className="setting-card space-overview-row">
               <span
-                className="workspace-mark"
+                className="workspace-mark space-overview-mark"
                 style={{
                   background: `${entry.color ?? '#17865b'}24`,
                   borderColor: `${entry.color ?? '#17865b'}40`,
@@ -278,20 +278,20 @@ export default function TeamSettings() {
               >
                 {entry.icon ?? '📔'}
               </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{entry.name}</span>
-                  <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : t('个人空间')}>
+              <div className="space-overview-main">
+                <div className="space-overview-title">
+                  <span className="space-overview-name">{entry.name}</span>
+                  <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : t('个人空间')} aria-label={entry.kind === 'team' ? t('团队空间') : t('个人空间')}>
                     {entry.kind === 'team' ? <Users size={12} /> : <UserRound size={12} />}
                   </span>
                   {entry.id === workspaceId && <span className="badge badge-green">{t('当前')}</span>}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                <div className="space-overview-meta">
                   {entry.kind === 'team' ? t('成员 {n} 人', { n: entry.memberCount ?? 1 }) : t('只有你可以访问')} · {roleLabel(t, entry.role)}
                 </div>
               </div>
               {entry.id !== workspaceId && (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => void switchSpace(entry.id)}>
+                <button type="button" className="btn btn-secondary btn-sm space-overview-action" onClick={() => void switchSpace(entry.id)}>
                   {t('切换')}
                 </button>
               )}
@@ -310,7 +310,7 @@ export default function TeamSettings() {
         </div>
         <div className="setting-card">
           <div className="setting-inline-form">
-            <div className="field" style={{ flex: '0 0 64px' }}>
+            <div className="field field-icon">
               <label>{t('图标')}</label>
               <input
                 className="input"

@@ -62,9 +62,13 @@
   height: 64px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--paper-50);
+  background: color-mix(in srgb, var(--paper-50) 68%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink-1000) 6%, transparent);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
 }
 
 .public-header-inner > a[aria-label='360note'] {
@@ -91,6 +95,7 @@
 }
 
 .public-header-cta {
+  margin-left: auto;
   font-size: 13px;
   color: var(--text-secondary);
   display: inline-flex;

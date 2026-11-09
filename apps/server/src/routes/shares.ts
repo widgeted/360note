@@ -243,6 +243,19 @@ export default async function shareRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.delete('/api/shares/:id/permanent', async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const share = await one<ShareRow>('SELECT * FROM share_links WHERE id = $1', [id]);
+    if (!share) throw errors.notFound();
+    const { note } = await getNoteForUser(share.note_id, auth.user.id);
+    if (!note.canShare) throw errors.forbidden();
+    if (!share.revoked_at) throw errors.badRequest('请先撤销分享再删除记录');
+    await one('DELETE FROM share_links WHERE id = $1 RETURNING id', [id]);
+    await audit({ workspaceId: note.workspaceId, actorId: auth.user.id, action: 'share.delete', targetType: 'share', targetId: id, ip: clientIp(request) });
+    return { ok: true };
+  });
+
   // ---- Public share endpoints (no account required) ----
 
   app.post('/api/public/shares/:token/unlock', {
