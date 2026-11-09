@@ -7,8 +7,29 @@ import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/passwords.js';
 import { parse } from '../lib/validate.js';
 import { deleteAttachment, deleteBackupFile } from '../lib/storage.js';
+import { createUserExport } from '../services/user-export.js';
 
 export default async function accountRoutes(app: FastifyInstance) {
+  app.post('/api/me/export', {
+    config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+  }, async (request) => {
+    const auth = requireAuth(request);
+    const result = await createUserExport({
+      userId: auth.user.id,
+      email: auth.user.email,
+      displayName: auth.user.display_name,
+      prefs: auth.user.prefs,
+    });
+    await audit({
+      actorId: auth.user.id,
+      action: 'account.export',
+      targetType: 'user',
+      targetId: auth.user.id,
+      ip: clientIp(request),
+    });
+    return result;
+  });
+
   app.delete('/api/me', async (request, reply) => {
     const auth = requireAuth(request);
     const body = parse(z.object({ password: z.string().min(1), confirm: z.literal('DELETE') }), request.body);

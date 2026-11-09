@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Database, Download, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Ban, Database, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -49,7 +49,7 @@ export default function AdminSettings() {
   const [auditOffset, setAuditOffset] = useState(0);
   const [auditLoading, setAuditLoading] = useState(false);
   const [ipBlocks, setIpBlocks] = useState<Array<{ id: string; ip: string; reason: string | null; createdAt: string }>>([]);
-  const [shares, setShares] = useState<Array<{ id: string; workspaceName: string; ownerEmail: string | null; permission: string; hasPassword: boolean; expiresAt: string | null; viewCount: number; url: string }>>([]);
+  const [shares, setShares] = useState<Array<{ id: string; workspaceName: string; ownerName: string | null; permission: string; hasPassword: boolean; expiresAt: string | null; viewCount: number; url: string }>>([]);
   const [blockIp, setBlockIp] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
@@ -104,16 +104,6 @@ export default function AdminSettings() {
       toast('success', t('用户限制已更新'));
     } catch (error) {
       toast('error', t('操作失败'), (error as Error).message);
-    }
-  }
-
-  async function exportUserData(member: AdminUser) {
-    try {
-      const response = await api.post<{ emailed: boolean; message?: string }>(`/api/admin/users/${member.id}/export`);
-      if (response.emailed) toast('success', t('导出链接已发送到该用户邮箱'));
-      else toast('warning', t('邮件未配置，导出文件未发送'), response.message);
-    } catch (error) {
-      toast('error', t('导出失败'), (error as Error).message);
     }
   }
 
@@ -254,7 +244,7 @@ export default function AdminSettings() {
                   <td>{member.lastLoginAt ? formatRelativeShort(member.lastLoginAt) : '—'}</td>
                   <td>
                     <Dropdown
-                      width={210}
+                      width="auto"
                       trigger={
                         <button type="button" className="icon-btn icon-btn-sm" aria-label={t('更多操作')} title={t('更多操作')}>
                           <MoreHorizontal size={14} />
@@ -263,9 +253,6 @@ export default function AdminSettings() {
                     >
                       {(close) => (
                         <>
-                          <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportUserData(member); }}>
-                            {t('导出数据给用户')}
-                          </MenuItem>
                           <MenuItem
                             icon={<Share2 size={14} />}
                             disabled={member.id === currentUser?.id || Boolean(member.disabledAt)}
@@ -314,7 +301,7 @@ export default function AdminSettings() {
               ) : (
                 <a className="admin-share-link" href={share.url} target="_blank" rel="noopener noreferrer" title={share.url}>{share.url}</a>
               )}
-              <span className="admin-share-owner" title={share.ownerEmail ?? ''}>{share.ownerEmail ?? '—'}</span>
+              <span className="admin-share-owner" title={share.ownerName ?? ''}>{share.ownerName ?? '—'}</span>
               <span>{share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}</span>
               <span>{share.hasPassword ? t('需要密码') : t('公开')}</span>
               <span>{share.expiresAt ? formatFullDate(share.expiresAt) : t('永不过期')}</span>

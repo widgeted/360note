@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Check, Mail, Save, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Mail, Save, Trash2, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useAppStore } from '../../stores/app';
@@ -30,6 +30,7 @@ export default function AccountSettings() {
   const [saving, setSaving] = useState(false);
   const [summary, setSummary] = useState<{ noteCount: number; memberCount: number; attachmentBytes: number } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -137,6 +138,18 @@ export default function AccountSettings() {
     } catch (error) {
       setError((error as Error).message);
       setDeleting(false);
+    }
+  }
+
+  async function exportData() {
+    setExporting(true);
+    try {
+      await api.post('/api/me/export');
+      toast('success', t('导出链接已发送到你的邮箱'));
+    } catch (error) {
+      toast('error', t('导出失败'), (error as Error).message);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -276,6 +289,23 @@ export default function AccountSettings() {
         </div>
         <div className="setting-note" style={{ marginTop: 8 }}>
           {t('账户创建于 {date}', { date: user ? formatFullDate(user.createdAt) : '' })} · {t('实例管理员')}: {user?.role === 'admin' ? t('是') : t('否')}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-head">
+          <span className="settings-section-title">{t('我的数据')}</span>
+        </div>
+        <div className="setting-row">
+          <div className="setting-row-main">
+            <div className="setting-row-title">{t('导出我的数据')}</div>
+            <div className="setting-row-desc">{t('生成包含你自有空间的 .nhbackup 包，并把 7 天有效的下载链接发送到你的邮箱。每 24 小时最多一次。')}</div>
+          </div>
+          <div className="setting-row-control">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void exportData()} disabled={exporting}>
+              {exporting ? <span className="spinner" /> : <Download size={13} />} {t('导出我的数据')}
+            </button>
+          </div>
         </div>
       </section>
 

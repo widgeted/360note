@@ -70,11 +70,11 @@ export function formatRelativeShort(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return translate('刚刚');
-  if (minutes < 60) return translate('分钟前', { n: minutes });
+  if (minutes < 60) return translate('{n} 分钟前', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return translate('小时前', { n: hours });
+  if (hours < 24) return translate('{n} 小时前', { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return translate('天前', { n: days });
+  if (days < 30) return translate('{n} 天前', { n: days });
   return formatNoteDate(iso);
 }
 
