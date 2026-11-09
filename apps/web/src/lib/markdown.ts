@@ -4,6 +4,11 @@ import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 import { escapeHtml } from './utils';
 
+// Never allow data: URLs on links. They are legitimate only for images.
+DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+  if (data.attrName === 'href' && /^\s*data:/i.test(data.attrValue)) data.keepAttr = false;
+});
+
 const turndown = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',

@@ -267,7 +267,9 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/api/workspaces/:id/invitations', async (request) => {
+  app.post('/api/workspaces/:id/invitations', {
+    config: { rateLimit: { max: 30, timeWindow: '1 hour' } },
+  }, async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const actorRole = await requireWorkspace(auth.user.id, id, 'manage');
