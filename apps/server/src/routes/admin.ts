@@ -11,7 +11,8 @@ import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite }
 import { getNoteForUser } from '../services/notes.js';
 import { readBackup } from '../lib/storage.js';
 import { decryptString, sha256 } from '../lib/crypto.js';
-import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, saveInstanceBackupSettings } from '../services/instance-backups.js';
+import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, saveInstanceBackupSettings, uploadInstanceBackupToOffsite } from '../services/instance-backups.js';
+import { attachmentMigrationRunning, getAttachmentStorageUsage, getLocalAttachmentUsage, startDisableAttachments, startEnableAttachments } from '../services/attachment-storage.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
   async function requireAdmin(userId: string): Promise<void> {
@@ -48,6 +49,16 @@ export default async function adminRoutes(app: FastifyInstance) {
         pg_database_size(current_database())::text AS database_bytes,
         (SELECT max(created_at) FROM backups) AS last_backup`,
     );
+    const [localUsage, attachmentMeta, offsiteConfig] = await Promise.all([
+      getLocalAttachmentUsage().catch(() => ({ files: 0, bytes: 0 })),
+      one<{ local_rows: string; remote_rows: string }>(
+        `SELECT
+          count(*) FILTER (WHERE storage_key NOT LIKE 's3:%')::text AS local_rows,
+          count(*) FILTER (WHERE storage_key LIKE 's3:%')::text AS remote_rows
+         FROM attachments WHERE deleted_at IS NULL`,
+      ),
+      getOffsiteConfig(),
+    ]);
     return {
       stats: {
         users: Number(stats!.users),
@@ -73,6 +84,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         aiEnabled: (await getAiConfig()).enabled,
         ocrEnabled: config.ocrEnabled,
         backupRetentionDays: config.backupRetentionDays,
+      },
+      attachmentStorage: {
+        localBytes: localUsage.bytes,
+        localFiles: localUsage.files,
+        localAttachments: Number(attachmentMeta?.local_rows ?? 0),
+        remoteAttachments: Number(attachmentMeta?.remote_rows ?? 0),
+        attachmentsEnabled: offsiteConfig.attachmentsEnabled,
+        offsiteEnabled: offsiteConfig.enabled,
       },
     };
   });
@@ -284,6 +303,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         filename: row.filename,
         size: Number(row.size_bytes),
         status: row.status,
+        offsiteStatus: row.offsite_status,
+        offsiteError: row.offsite_error,
         createdAt: row.created_at.toISOString(),
       })),
       settings: await getInstanceBackupSettings(),
@@ -296,6 +317,16 @@ export default async function adminRoutes(app: FastifyInstance) {
     const backup = await createInstanceBackup(auth.user.id);
     await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create', targetType: 'instance_backup', targetId: backup.id, meta: { size: backup.size }, ip: clientIp(request) });
     return { backup };
+  });
+
+  app.post('/api/admin/instance-backups/:id/upload', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const status = await uploadInstanceBackupToOffsite(id);
+    if (status === 'failed') throw new AppError(502, 'INSTANCE_BACKUP_UPLOAD_FAILED', '对象存储上传失败，请查看连接状态');
+    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.upload', targetType: 'instance_backup', targetId: id, meta: { status }, ip: clientIp(request) });
+    return { status };
   });
 
   app.get('/api/admin/instance-backups/:id/download', async (request, reply) => {
@@ -422,6 +453,22 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (body.enabled && (!body.endpoint || !body.bucket || !body.accessKeyId)) {
       throw errors.badRequest('启用异地备份需要填写 endpoint、bucket、accessKeyId');
     }
+    if (attachmentMigrationRunning()) throw errors.conflict('附件迁移正在进行，暂不能修改对象存储连接');
+    const current = await getOffsiteConfig();
+    const stored = await one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM attachments WHERE deleted_at IS NULL AND storage_key LIKE 's3:%'`,
+    );
+    const hasRemoteAttachments = Number(stored?.count ?? 0) > 0 || current.attachmentsEnabled;
+    const identityChanged =
+      body.endpoint !== current.endpoint ||
+      body.bucket !== current.bucket ||
+      body.prefix !== current.prefix ||
+      body.accessKeyId !== current.accessKeyId ||
+      (body.secretAccessKey ? body.secretAccessKey !== current.secretAccessKey : false) ||
+      (body.forcePathStyle ?? current.forcePathStyle) !== current.forcePathStyle;
+    if (hasRemoteAttachments && identityChanged) {
+      throw errors.badRequest('已有附件保存在对象存储中。请先停用并取回全部附件，再修改连接配置。');
+    }
     await saveOffsiteConfig(body);
     await audit({ actorId: auth.user.id, action: 'admin.offsite.update', meta: { enabled: body.enabled, bucket: body.bucket }, ip: clientIp(request) });
     return { offsite: await offsitePublicConfig() };
@@ -437,6 +484,30 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (error) {
       throw new AppError(502, 'OFFSITE_TEST_FAILED', (error as Error).message.slice(0, 300));
     }
+  });
+
+  app.get('/api/admin/offsite/usage', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { force } = parse(z.object({ force: z.enum(['0', '1']).optional() }), request.query);
+    return await getAttachmentStorageUsage(force === '1');
+  });
+
+  app.post('/api/admin/offsite/attachments/enable', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const state = await startEnableAttachments();
+    await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.enable', ip: clientIp(request) });
+    return { migration: state };
+  });
+
+  app.post('/api/admin/offsite/attachments/disable', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const body = parse(z.object({ purgeRemote: z.boolean().optional() }), request.body ?? {});
+    const state = await startDisableAttachments(Boolean(body.purgeRemote));
+    await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.disable', meta: { purgeRemote: Boolean(body.purgeRemote) }, ip: clientIp(request) });
+    return { migration: state };
   });
 
   app.get('/api/admin/audit', async (request) => {

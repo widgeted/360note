@@ -75,8 +75,8 @@ export async function executeImport(input: {
         try {
           const data = await fs.readFile(path.join(input.jobDir, attachment.storedPath));
           const attachmentId = crypto.randomUUID();
-          const storageKey = attachmentStorageKey(input.workspaceId, attachmentId);
-          await saveAttachment(storageKey, data);
+          const localKey = attachmentStorageKey(input.workspaceId, attachmentId);
+          const storageKey = await saveAttachment(localKey, data);
           await one(
             `INSERT INTO attachments (id, workspace_id, note_id, filename, mime, size_bytes, sha256, storage_key, created_by)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Database, Download, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { Activity, Ban, Cloud, CloudUpload, Database, Download, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -23,6 +23,21 @@ interface Stats {
   lastBackupAt: string | null;
 }
 
+interface AttachmentStorageStats {
+  localBytes: number;
+  localFiles: number;
+  localAttachments: number;
+  remoteAttachments: number;
+  attachmentsEnabled: boolean;
+  offsiteEnabled: boolean;
+}
+
+interface OffsiteUsage {
+  local: { files: number; bytes: number; attachments: number };
+  remote: { available: boolean; total: { objects: number; bytes: number }; attachments: { objects: number; bytes: number }; backups: { objects: number; bytes: number } } | null;
+  attachmentsEnabled: boolean;
+}
+
 interface AdminUser {
   id: string;
   email: string;
@@ -43,6 +58,8 @@ export default function AdminSettings() {
   const t = useT();
   const currentUser = useAuthStore((state) => state.user);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [attachmentStorage, setAttachmentStorage] = useState<AttachmentStorageStats | null>(null);
+  const [offsiteUsage, setOffsiteUsage] = useState<OffsiteUsage | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
@@ -57,17 +74,19 @@ export default function AdminSettings() {
   const [retention, setRetention] = useState(30);
   const [saving, setSaving] = useState(false);
   const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'shares' | 'logs'>('overview');
-  const [instanceBackups, setInstanceBackups] = useState<Array<{ id: string; filename: string; size: number; createdAt: string }>>([]);
+  const [instanceBackups, setInstanceBackups] = useState<Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>>([]);
   const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7 });
   const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
 
   useEffect(() => {
-    api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime }>('/api/admin/stats').then((res) => {
+    api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime; attachmentStorage: AttachmentStorageStats }>('/api/admin/stats').then((res) => {
       setStats(res.stats);
       setInstance(res.instance as typeof instance);
       setRuntime(res.runtime as typeof runtime);
+      setAttachmentStorage(res.attachmentStorage);
       setRetention(res.instance?.backupRetentionDays ?? 30);
     }).catch(() => {});
+    void refreshOffsiteUsage();
     api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch(() => {});
     void loadAudit(0);
     void refreshIpBlocks();
@@ -112,8 +131,17 @@ export default function AdminSettings() {
     }
   }
 
+  async function refreshOffsiteUsage() {
+    try {
+      const response = await api.get<OffsiteUsage>('/api/admin/offsite/usage');
+      setOffsiteUsage(response);
+    } catch {
+      /* Object storage may not be configured. */
+    }
+  }
+
   async function refreshInstanceBackups() {
-    const response = await api.get<{ backups: Array<{ id: string; filename: string; size: number; createdAt: string }>; settings: typeof instanceBackupSettings }>('/api/admin/instance-backups');
+    const response = await api.get<{ backups: Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>; settings: typeof instanceBackupSettings }>('/api/admin/instance-backups');
     setInstanceBackups(response.backups);
     setInstanceBackupSettings(response.settings);
   }
@@ -132,7 +160,7 @@ export default function AdminSettings() {
     setInstanceBackupBusy(true);
     try {
       await api.post('/api/admin/instance-backups');
-      await refreshInstanceBackups();
+      await Promise.all([refreshInstanceBackups(), refreshOffsiteUsage()]);
       toast('success', t('整站备份已创建'));
     } catch (error) {
       toast('error', t('备份失败'), (error as Error).message);
@@ -141,10 +169,20 @@ export default function AdminSettings() {
     }
   }
 
+  async function retryInstanceBackupUpload(id: string) {
+    try {
+      await api.post(`/api/admin/instance-backups/${id}/upload`);
+      await Promise.all([refreshInstanceBackups(), refreshOffsiteUsage()]);
+      toast('success', t('已上传到对象存储'));
+    } catch (error) {
+      toast('error', t('上传失败'), (error as Error).message);
+    }
+  }
+
   async function removeInstanceBackup(id: string) {
     try {
       await api.delete(`/api/admin/instance-backups/${id}`);
-      await refreshInstanceBackups();
+      await Promise.all([refreshInstanceBackups(), refreshOffsiteUsage()]);
     } catch (error) {
       toast('error', t('删除失败'), (error as Error).message);
     }
@@ -259,6 +297,33 @@ export default function AdminSettings() {
 
       <section className="settings-section" hidden={adminTab !== 'overview'}>
         <div className="settings-section-head">
+          <span className="settings-section-title">{t('附件存储')}</span>
+          <span className="settings-section-desc">{attachmentStorage?.attachmentsEnabled ? t('对象存储') : t('本机')}</span>
+        </div>
+        <div className="admin-stats">
+          <div className="setting-card">
+            <span style={{ color: 'var(--text-tertiary)' }}><HardDrive size={15} /></span>
+            <div className="admin-stat-value">{formatBytes(offsiteUsage?.local.bytes ?? attachmentStorage?.localBytes ?? 0)}</div>
+            <div className="setting-note">{t('本机附件占用')} · {offsiteUsage?.local.files ?? attachmentStorage?.localFiles ?? 0} {t('个文件')}</div>
+          </div>
+          <div className="setting-card">
+            <span style={{ color: 'var(--text-tertiary)' }}><Cloud size={15} /></span>
+            <div className="admin-stat-value">{formatBytes(offsiteUsage?.remote?.attachments.bytes ?? 0)}</div>
+            <div className="setting-note">{t('对象存储附件')} · {offsiteUsage?.remote?.attachments.objects ?? 0} {t('个对象')}</div>
+          </div>
+          <div className="setting-card">
+            <span style={{ color: 'var(--text-tertiary)' }}><CloudUpload size={15} /></span>
+            <div className="admin-stat-value">{formatBytes(offsiteUsage?.remote?.backups.bytes ?? 0)}</div>
+            <div className="setting-note">{t('对象存储备份')} · {offsiteUsage?.remote?.backups.objects ?? 0} {t('个对象')}</div>
+          </div>
+        </div>
+        <p className="setting-note" style={{ marginTop: 6 }}>
+          {t('本机附件与对象存储附件分开统计；切换存储不会改变附件链接。可在“数据与备份”中启用、停用并迁移。')}
+        </p>
+      </section>
+
+      <section className="settings-section" hidden={adminTab !== 'overview'}>
+        <div className="settings-section-head">
           <span className="settings-section-title">{t('备份保留')}</span>
         </div>
         <div className="setting-inline-form">
@@ -279,6 +344,7 @@ export default function AdminSettings() {
           <span className="settings-section-desc">{instanceBackups.length}</span>
         </div>
         <p className="setting-note">{t('整站备份包含数据库导出和加密附件，用于灾难恢复。下载文件为 .3nb，需要主密钥才能恢复。')}</p>
+        <p className="setting-note">{t('启用“异地备份与对象存储”中的备份副本后，整站备份会自动上传，失败可在下方重试。')}</p>
         <div className="setting-inline-form" style={{ marginTop: 10 }}>
           <label className="checkbox-row" style={{ margin: 0 }}>
             <input type="checkbox" checked={instanceBackupSettings.enabled} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, enabled: event.target.checked }))} />
@@ -293,8 +359,14 @@ export default function AdminSettings() {
           {instanceBackups.length === 0 ? <div className="context-empty">{t('暂无整站备份')}</div> : instanceBackups.map((backup) => (
             <div className="admin-ip-row" key={backup.id}>
               <span className="mono" title={backup.filename}>{backup.filename}</span>
-              <span>{formatBytes(backup.size)} · {formatRelativeShort(backup.createdAt)}</span>
+              <span>
+                {formatBytes(backup.size)} · {formatRelativeShort(backup.createdAt)}
+                {backup.offsiteStatus === 'uploaded' && <span className="badge badge-green" style={{ marginLeft: 6 }}><Cloud size={10} /> S3</span>}
+                {backup.offsiteStatus === 'failed' && <span className="badge badge-red" style={{ marginLeft: 6 }} title={backup.offsiteError ?? ''}>{t('上传失败')}</span>}
+                {backup.offsiteStatus === 'skipped' && <span className="badge badge-gray" style={{ marginLeft: 6 }}>{t('仅本机')}</span>}
+              </span>
               <span style={{ display: 'flex', gap: 4 }}>
+                {backup.offsiteStatus === 'failed' && <button type="button" className="icon-btn icon-btn-sm" onClick={() => void retryInstanceBackupUpload(backup.id)} aria-label={t('重试上传')} title={t('重试上传')}><CloudUpload size={13} /></button>}
                 <a className="icon-btn icon-btn-sm" href={`/api/admin/instance-backups/${backup.id}/download`} aria-label={t('下载')}><Download size={13} /></a>
                 <button type="button" className="icon-btn icon-btn-sm" onClick={() => void removeInstanceBackup(backup.id)} aria-label={t('删除')}><Trash2 size={13} /></button>
               </span>

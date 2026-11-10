@@ -87,7 +87,7 @@ async function buildServer() {
     const language = requestLanguage(request.headers as Record<string, unknown>);
     const localize = (message: string) => localizeMessage(message, language);
     if (error instanceof AppError) {
-      if (error.statusCode >= 500) app.log.error({ error, url: request.url }, 'request failed');
+      if (error.statusCode >= 500) app.log.error({ error, stack: error.stack, url: request.url }, 'request failed');
       const payload = errorPayload(error);
       payload.error.message = localize(payload.error.message);
       return reply.status(error.statusCode).send(payload);
@@ -98,7 +98,7 @@ async function buildServer() {
     if (error.statusCode === 413) {
       return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: localize('上传内容过大') } });
     }
-    app.log.error({ error, url: request.url }, 'unhandled error');
+    app.log.error({ error, stack: error.stack, url: request.url }, 'unhandled error');
     return reply.status(500).send({ error: { code: 'INTERNAL_ERROR', message: localize('服务器内部错误') } });
   });
 

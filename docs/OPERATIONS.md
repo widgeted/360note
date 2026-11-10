@@ -269,8 +269,23 @@ curl -fsS https://360note.com/health
 - 保留：14 份自动 + 30 天（`BACKUP_RETENTION_DAYS`）。
 - 备份文件：`/var/lib/360note/backups/*.3nb`，AES-256-GCM 加密。
 - 备份包含：notes/folders/tags/versions/comments/attachments。不含分享链接/API token/密码。
-- **默认在同一服务器**：管理员可在 设置→数据与备份→异地备份 配置 S3 兼容存储；仍建议定期下载。
+- **默认在同一服务器**：管理员可在 设置→数据与备份→异地备份与对象存储 配置 S3 兼容存储；仍建议定期下载。
 - 异地备份上传的是同一个已加密 `.3nb`；S3 侧无法读取内容。
+- 可同时启用附件对象存储：先迁移本机附件，再切换新上传；停用前会把所有附件取回并校验。附件 URL 不变。
+- 对象存储用量按 bucket 内 `prefix/attachments/` 与备份对象统计；本机用量按 `/var/lib/360note/attachments` 实际文件统计。
+- 有远端附件时修改连接配置会被拒绝，需先停用并取回全部附件。
+
+### 对象存储回归测试
+
+测试会创建临时数据库、临时数据目录和本地 S3 兼容服务，不会触碰生产附件：
+
+```bash
+cd /opt/360note
+sudo bash -c 'set -a; source /etc/360note/360note.env; set +a; \
+  PATH=/opt/node22/bin:$PATH /opt/node22/bin/node tests/manual/object-storage-e2e.mjs'
+```
+
+覆盖：本机上传/缩略图、连接测试、启用迁移、新附件直传、停用取回、重复启用按大小跳过、删除清理远端、整站备份包含远端附件并自动上传。
 
 ### 5.2 手动备份 + 下载
 

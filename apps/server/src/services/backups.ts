@@ -639,8 +639,8 @@ async function restoreReplace(input: {
     const entry = zip.getEntry(attachment.zipPath);
     if (!entry) continue;
     const data = readEntryData(entry);
-    const storageKey = attachmentStorageKey(input.workspaceId, attachment.id);
-    await saveAttachment(storageKey, data);
+    const localKey = attachmentStorageKey(input.workspaceId, attachment.id);
+    const storageKey = await saveAttachment(localKey, data);
     newStorageKeys.add(storageKey);
     const createdBy = userIds.has(attachment.createdBy) ? attachment.createdBy : input.userId;
     await one(

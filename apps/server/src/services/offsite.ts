@@ -8,6 +8,7 @@ import { getSetting, setSetting } from './settings.js';
 
 export interface OffsiteConfig {
   enabled: boolean;
+  attachmentsEnabled: boolean;
   endpoint: string;
   region: string;
   bucket: string;
@@ -19,6 +20,7 @@ export interface OffsiteConfig {
 
 interface StoredOffsite {
   enabled?: boolean;
+  attachmentsEnabled?: boolean;
   endpoint?: string;
   region?: string;
   bucket?: string;
@@ -35,6 +37,7 @@ export async function getOffsiteConfig(): Promise<OffsiteConfig> {
   const stored = await getSetting<StoredOffsite>('offsite');
   return {
     enabled: Boolean(stored?.enabled),
+    attachmentsEnabled: Boolean(stored?.attachmentsEnabled),
     endpoint: stored?.endpoint ?? '',
     region: stored?.region ?? 'auto',
     bucket: stored?.bucket ?? '',
@@ -53,6 +56,7 @@ export async function saveOffsiteConfig(input: Partial<OffsiteConfig> & { secret
       : existing?.secretAccessKeyEnc ?? '';
   const value: StoredOffsite = {
     enabled: input.enabled ?? existing?.enabled ?? false,
+    attachmentsEnabled: existing?.attachmentsEnabled ?? false,
     endpoint: input.endpoint ?? existing?.endpoint ?? '',
     region: input.region ?? existing?.region ?? 'auto',
     bucket: input.bucket ?? existing?.bucket ?? '',
@@ -86,7 +90,7 @@ export async function testOffsite(config: OffsiteConfig): Promise<void> {
     throw new Error('S3 配置不完整');
   }
   const s3 = client(config);
-  await s3.send(new ListObjectsV2Command({ Bucket: config.bucket, Prefix: config.prefix, MaxKeys: 1 }));
+  await s3.send(new ListObjectsV2Command({ Bucket: config.bucket, Prefix: config.prefix, MaxKeys: 1000 }));
   await setSetting('offsite', {
     ...(await getSetting<Record<string, unknown>>('offsite')),
     lastTestAt: new Date().toISOString(),
@@ -140,7 +144,7 @@ export async function uploadOffsiteBackup(filename: string): Promise<'uploaded' 
 
 export async function deleteOffsiteBackup(filename: string): Promise<void> {
   const config = await getOffsiteConfig();
-  if (!config.enabled || !config.endpoint || !config.bucket) return;
+  if (!config.endpoint || !config.bucket || !config.accessKeyId || !config.secretAccessKey) return;
   try {
     await client(config).send(
       new DeleteObjectCommand({ Bucket: config.bucket, Key: keyFor(config, filename) }),
@@ -155,6 +159,7 @@ export async function offsitePublicConfig(): Promise<Record<string, unknown>> {
   const stored = (await getSetting<StoredOffsite>('offsite')) ?? {};
   return {
     enabled: config.enabled,
+    attachmentsEnabled: config.attachmentsEnabled,
     endpoint: config.endpoint,
     region: config.region,
     bucket: config.bucket,

@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { config, paths } from '../config.js';
 import { encryptBuffer, decryptBuffer } from './crypto.js';
+import { attachmentObjectStorageKey, attachmentStorageKeyFromObject, deleteObject, getObject, getObjectStorageConfig, objectExists, objectStorageConfigured, putObject, attachmentStorageMigrationMode } from './object-storage.js';
 
 const ATTACHMENT_AAD = '360note:attachment';
 const BACKUP_AAD = '360note:backup';
@@ -30,21 +31,37 @@ export function attachmentThumbnailStorageKey(storageKey: string): string {
   return storageKey.endsWith('.nh') ? `${storageKey.slice(0, -3)}.thumb.nh` : `${storageKey}.thumb`;
 }
 
-export async function saveAttachment(storageKey: string, data: Buffer): Promise<void> {
-  const target = path.join(paths.attachments, storageKey);
-  assertInside(paths.attachments, target);
-  await fsp.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+export async function saveAttachment(
+  storageKey: string,
+  data: Buffer,
+  target?: 'local' | 's3',
+): Promise<string> {
+  const config = await getObjectStorageConfig();
+  const wantS3 = target === 's3' || (target === undefined && config.attachmentsEnabled && objectStorageConfigured(config) && !attachmentStorageMigrationMode());
+  const effectiveKey = storageKey.startsWith('s3:') || !wantS3 ? storageKey : attachmentObjectStorageKey(storageKey);
   const encrypted = encryptBuffer(data, ATTACHMENT_AAD);
-  await fsp.writeFile(target, encrypted, { mode: 0o600 });
+  if (effectiveKey.startsWith('s3:')) {
+    await putObject(effectiveKey, encrypted);
+    return effectiveKey;
+  }
+  const localTarget = path.join(paths.attachments, effectiveKey);
+  assertInside(paths.attachments, localTarget);
+  await fsp.mkdir(path.dirname(localTarget), { recursive: true, mode: 0o700 });
+  await fsp.writeFile(localTarget, encrypted, { mode: 0o600 });
+  return effectiveKey;
 }
 
 export async function readAttachment(storageKey: string): Promise<Buffer> {
+  if (storageKey.startsWith('s3:')) {
+    return decryptBuffer(await getObject(storageKey), ATTACHMENT_AAD);
+  }
   const target = path.join(paths.attachments, storageKey);
   assertInside(paths.attachments, target);
   return decryptBuffer(await fsp.readFile(target), ATTACHMENT_AAD);
 }
 
-export async function deleteAttachment(storageKey: string): Promise<void> {
+async function removeLocalAttachmentFiles(storageKey: string): Promise<void> {
+  if (storageKey.startsWith('s3:')) return;
   const target = path.join(paths.attachments, storageKey);
   const thumb = path.join(paths.attachments, attachmentThumbnailStorageKey(storageKey));
   assertInside(paths.attachments, target);
@@ -55,7 +72,18 @@ export async function deleteAttachment(storageKey: string): Promise<void> {
   ]);
 }
 
+export async function deleteAttachment(storageKey: string): Promise<void> {
+  const localKey = storageKey.startsWith('s3:') ? attachmentStorageKeyFromObject(storageKey) : storageKey;
+  const remoteKey = storageKey.startsWith('s3:') ? storageKey : attachmentObjectStorageKey(storageKey);
+  await Promise.all([
+    removeLocalAttachmentFiles(localKey),
+    deleteObject(remoteKey).catch(() => {}),
+    deleteObject(attachmentThumbnailStorageKey(remoteKey)).catch(() => {}),
+  ]);
+}
+
 export async function attachmentExists(storageKey: string): Promise<boolean> {
+  if (storageKey.startsWith('s3:')) return objectExists(storageKey);
   try {
     await fsp.access(path.join(paths.attachments, storageKey));
     return true;

@@ -36,7 +36,10 @@ export async function ensureAttachmentThumbnail(
   try {
     const source = original ?? (await readAttachment(storageKey));
     const thumbnail = await buildAttachmentThumbnail(source);
-    await saveAttachment(thumbKey, thumbnail);
+    // Keep the thumbnail next to its original. Otherwise a local attachment
+    // left over during a migration could write its thumbnail to the remote
+    // side while the row still points at the local original.
+    await saveAttachment(thumbKey, thumbnail, storageKey.startsWith('s3:') ? 's3' : 'local');
     return thumbnail;
   } catch {
     return null;

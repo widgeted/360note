@@ -258,8 +258,8 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 2. multipart 限制 25MB（可通过 `MAX_UPLOAD_BYTES` 调整）；
 3. MIME 嗅探（PNG/JPEG/GIF/WebP/PDF/ZIP 等）+ 文件名安全化；
 4. `image-size` 读取宽高；
-5. AES-256-GCM 加密后写入 `/var/lib/360note/attachments/<workspace>/<attachment>.nh`；
-6. DB 记录 SHA-256 / storage_key / 元数据；
+5. AES-256-GCM 加密后写入 `/var/lib/360note/attachments/<workspace>/<attachment>.nh`；启用对象存储时写入 S3 的 `prefix/attachments/<workspace>/<attachment>.nh`；
+6. DB 记录 SHA-256 / storage_key / 元数据；`storage_key` 决定读取位置（本机相对路径或 `s3:` 前缀），外部 URL 不受影响；
 7. 若 `OCR_ENABLED=true`，异步队列调用 tesseract（图片）或 pdftotext（PDF），结果写入 `ocr_text`，失败标记 `failed`。
 
 ### 6.2 读取
@@ -271,6 +271,7 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 
 - 主密钥 `NOTE360_MASTER_KEY` 为 32 字节 base64；缺失时生产启动失败。
 - 文件格式：`[version=1][iv 12][tag 16][ciphertext]`，AAD=`360note:attachment`。
+- 启用/停用对象存储时按行迁移：上传完成后才更新 `storage_key`；回迁时先写入本机并校验，再更新 `storage_key`。迁移期间新上传保持在本机，结束后补迁，避免快照遗漏。
 - 备份也用同一主密钥加密，AAD=`360note:backup`。
 - 丢失主密钥 = 附件/备份不可读；运行手册要求离线保存密钥。
 

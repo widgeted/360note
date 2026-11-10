@@ -45,9 +45,9 @@ export default async function attachmentRoutes(app: FastifyInstance) {
       }
     }
     const attachmentId = crypto.randomUUID();
-    const storageKey = attachmentStorageKey(note.workspaceId, attachmentId);
+    const localKey = attachmentStorageKey(note.workspaceId, attachmentId);
     const digest = checksum(buffer);
-    await saveAttachment(storageKey, buffer);
+    const storageKey = await saveAttachment(localKey, buffer);
     if (isDisplayableImage(mime)) {
       void ensureAttachmentThumbnail(storageKey, mime, buffer).then((thumbnail) => {
         if (!thumbnail) app.log.warn({ attachmentId }, 'failed to generate attachment thumbnail');

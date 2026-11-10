@@ -6,8 +6,10 @@ import { promisify } from 'node:util';
 import crypto from 'node:crypto';
 import { config, paths } from '../config.js';
 import { many, one, query } from '../db.js';
-import { deleteBackupFile, readBackup, safeFilename, saveBackup } from '../lib/storage.js';
+import { attachmentThumbnailStorageKey, deleteBackupFile, readBackup, safeFilename, saveBackup } from '../lib/storage.js';
+import { attachmentStorageKeyFromObject, getObject } from '../lib/object-storage.js';
 import { getSetting, setSetting } from './settings.js';
+import { deleteOffsiteBackup, uploadOffsiteBackup } from './offsite.js';
 
 const exec = promisify(execFile);
 
@@ -72,7 +74,29 @@ export async function createInstanceBackup(userId: string): Promise<{ id: string
       note: 'database.dump is pg_dump custom format; attachments/ contains AES-256-GCM encrypted attachment files from the instance data directory.',
     }, null, 2)));
     zip.addLocalFile(dumpPath);
-    await fs.access(paths.attachments).then(() => zip.addLocalFolder(paths.attachments, 'attachments')).catch(() => {});
+    // Object-storage-only attachments are not on disk. Copy the local
+    // encrypted files, then overlay every remote object so the archive is a
+    // complete instance snapshot regardless of where each attachment lives.
+    const attachmentDir = path.join(tempDir, 'attachments');
+    await fs.cp(paths.attachments, attachmentDir, { recursive: true, force: true }).catch(() => {});
+    const remoteRows = await many<{ storage_key: string }>(
+      `SELECT storage_key FROM attachments WHERE deleted_at IS NULL AND storage_key LIKE 's3:%'`,
+    );
+    for (const row of remoteRows) {
+      const relative = attachmentStorageKeyFromObject(row.storage_key);
+      const originalTarget = path.join(attachmentDir, relative);
+      await fs.mkdir(path.dirname(originalTarget), { recursive: true, mode: 0o700 });
+      await fs.writeFile(originalTarget, await getObject(row.storage_key), { mode: 0o600 });
+      try {
+        const thumbObject = attachmentThumbnailStorageKey(row.storage_key);
+        const thumbTarget = path.join(attachmentDir, attachmentThumbnailStorageKey(relative));
+        await fs.mkdir(path.dirname(thumbTarget), { recursive: true, mode: 0o700 });
+        await fs.writeFile(thumbTarget, await getObject(thumbObject), { mode: 0o600 });
+      } catch {
+        /* Thumbnails can be regenerated; a missing one must not block disaster recovery. */
+      }
+    }
+    await fs.access(attachmentDir).then(() => zip.addLocalFolder(attachmentDir, 'attachments')).catch(() => {});
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
     const filename = `instance-${safeFilename(config.publicOrigin.replace(/^https?:\/\//, '').replace(/[^a-z0-9.-]/gi, '_'))}-${stamp}.3nb`;
     const size = await saveBackup(filename, zip.toBuffer());
@@ -81,11 +105,27 @@ export async function createInstanceBackup(userId: string): Promise<{ id: string
        VALUES ($1, $2, $3, 'ready', $4) RETURNING id`,
       [filename, filename, size, userId],
     );
+    await uploadInstanceBackupToOffsite(row!.id);
     await pruneInstanceBackups(await getInstanceBackupSettings());
     return { id: row!.id, filename, size };
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+export async function uploadInstanceBackupToOffsite(id: string): Promise<'uploaded' | 'skipped' | 'failed'> {
+  const row = await one<{ filename: string }>('SELECT filename FROM instance_backups WHERE id = $1', [id]);
+  if (!row) return 'failed';
+  const result = await uploadOffsiteBackup(row.filename);
+  const status = result === 'uploaded' ? 'uploaded' : result === 'disabled' ? 'skipped' : 'failed';
+  const stored = await getSetting<{ lastError?: string | null }>('offsite');
+  const error = status === 'failed' ? stored?.lastError ?? '对象存储上传失败' : null;
+  await query('UPDATE instance_backups SET offsite_status = $2, offsite_error = $3 WHERE id = $1', [
+    id,
+    status,
+    error,
+  ]);
+  return status;
 }
 
 export async function pruneInstanceBackups(settings: InstanceBackupSettings): Promise<void> {
@@ -94,6 +134,7 @@ export async function pruneInstanceBackups(settings: InstanceBackupSettings): Pr
   );
   for (const row of rows.slice(settings.retentionCount)) {
     await deleteBackupFile(row.filename).catch(() => {});
+    await deleteOffsiteBackup(row.filename).catch(() => {});
     await query('DELETE FROM instance_backups WHERE id = $1', [row.id]);
   }
 }
@@ -104,8 +145,10 @@ export async function listInstanceBackups() {
     filename: string;
     size_bytes: string;
     status: string;
+    offsite_status: string;
+    offsite_error: string | null;
     created_at: Date;
-  }>('SELECT id, filename, size_bytes, status, created_at FROM instance_backups ORDER BY created_at DESC');
+  }>('SELECT id, filename, size_bytes, status, offsite_status, offsite_error, created_at FROM instance_backups ORDER BY created_at DESC');
 }
 
 export async function downloadInstanceBackup(filename: string): Promise<Buffer> {
@@ -116,6 +159,7 @@ export async function deleteInstanceBackup(id: string): Promise<void> {
   const row = await one<{ filename: string }>('SELECT filename FROM instance_backups WHERE id = $1', [id]);
   if (!row) return;
   await deleteBackupFile(row.filename).catch(() => {});
+  await deleteOffsiteBackup(row.filename).catch(() => {});
   await query('DELETE FROM instance_backups WHERE id = $1', [id]);
 }
 

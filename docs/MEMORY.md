@@ -618,3 +618,12 @@ apps/web/src/styles/tokens.css        设计 token
 - 备份/导出扩展名改为 `.3nb`；旧 `.nhbackup` 仍兼容。
 - 新增 `instance_backups` 迁移 009、`instance-backups.ts`（pg_dump + 加密附件），admin 9 个 API；概览卡片可设置自动频率/保留数。实例管理分四栏 tabs。
 - 语音输入依赖 Web Speech API（Chrome/Edge/Safari），OCR 依赖 tesseract(chi_sim+eng)+pdftotext，本机均可用。
+
+## 2026-11-10 · v0.1.27 对象存储附件
+
+- 附件 `storage_key` 是唯一路由依据：本机相对路径或 `s3:attachments/...`；外部链接固定 `/api/attachments/:id/content`。
+- `saveAttachment()` 返回实际 key，上传/导入/恢复/缩略图必须使用返回值，否则新附件记录会指向错误位置。
+- 启用迁移：先上传（同路径同大小跳过）再更新 DB；停用：先取回校验再更新 DB，全部成功后才切标志。迁移锁期间新上传留在本机，结束后补迁。
+- 有远端附件时禁止改 endpoint/bucket/prefix/access key/secret；必须停用取回。
+- 整站备份会把远端附件原始加密对象写入归档，避免备份缺附件。
+- 验证脚本 `tests/manual/object-storage-e2e.mjs`，使用 s3rver 与临时数据库。
