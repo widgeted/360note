@@ -74,6 +74,14 @@ export function htmlToMarkdown(html: string): string {
   if (!html || html === '<p></p>') return '';
   const withoutPlaceholders = new DOMParser().parseFromString(html, 'text/html');
   withoutPlaceholders.querySelectorAll('[data-upload-placeholder]').forEach((element) => element.remove());
+  // The editor renders captions in a figure for display, but Markdown stores
+  // them as the image title. Drop the display-only figcaption before Turndown.
+  withoutPlaceholders.querySelectorAll('figure').forEach((figure) => {
+    figure.querySelectorAll('figcaption').forEach((caption) => caption.remove());
+    const image = figure.querySelector('img');
+    if (image) figure.replaceWith(image);
+    else figure.remove();
+  });
   withoutPlaceholders.querySelectorAll('img[data-original-src]').forEach((image) => {
     const original = image.getAttribute('data-original-src');
     if (original) image.setAttribute('src', original);

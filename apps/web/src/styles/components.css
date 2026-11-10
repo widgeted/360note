@@ -36,7 +36,7 @@
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  transition: border-color var(--dur), box-shadow var(--dur), background var(--dur);
+  transition: border-color var(--dur), background var(--dur);
 }
 
 .identity-symbol:hover {
@@ -46,7 +46,6 @@
 
 .identity-symbol.selected {
   border-color: var(--blue);
-  box-shadow: 0 0 0 2px var(--blue-soft);
 }
 
 .identity-color {
@@ -68,7 +67,7 @@
   height: 28px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   background: var(--surface);
   cursor: pointer;
 }
@@ -209,7 +208,7 @@ a.btn {
   padding: 0 10px;
   font-size: 13px;
   gap: 5px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
 }
 
 .btn-lg {
@@ -233,7 +232,7 @@ a.btn {
   place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   color: var(--text-secondary);
   transition: background var(--dur), color var(--dur);
   flex: none;
@@ -268,7 +267,8 @@ a.btn {
 .icon-btn-lg {
   width: 36px;
   height: 36px;
-  border-radius: 9px;
+  /* Rounded to the adjacent 8px scale step rather than adding a one-off token. */
+  border-radius: var(--radius-sm);
 }
 
 /* Popovers & menus */
@@ -435,7 +435,7 @@ a.btn {
   padding: 2px;
   gap: 2px;
   background: var(--paper-200);
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
 }
 
 .segmented button {
@@ -785,7 +785,7 @@ a.btn {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   color: var(--text-soft);
   font-size: 13px;
   cursor: pointer;
@@ -1226,7 +1226,7 @@ a.btn {
   gap: 8px;
   padding: 9px 10px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   background: var(--surface);
 }
 
@@ -1688,7 +1688,7 @@ a.btn {
 .share-QR img {
   width: 76px;
   height: 76px;
-  border-radius: 4px;
+  border-radius: var(--radius-xxs);
   background: #fff;
 }
 
@@ -1708,7 +1708,7 @@ a.btn {
   font-size: max(13px, 0.9em);
   background: var(--paper-150);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xxs);
   padding: 1px 4px;
 }
 
@@ -2103,15 +2103,18 @@ a.btn {
   gap: 6px;
   height: 34px;
   padding: 0 11px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(20, 22, 20, 0.72);
   color: #f5f3ec;
   font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  flex: none;
   text-decoration: none;
 }
 
-.image-lightbox-bar button {
+.image-lightbox-bar .image-lightbox-close {
   width: 34px;
   padding: 0;
   justify-content: center;
@@ -2679,4 +2682,125 @@ a.btn {
 .pwa-update {
   top: calc(12px + env(safe-area-inset-top));
   bottom: auto;
+}
+
+/* Notification rows: unread state is a light green surface, not only font weight. */
+.notification-item {
+  margin: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.notification-item.is-unread {
+  background: var(--green-soft);
+  border-color: color-mix(in srgb, var(--green) 22%, transparent);
+}
+
+.notification-item .notification-summary {
+  align-items: flex-start;
+  white-space: normal;
+  padding: 8px 9px;
+  background: transparent;
+}
+
+.notification-item .notification-summary:hover {
+  background: color-mix(in srgb, var(--surface-hover) 55%, transparent);
+}
+
+.notification-icon {
+  margin-top: 2px;
+}
+
+.notification-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-title {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.notification-item.is-unread .notification-title {
+  font-weight: 680;
+}
+
+.notification-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.notification-item.is-expanded .notification-excerpt {
+  display: block;
+  overflow: visible;
+  white-space: pre-wrap;
+}
+
+.notification-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.notification-unread-dot {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.notification-chevron {
+  margin-top: 2px;
+  margin-left: auto;
+  color: var(--text-tertiary);
+  transition: transform var(--dur);
+}
+
+.notification-item.is-expanded .notification-chevron {
+  transform: rotate(180deg);
+}
+
+.notification-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 9px 8px;
+}
+
+.notification-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: auto;
+  min-height: 27px;
+  height: 27px;
+  padding: 0 9px;
+  border-radius: var(--radius-xs-sm);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.notification-action:hover {
+  background: color-mix(in srgb, var(--blue) 10%, transparent);
 }

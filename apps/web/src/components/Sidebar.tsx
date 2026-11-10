@@ -30,7 +30,7 @@ import { cn } from '../lib/utils';
 import { Avatar } from './Avatar';
 import { LogoLockup } from './Logo';
 import { Dropdown, MenuItem } from './Dropdown';
-import { Modal } from './Modal';
+import { ConfirmDialog, Modal } from './Modal';
 import { NotificationCenter } from './NotificationCenter';
 import { api } from '../lib/api';
 import { toast } from '../stores/toast';
@@ -113,7 +113,7 @@ export function Sidebar() {
   const workspaceId = useAppStore((state) => state.workspaceId);
   const folders = useAppStore((state) => state.folders);
   const tags = useAppStore((state) => state.tags);
-  const total = useAppStore((state) => state.total);
+  const allTotal = useAppStore((state) => state.allTotal);
   const filter = useAppStore((state) => state.filter);
   const folderId = useAppStore((state) => state.folderId);
   const tagId = useAppStore((state) => state.tagId);
@@ -133,6 +133,7 @@ export function Sidebar() {
   const [editingFolder, setEditingFolder] = useState<{ id?: string; name: string; parentId?: string | null } | null>(null);
   const [editingTag, setEditingTag] = useState<{ id?: string; name: string } | null>(null);
   const [deleteNode, setDeleteNode] = useState<{ kind: 'folder' | 'tag'; id: string; name: string } | null>(null);
+  const [clearDataOpen, setClearDataOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const currentWorkspace = workspaces.find((workspace) => workspace.id === workspaceId);
@@ -482,7 +483,7 @@ export function Sidebar() {
           <button type="button" className={cn('nav-item', !settingsActive && filter === 'all' && 'active')} aria-current={!settingsActive && filter === 'all' ? 'page' : undefined} onClick={() => void selectFilter('all')}>
             <Archive size={15} />
             <span className="nav-label">{t('全部笔记')}</span>
-            <span className="nav-count">{total}</span>
+            <span className="nav-count">{allTotal}</span>
           </button>
           <button type="button" className={cn('nav-item', !settingsActive && filter === 'recent' && 'active')} aria-current={!settingsActive && filter === 'recent' ? 'page' : undefined} onClick={() => void selectFilter('recent')}>
             <Clock3 size={15} />
@@ -663,11 +664,9 @@ export function Sidebar() {
                 <MenuItem
                   danger
                   icon={<Trash2 size={14} />}
-                  onClick={async () => {
+                  onClick={() => {
                     close();
-                    if (!window.confirm(t('退出并清除本机数据会删除本机离线缓存和未同步草稿，且无法恢复。确定继续？'))) return;
-                    await logout({ clearLocalData: true });
-                    navigate('/login');
+                    setClearDataOpen(true);
                   }}
                 >
                   {t('退出并清除本机数据')}
@@ -700,6 +699,20 @@ export function Sidebar() {
       >
         <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{deleteNode?.name}</p>
       </Modal>
+
+      <ConfirmDialog
+        open={clearDataOpen}
+        onClose={() => setClearDataOpen(false)}
+        onConfirm={async () => {
+          setClearDataOpen(false);
+          await logout({ clearLocalData: true });
+          navigate('/login');
+        }}
+        title={t('退出并清除本机数据')}
+        description={t('退出并清除本机数据会删除本机离线缓存和未同步草稿，且无法恢复。确定继续？')}
+        confirmLabel={t('退出并清除')}
+        danger
+      />
     </>
   );
 }

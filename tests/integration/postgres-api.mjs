@@ -155,6 +155,17 @@ async function main() {
   const crossRead = await req(`/api/notes/${noteId}`, { cookie: b.cookie });
   assert.ok([403, 404].includes(crossRead.status), `cross-workspace read returned ${crossRead.status}`);
 
+  const allList = await req(`/api/notes?workspaceId=${spaceA.id}&filter=all`, { cookie: a.cookie });
+  assert.equal(allList.status, 200, allList.text);
+  const allTotal = allList.json.allTotal;
+  assert.ok(allTotal >= 2, `allTotal should include every active note: ${allList.text}`);
+  const favoritePatch = await req(`/api/notes/${noteId}`, { method: 'PATCH', cookie: a.cookie, body: { isFavorite: true } });
+  assert.equal(favoritePatch.status, 200, favoritePatch.text);
+  const favorites = await req(`/api/notes?workspaceId=${spaceA.id}&filter=favorites`, { cookie: a.cookie });
+  assert.equal(favorites.status, 200, favorites.text);
+  assert.equal(favorites.json.allTotal, allTotal, 'filtered list must keep the independent all-notes total');
+  console.log('PASS  all-notes count is independent from the active filter');
+
   const backupStart = await req(`/api/workspaces/${spaceA.id}/backups`, { method: 'POST', cookie: a.cookie });
   assert.equal(backupStart.status, 200, backupStart.text);
   let job;

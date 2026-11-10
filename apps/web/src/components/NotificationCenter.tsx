@@ -1,10 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, ChevronRight, MessageCircle, PencilLine, ShieldAlert, UserPlus } from 'lucide-react';
+import { Bell, CheckCheck, ChevronDown, ChevronRight, MessageCircle, PencilLine, ShieldAlert, UserPlus } from 'lucide-react';
 import type { Notification } from '@360note/shared';
 import { api } from '../lib/api';
 import { useT } from '../lib/i18n';
-import { formatRelativeShort } from '../lib/utils';
+import { cn, formatRelativeShort } from '../lib/utils';
 import { Dropdown } from './Dropdown';
 import { Modal } from './Modal';
 
@@ -25,6 +25,9 @@ export function NotificationCenter() {
   const [allTotal, setAllTotal] = useState(0);
   const [allOffset, setAllOffset] = useState(0);
   const [allLoading, setAllLoading] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   async function load() {
     try {
@@ -53,10 +56,34 @@ export function NotificationCenter() {
     }
   }
 
+  async function markRead(notification: Notification) {
+    if (notification.readAt) return;
+    const readAt = new Date().toISOString();
+    setNotifications((current) => current.map((entry) => (entry.id === notification.id ? { ...entry, readAt } : entry)));
+    setAllNotifications((current) => current.map((entry) => (entry.id === notification.id ? { ...entry, readAt } : entry)));
+    setUnread((current) => Math.max(0, current - 1));
+    await api.post(`/api/notifications/${notification.id}/read`).catch(() => { void loadRef.current(); });
+  }
+
+  function toggleNotification(notification: Notification) {
+    if (!notification.readAt) void markRead(notification);
+    setExpandedId((current) => (current === notification.id ? null : notification.id));
+  }
+
+  function actionLabel(notification: Notification): string {
+    return notification.type === 'share_edit'
+      ? t('查看修改')
+      : notification.type === 'comment'
+        ? t('查看评论')
+        : notification.type === 'security'
+          ? t('查看安全设置')
+          : t('查看');
+  }
+
   useEffect(() => {
-    void load();
-    const interval = window.setInterval(() => void load(), 60_000);
-    const onFocus = () => void load();
+    void loadRef.current();
+    const interval = window.setInterval(() => void loadRef.current(), 60_000);
+    const onFocus = () => void loadRef.current();
     window.addEventListener('focus', onFocus);
     return () => {
       window.clearInterval(interval);
@@ -75,11 +102,7 @@ export function NotificationCenter() {
   }
 
   async function open(notification: Notification) {
-    if (!notification.readAt) {
-      await api.post(`/api/notifications/${notification.id}/read`).catch(() => {});
-      await load();
-      if (showAll) await loadAll(allOffset);
-    }
+    await markRead(notification);
     if (notification.link) {
       let link = notification.link;
       // Older notifications were stored before deep links existed. Infer the
@@ -95,56 +118,50 @@ export function NotificationCenter() {
   }
 
   function renderNotification(notification: Notification, close?: () => void) {
+    const expanded = expandedId === notification.id;
+    const unread = !notification.readAt;
+    const body = notification.body?.trim() ?? '';
+    const preview = body.length > 96 ? `${body.slice(0, 96)}…` : body;
     return (
-      <button
+      <div
         key={notification.id}
-        type="button"
-        className="menu-item"
-        onClick={() => {
-          void open(notification);
-          close?.();
-        }}
-        style={{ alignItems: 'flex-start', paddingTop: 8, paddingBottom: 8 }}
+        className={cn('notification-item', unread && 'is-unread', expanded && 'is-expanded')}
       >
-        <span style={{ color: notification.readAt ? 'var(--text-tertiary)' : 'var(--blue)', marginTop: 1 }}>
-          {notificationIcon(notification)}
-        </span>
-        <span style={{ minWidth: 0, whiteSpace: 'normal' }}>
-          <span style={{ display: 'block', fontWeight: notification.readAt ? 450 : 600, color: 'var(--text)', lineHeight: 1.4 }}>
-            {notification.title}
+        <button
+          type="button"
+          className="menu-item notification-summary"
+          onClick={() => toggleNotification(notification)}
+          aria-expanded={expanded}
+        >
+          <span className="notification-icon" style={{ color: unread ? 'var(--blue)' : 'var(--text-tertiary)' }}>
+            {notificationIcon(notification)}
           </span>
-          {notification.body && (
-            <span style={{ display: 'block', marginTop: 2, fontSize: 13, color: 'var(--text-tertiary)', lineHeight: 1.45 }}>
-              {notification.body}
+          <span className="notification-main">
+            <span className="notification-title">{notification.title}</span>
+            {body && <span className="notification-excerpt">{expanded ? body : preview}</span>}
+            <span className="notification-meta">
+              {formatRelativeShort(notification.createdAt)}
+              {unread && <span className="notification-unread-dot">{t('未读')}</span>}
             </span>
-          )}
-          <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: 'var(--text-tertiary)' }}>
-            {formatRelativeShort(notification.createdAt)}
           </span>
-          {notification.link && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-                marginTop: 5,
-                fontSize: 13,
-                fontWeight: 560,
-                color: 'var(--blue)',
+          <ChevronDown size={13} className="notification-chevron" aria-hidden="true" />
+        </button>
+        {expanded && notification.link && (
+          <div className="notification-actions">
+            <button
+              type="button"
+              className="menu-item notification-action"
+              onClick={() => {
+                void open(notification);
+                close?.();
               }}
             >
-              {notification.type === 'share_edit'
-                ? t('查看修改')
-                : notification.type === 'comment'
-                  ? t('查看评论')
-                  : notification.type === 'security'
-                    ? t('查看安全设置')
-                    : t('查看')}
+              {actionLabel(notification)}
               <ChevronRight size={12} />
-            </span>
-          )}
-        </span>
-      </button>
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 

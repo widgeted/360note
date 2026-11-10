@@ -23,6 +23,7 @@ import { api } from '../lib/api';
 import { cn, formatBytes, formatFullDate, formatRelativeShort } from '../lib/utils';
 import { renderMarkdown } from '../lib/markdown';
 import { Avatar } from './Avatar';
+import { ConfirmDialog } from './Modal';
 import { toast } from '../stores/toast';
 
 const REASON_LABELS: Record<string, string> = {
@@ -61,6 +62,7 @@ export function ContextPanel() {
   const [versionDetail, setVersionDetail] = useState<NoteVersionDetail | null>(null);
   const [loadingVersionId, setLoadingVersionId] = useState<number | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
+  const [deleteCommentTarget, setDeleteCommentTarget] = useState<Comment | null>(null);
   const [tagOpen, setTagOpen] = useState(false);
   const [tagQuery, setTagQuery] = useState('');
   const [addTagLoading, setAddTagLoading] = useState(false);
@@ -205,11 +207,12 @@ export function ContextPanel() {
     }
   }
 
-  async function deleteComment(comment: Comment) {
-    if (!window.confirm(t('删除这条评论？'))) return;
+  async function deleteComment() {
+    if (!deleteCommentTarget) return;
     try {
-      await api.delete(`/api/comments/${comment.id}`);
-      setComments((current) => current.filter((entry) => entry.id !== comment.id));
+      await api.delete(`/api/comments/${deleteCommentTarget.id}`);
+      setComments((current) => current.filter((entry) => entry.id !== deleteCommentTarget.id));
+      setDeleteCommentTarget(null);
       toast('success', t('评论已删除'));
     } catch (error) {
       toast('error', t('删除评论失败'), (error as Error).message);
@@ -453,7 +456,7 @@ export function ContextPanel() {
                             <button
                               type="button"
                               className="footbar-button"
-                              onClick={() => void deleteComment(comment)}
+                              onClick={() => setDeleteCommentTarget(comment)}
                               title={t('删除评论')}
                               aria-label={t('删除评论')}
                             >
@@ -544,6 +547,16 @@ export function ContextPanel() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteCommentTarget)}
+        onClose={() => setDeleteCommentTarget(null)}
+        onConfirm={() => void deleteComment()}
+        title={t('删除评论')}
+        description={t('删除这条评论？')}
+        confirmLabel={t('删除')}
+        danger
+      />
     </aside>
   );
 }

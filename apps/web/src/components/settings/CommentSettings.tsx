@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { formatFullDate } from '../../lib/utils';
 import { toast } from '../../stores/toast';
+import { ConfirmDialog } from '../Modal';
 
 interface ManagedComment {
   id: string;
@@ -25,6 +26,7 @@ export default function CommentSettings() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ManagedComment | null>(null);
 
   async function load(nextOffset: number) {
     setLoading(true);
@@ -46,10 +48,11 @@ export default function CommentSettings() {
     void load(0);
   }, []);
 
-  async function remove(comment: ManagedComment) {
-    if (!window.confirm(t('删除这条评论？'))) return;
+  async function remove() {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/api/comments/${comment.id}`);
+      await api.delete(`/api/comments/${deleteTarget.id}`);
+      setDeleteTarget(null);
       await load(offset);
       toast('success', t('评论已删除'));
     } catch (error) {
@@ -90,7 +93,7 @@ export default function CommentSettings() {
                   <td className="setting-note">{formatFullDate(comment.createdAt)}</td>
                   <td>
                     {comment.canDelete ? (
-                      <button type="button" className="icon-btn icon-btn-sm" onClick={() => void remove(comment)} title={t('删除评论')} aria-label={t('删除评论')}>
+                      <button type="button" className="icon-btn icon-btn-sm" onClick={() => setDeleteTarget(comment)} title={t('删除评论')} aria-label={t('删除评论')}>
                         <Trash2 size={13} />
                       </button>
                     ) : <span className="setting-note">—</span>}
@@ -106,6 +109,15 @@ export default function CommentSettings() {
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => void load(offset + 50)} disabled={loading || offset + 50 >= total}>{t('下一页')}</button>
         </div>
       </section>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void remove()}
+        title={t('删除评论')}
+        description={t('删除这条评论？')}
+        confirmLabel={t('删除')}
+        danger
+      />
     </>
   );
 }

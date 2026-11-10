@@ -60,21 +60,11 @@ export function Dropdown({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
     };
-    const onScroll = (event: Event) => {
-      // Scrolling inside the panel (wheel or scrollbar) must never close it.
-      const target = event.target as Node | null;
-      if (target && panelRef.current?.contains(target)) return;
-      setOpen(false);
-    };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onScroll);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onScroll);
       window.cancelAnimationFrame(frame);
     };
   }, [open]);

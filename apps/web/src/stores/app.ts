@@ -33,6 +33,7 @@ interface AppState {
   initializedWorkspace: string | null;
   notes: NoteSummary[];
   total: number;
+  allTotal: number;
   folders: Folder[];
   tags: Tag[];
   note: Note | null;
@@ -121,6 +122,7 @@ async function persistSnapshot(state: AppState): Promise<void> {
     folders: state.folders,
     tags: state.tags,
     total: state.total,
+    allTotal: state.allTotal,
   }).catch(() => {});
 }
 
@@ -187,6 +189,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   initializedWorkspace: null,
   notes: [],
   total: 0,
+  allTotal: 0,
   folders: [],
   tags: [],
   note: null,
@@ -242,6 +245,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         folders: cached.folders,
         tags: cached.tags,
         total: cached.total,
+        allTotal: cached.allTotal ?? cached.total,
         loadingList: false,
       });
     }
@@ -251,7 +255,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const [foldersResponse, tagsResponse, notesResponse] = await Promise.all([
         api.get<{ folders: Folder[] }>(`/api/folders?workspaceId=${workspaceId}`),
         api.get<{ tags: Tag[] }>(`/api/tags?workspaceId=${workspaceId}`),
-        api.get<{ notes: NoteSummary[]; total: number }>(`/api/notes?workspaceId=${workspaceId}&filter=all&sort=updated&limit=100`),
+        api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(`/api/notes?workspaceId=${workspaceId}&filter=all&sort=updated&limit=100`),
       ]);
       const notes = mergeLocalNotes(notesResponse.notes, get().notes, 'all', null, null, '');
       set({
@@ -259,6 +263,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         tags: tagsResponse.tags,
         notes,
         total: notesResponse.total + (notes.length - notesResponse.notes.length),
+        allTotal: (notesResponse.allTotal ?? notesResponse.total) + (notes.length - notesResponse.notes.length),
         loadingList: false,
         initializedWorkspace: workspaceId,
         offline: false,
@@ -296,9 +301,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!workspaceId) return;
     if (!options?.silent) set({ loadingList: !options?.append });
     try {
-      let response: { notes: NoteSummary[]; total: number };
+      let response: { notes: NoteSummary[]; total: number; allTotal: number };
       if (query.trim()) {
-        response = await api.get<{ notes: NoteSummary[]; total: number }>(
+        response = await api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(
           `/api/search?workspaceId=${workspaceId}&q=${encodeURIComponent(query.trim())}&limit=100`,
         );
       } else {
@@ -310,7 +315,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
         if (filter === 'folder' && folderId) params.set('folderId', folderId);
         if (filter === 'tag' && tagId) params.set('tagId', tagId);
-        response = await api.get<{ notes: NoteSummary[]; total: number }>(`/api/notes?${params.toString()}`);
+        response = await api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(`/api/notes?${params.toString()}`);
       }
       let serverNotes = response.notes;
       if (options?.append) {
@@ -322,6 +327,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         notes: merged,
         total: response.total + (merged.length - response.notes.length),
+        allTotal: (response.allTotal ?? response.total) + (filter === 'all' && !query.trim() ? Math.max(0, merged.length - response.notes.length) : 0),
         loadingList: false,
         offline: false,
         serverOffset: offset,
@@ -332,6 +338,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         folders: get().folders,
         tags: get().tags,
         total: response.total,
+        allTotal: get().allTotal,
       });
     } catch (error) {
       if (isNetworkError(error) || !navigator.onLine) {
@@ -363,16 +370,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!workspaceId || !hasMore || loadingList) return;
     set({ loadingList: true });
     try {
-      let response: { notes: NoteSummary[]; total: number };
+      let response: { notes: NoteSummary[]; total: number; allTotal: number };
       if (query.trim()) {
-        response = await api.get<{ notes: NoteSummary[]; total: number }>(
+        response = await api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(
           `/api/search?workspaceId=${workspaceId}&q=${encodeURIComponent(query.trim())}&limit=60&offset=${serverOffset}`,
         );
       } else {
         const params = new URLSearchParams({ workspaceId, filter, sort, limit: '100', offset: String(serverOffset) });
         if (filter === 'folder' && folderId) params.set('folderId', folderId);
         if (filter === 'tag' && tagId) params.set('tagId', tagId);
-        response = await api.get<{ notes: NoteSummary[]; total: number }>(`/api/notes?${params.toString()}`);
+        response = await api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(`/api/notes?${params.toString()}`);
       }
       const existing = new Set(get().notes.map((note) => note.id));
       const appended = response.notes.filter((note) => !existing.has(note.id));
@@ -381,6 +388,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         notes,
         total: response.total + Math.max(0, notes.length - response.notes.length),
+        allTotal: response.allTotal ?? get().allTotal,
         loadingList: false,
         serverOffset: offset,
         hasMore: offset < response.total,
@@ -390,6 +398,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         folders: get().folders,
         tags: get().tags,
         total: response.total,
+        allTotal: get().allTotal,
       });
     } catch (error) {
       set({ loadingList: false, listError: (error as Error).message });
@@ -530,6 +539,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         note,
         notes: upsertSummary(get().notes, note),
+        allTotal: get().allTotal + 1,
         query: '',
         syncState: 'saved',
         lastSavedAt: Date.now(),
@@ -579,6 +589,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         note,
         notes: [noteSummary(note), ...get().notes],
+        allTotal: get().allTotal + 1,
         filter: 'all',
         folderId: null,
         tagId: null,
@@ -833,7 +844,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { workspaceId } = get();
     if (!workspaceId) return;
     await api.post('/api/notes/empty-trash', { workspaceId });
-    set({ notes: [], total: 0 });
+    set({ notes: [], total: 0, allTotal: 0 });
     await persistSnapshot(get());
     await get().refreshAll();
   },

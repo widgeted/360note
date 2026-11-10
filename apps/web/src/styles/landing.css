@@ -207,6 +207,9 @@
   background: var(--surface);
 }
 
+/* Decorative product preview: these mock-UI labels intentionally use <13px
+   type to preserve the screenshot-like scale. They are preview placeholders,
+   not readable page copy; do not raise them to the 13px UI minimum. */
 .landing-mock-sidebar {
   padding: 12px 9px;
   border-right: 1px solid var(--line-soft);
@@ -249,7 +252,7 @@
   place-items: center;
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-xxs);
   background: var(--blue-soft);
   color: var(--blue-strong);
   font-size: 9px;
@@ -311,7 +314,7 @@
 .landing-mock-tags span {
   font-size: 10px;
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xxs);
   background: var(--surface);
   border: 1px solid var(--line-soft);
   color: var(--text-tertiary);

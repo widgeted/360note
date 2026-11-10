@@ -2,9 +2,37 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+
+const versionFiles = [
+  'package.json',
+  'public/favicon.svg',
+  'public/favicon.ico',
+  'public/icons/apple-touch-icon.png',
+  'public/icons/apple-touch-icon-152.png',
+  'public/icons/apple-touch-icon-167.png',
+];
+const assetVersion = crypto
+  .createHash('sha256')
+  .update(versionFiles.map((file) => {
+    try {
+      return fs.readFileSync(path.resolve(__dirname, file));
+    } catch {
+      return file;
+    }
+  }).join('\n'))
+  .digest('hex')
+  .slice(0, 10);
 
 export default defineConfig({
   plugins: [
+    {
+      name: 'asset-version',
+      transformIndexHtml(html) {
+        return html.replaceAll('__ASSET_VERSION__', assetVersion);
+      },
+    },
     react(),
     VitePWA({
       registerType: 'prompt',
@@ -14,7 +42,7 @@ export default defineConfig({
         short_name: '360note',
         description: '360note / 360笔记 — a calm, local-first notebook for ideas and knowledge.',
         theme_color: '#17865b',
-        background_color: '#f6f4ef',
+        background_color: '#F8F6F1',
         id: '/',
         lang: 'zh-CN',
         dir: 'ltr',

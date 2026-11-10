@@ -64,13 +64,13 @@ export function ImageLightbox() {
             <PencilLine size={14} /> {translate('图片说明')}
           </button>
         )}
-        <button type="button" onClick={() => setImage(null)} aria-label={translate('关闭预览')}>
+        <button type="button" className="image-lightbox-close" onClick={() => setImage(null)} aria-label={translate('关闭预览')}>
           <X size={18} />
         </button>
       </div>
       <img
         src={image.src}
-        alt={image.alt ?? ''}
+        alt={image.alt?.trim() ? image.alt : translate('图片预览')}
         onClick={(event) => event.stopPropagation()}
       />
     </div>,

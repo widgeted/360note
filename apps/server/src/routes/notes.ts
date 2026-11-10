@@ -81,7 +81,7 @@ export default async function noteRoutes(app: FastifyInstance) {
         limit: params.limit,
         offset: params.offset,
       });
-      return { notes: result.notes, attachments: [], total: result.total, tookMs: Date.now() - started };
+      return { notes: result.notes, attachments: [], total: result.total, allTotal: result.allTotal, tookMs: Date.now() - started };
     }
     await requireWorkspace(auth.user.id, params.workspaceId, 'read');
     const q = params.q.trim();
@@ -142,7 +142,13 @@ export default async function noteRoutes(app: FastifyInstance) {
        ORDER BY a.created_at DESC LIMIT 12`,
       [params.workspaceId, like],
     );
+    const allCount = await one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM notes n
+       WHERE n.workspace_id = $1 AND n.deleted_at IS NULL AND n.trashed_at IS NULL`,
+      [params.workspaceId],
+    );
     return {
+      allTotal: Number(allCount?.count ?? 0),
       notes: rows.map((row) => ({
         ...mapSummary(row),
         snippet: snippetFor((row as unknown as { content_md: string }).content_md, q),

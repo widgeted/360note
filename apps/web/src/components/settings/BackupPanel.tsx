@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArchiveRestore,
-  Check,
   CloudDownload,
   Download,
   HardDrive,
@@ -18,7 +17,7 @@ import { useAppStore } from '../../stores/app';
 import { getLocale, useT } from '../../lib/i18n';
 import { downloadBlob } from '../../lib/api';
 import { formatBytes, formatFullDate, formatRelativeShort, sleep } from '../../lib/utils';
-import { Modal } from '../Modal';
+import { ConfirmDialog, Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 
 interface RestorePreview {
@@ -41,7 +40,7 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
   const [restoring, setRestoring] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState(0);
-  const [revokeId, setRevokeId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BackupInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retention, setRetention] = useState<{ retentionDays: number; autoKeep: number } | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -100,15 +99,12 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
     }
   }
 
-  async function remove(backup: BackupInfo) {
-    if (revokeId !== backup.id) {
-      setRevokeId(backup.id);
-      return;
-    }
+  async function remove() {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/api/backups/${backup.id}?workspaceId=${workspaceId}`);
-      setBackups((current) => current.filter((entry) => entry.id !== backup.id));
-      setRevokeId(null);
+      await api.delete(`/api/backups/${deleteTarget.id}?workspaceId=${workspaceId}`);
+      setBackups((current) => current.filter((entry) => entry.id !== deleteTarget.id));
+      setDeleteTarget(null);
       toast('success', t('备份已删除'));
     } catch (error) {
       toast('error', t('删除失败'), (error as Error).message);
@@ -235,12 +231,11 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
               <button
                 type="button"
                 className="icon-btn icon-btn-sm"
-                onClick={() => void remove(backup)}
-                title={revokeId === backup.id ? t('再次点击确认') : t('删除')}
+                onClick={() => setDeleteTarget(backup)}
+                title={t('删除')}
                 aria-label={t('删除')}
-                style={revokeId === backup.id ? { background: 'var(--red-soft)', color: 'var(--red)' } : undefined}
               >
-                {revokeId === backup.id ? <Check size={14} /> : <Trash2 size={14} />}
+                <Trash2 size={14} />
               </button>
             </div>
           ))}
@@ -310,6 +305,16 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void remove()}
+        title={t('删除备份')}
+        description={deleteTarget ? t('删除备份“{name}”？此操作无法撤销。', { name: deleteTarget.filename }) : undefined}
+        confirmLabel={t('删除')}
+        danger
+      />
     </div>
   );
 }

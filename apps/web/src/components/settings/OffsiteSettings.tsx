@@ -6,6 +6,7 @@ import { useT } from '../../lib/i18n';
 import { toast } from '../../stores/toast';
 import { formatBytes, formatRelativeShort } from '../../lib/utils';
 import { LoadFailure } from '../LoadFailure';
+import { ConfirmDialog } from '../Modal';
 
 interface OffsiteConfig {
   enabled: boolean;
@@ -66,6 +67,7 @@ export function OffsiteSettings() {
   const [objectsLoading, setObjectsLoading] = useState(false);
   const [verifyState, setVerifyState] = useState<Record<string, { ok: boolean; text: string }>>({});
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [restoreKey, setRestoreKey] = useState<string | null>(null);
   const [secret, setSecret] = useState('');
   const [purgeRemote, setPurgeRemote] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -158,7 +160,6 @@ export function OffsiteSettings() {
   }
 
   async function restoreObject(key: string) {
-    if (!window.confirm(t('把这份工作区备份恢复为副本？不会覆盖当前内容。'))) return;
     setRestoring(key);
     try {
       const response = await api.post<{ jobId: string }>('/api/admin/offsite/objects/restore', { key, mode: 'merge' });
@@ -491,7 +492,7 @@ export function OffsiteSettings() {
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => void verifyObject(object.key)}>{t('校验')}</button>
                       <a className="icon-btn icon-btn-sm" href={`/api/admin/offsite/objects/download?key=${encodeURIComponent(object.key)}`} title={t('下载')} aria-label={t('下载')}><Download size={13} /></a>
                       {object.kind === 'workspace-backup' && (
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void restoreObject(object.key)} disabled={restoring === object.key}>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRestoreKey(object.key)} disabled={restoring === object.key}>
                           {restoring === object.key ? <span className="spinner" /> : null} {t('恢复为副本')}
                         </button>
                       )}
@@ -505,6 +506,18 @@ export function OffsiteSettings() {
         </div>
         <p className="setting-note" style={{ marginTop: 8 }}>{t('整站备份只支持校验和下载，数据库级恢复请按运维手册执行。')}</p>
       </div>
+      <ConfirmDialog
+        open={Boolean(restoreKey)}
+        onClose={() => setRestoreKey(null)}
+        onConfirm={() => {
+          const key = restoreKey;
+          setRestoreKey(null);
+          if (key) void restoreObject(key);
+        }}
+        title={t('从对象存储恢复')}
+        description={t('把这份工作区备份恢复为副本？不会覆盖当前内容。')}
+        confirmLabel={t('恢复为副本')}
+      />
     </section>
   );
 }

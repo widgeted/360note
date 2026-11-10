@@ -702,6 +702,16 @@ apps/web/src/styles/tokens.css        设计 token
 - 空间菜单展开右对齐（align=end, width=trigger），收起左对齐（align=start, auto）。
 - 设计文档已从“全宽触发器统一左对齐”改为上述规则。
 
+## 2026-11-10 · v0.1.41 通知/计数/图片说明收尾
+
+- 通知：未读淡绿背景 + 未读徽标；默认摘要，点击展开完整内容并标记已读；操作按钮独立，支持键盘。
+- 全部笔记：后端 `/api/notes` 与 `/api/search` 返回独立 `allTotal`；前端 store 持久化 `allTotal`，切换筛选不再变化；集成测试断言通过。
+- 图片说明：编辑器 Image 节点用 figure/figcaption 显示；分享页与打印稿居中；Turndown 前移除 display-only figcaption 以保持 Markdown 干净。
+- 图片预览：仅关闭按钮保留 34px 图标样式，图片说明/查看原图共用行内按钮。
+- 落地页/关于页文案迁移到 en 翻译表；AppPage 模板改用 t()；DESIGN_SYSTEM 新增 §6 公开落地页主规则并删除“不要营销首页”。
+- 其余：ConfirmDialog 全量替换 window.confirm、Dropdown 仅 pointerdown 关闭、主题色/圆角/token/缓存版本/维护页/导入键盘/头像 ariaLabel 收尾。
+- 验证：typecheck、server 13、web 4、build、postgres-api（含 allTotal）、backup 相关测试通过；生产已部署 0.1.41。通知/计数/图片说明 Playwright 通过：未读浅绿背景、摘要折叠、点击展开并已读、全部笔记 11 保持稳定、编辑器 caption 可见、分享/打印 caption 居中、图片预览按钮 130×34 横向。管理员 6 个页签 Playwright 仍通过；测试会话均注销。
+
 ## 2026-11-10 · v0.1.40 yauzl 流式恢复与发布收尾
 
 - 备份预览/合并/替换恢复改用 yauzl：安全打开 ZIP、枚举条目时检查条目数/单文件/总大小/压缩比/路径/重复项；附件先流式复制到临时文件，再由 `saveAttachmentFromFile` 流式加密写入本地或 S3。

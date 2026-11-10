@@ -402,7 +402,7 @@
   }
 }
 
-/* Print: hide all app chrome, keep a clean article. */
+/* Print: hide all app chrome, keep a clean article. Serif print typography is allowed; do not force sans-serif here. */
 @media print {
   .sidebar,
   .list-pane,

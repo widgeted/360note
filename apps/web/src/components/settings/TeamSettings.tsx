@@ -21,7 +21,7 @@ import { getLocale, useT } from '../../lib/i18n';
 import { auditActionLabel } from '../../lib/audit';
 import { copyText, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { Avatar } from '../Avatar';
-import { Modal } from '../Modal';
+import { ConfirmDialog, Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 import { LoadFailure } from '../LoadFailure';
 
@@ -52,6 +52,7 @@ export default function TeamSettings() {
   const [inviting, setInviting] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [removeMember, setRemoveMember] = useState<WorkspaceMember | null>(null);
+  const [ownerTarget, setOwnerTarget] = useState<WorkspaceMember | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createKind, setCreateKind] = useState<'personal' | 'team'>('team');
@@ -148,10 +149,14 @@ export default function TeamSettings() {
   }
 
   async function changeRole(member: WorkspaceMember, role: string) {
-    if (role === 'owner' && !window.confirm(t('确定把空间所有权转移给 {name}？你将成为管理员。', { name: member.displayName }))) {
-      await loadMembers();
+    if (role === 'owner') {
+      setOwnerTarget(member);
       return;
     }
+    await applyRole(member, role);
+  }
+
+  async function applyRole(member: WorkspaceMember, role: string) {
     try {
       await api.patch(`/api/workspaces/${workspaceId}/members/${member.userId}`, { role });
       await loadMembers();
@@ -614,6 +619,20 @@ export default function TeamSettings() {
       >
         <p style={{ fontSize: 13 }}>{workspace?.name}</p>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(ownerTarget)}
+        onClose={() => setOwnerTarget(null)}
+        onConfirm={() => {
+          const member = ownerTarget;
+          setOwnerTarget(null);
+          if (member) void applyRole(member, 'owner');
+        }}
+        title={t('转移空间所有权')}
+        description={ownerTarget ? t('确定把空间所有权转移给 {name}？你将成为管理员。', { name: ownerTarget.displayName }) : undefined}
+        confirmLabel={t('转移所有权')}
+        danger
+      />
     </>
   );
 }

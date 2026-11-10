@@ -171,7 +171,7 @@ export default function AccountSettings() {
           <span className="settings-section-desc">{t('显示在评论、分享与团队中')}</span>
         </div>
         <div className="profile-layout">
-          <Avatar name={displayName || user?.displayName || 'N'} color={user?.avatarColor} size="xl" />
+          <Avatar name={displayName || user?.displayName || 'N'} color={user?.avatarColor} size="xl" ariaLabel={t('头像')} />
           <div className="profile-fields">
             <div className="field">
               <label>{t('显示名称')}</label>

@@ -7,6 +7,7 @@ import { auditActionLabel } from '../../lib/audit';
 import { cn, formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { toast } from '../../stores/toast';
 import { Dropdown, MenuItem } from '../Dropdown';
+import { ConfirmDialog } from '../Modal';
 import { OffsiteSettings } from './OffsiteSettings';
 import { useAuthStore } from '../../stores/auth';
 import { LoadFailure } from '../LoadFailure';
@@ -88,6 +89,7 @@ export default function AdminSettings() {
   const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
   const [drillBusy, setDrillBusy] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [deleteComment, setDeleteComment] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime; attachmentStorage: AttachmentStorageStats }>('/api/admin/stats').then((res) => {
@@ -247,10 +249,11 @@ export default function AdminSettings() {
     }
   }
 
-  async function deletePublicComment(id: string) {
-    if (!window.confirm(t('删除这条公开评论？'))) return;
+  async function deletePublicComment() {
+    if (!deleteComment) return;
     try {
-      await api.delete(`/api/admin/comments/${id}`);
+      await api.delete(`/api/admin/comments/${deleteComment}`);
+      setDeleteComment(null);
       await loadPublicComments(commentsOffset);
       toast('success', t('评论已删除'));
     } catch (error) {
@@ -631,7 +634,7 @@ export default function AdminSettings() {
                   </td>
                   <td><div className="admin-comment-note">{comment.noteTitle || t('未命名笔记')}</div></td>
                   <td className="setting-note">{formatFullDate(comment.createdAt)}</td>
-                  <td><button type="button" className="icon-btn icon-btn-sm" onClick={() => void deletePublicComment(comment.id)} title={t('删除评论')} aria-label={t('删除评论')}><Trash2 size={13} /></button></td>
+                  <td><button type="button" className="icon-btn icon-btn-sm" onClick={() => setDeleteComment(comment.id)} title={t('删除评论')} aria-label={t('删除评论')}><Trash2 size={13} /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -677,6 +680,16 @@ export default function AdminSettings() {
           </button>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(deleteComment)}
+        onClose={() => setDeleteComment(null)}
+        onConfirm={() => void deletePublicComment()}
+        title={t('删除公开评论')}
+        description={t('删除这条公开评论？')}
+        confirmLabel={t('删除')}
+        danger
+      />
     </>
   );
 }

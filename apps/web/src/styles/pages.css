@@ -317,7 +317,7 @@
 .public-comment-form input,
 .public-comment-form textarea {
   border: 1px solid var(--line-strong);
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   background: var(--paper-50);
   padding: 9px 10px;
   font-size: 13px;
@@ -772,7 +772,7 @@
   max-width: 100%;
   padding: 7px 9px;
   margin-left: -9px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs-sm);
   color: var(--text-secondary);
   font-size: 13px;
   text-decoration: none;
@@ -985,4 +985,15 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-tertiary);
+}
+
+/* Share/public articles and printed copies center image captions. */
+.public-body .prose-figure figcaption {
+  text-align: center;
+}
+
+@media print {
+  .prose-figure figcaption {
+    text-align: center;
+  }
 }

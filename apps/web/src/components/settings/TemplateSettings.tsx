@@ -4,7 +4,7 @@ import type { CustomTemplate } from '../../lib/templates';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { toast } from '../../stores/toast';
-import { Modal } from '../Modal';
+import { ConfirmDialog, Modal } from '../Modal';
 import { formatRelativeShort } from '../../lib/utils';
 
 const VARIABLES = ['{{date}}', '{{time}}', '{{datetime}}', '{{title}}', '{{user}}', '{{workspace}}', '{{folder}}'];
@@ -24,6 +24,7 @@ export default function TemplateSettings() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CustomTemplate | null>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
   async function load() {
@@ -85,10 +86,11 @@ export default function TemplateSettings() {
     }
   }
 
-  async function remove(template: CustomTemplate) {
-    if (!window.confirm(t('删除模板“{name}”？', { name: template.name }))) return;
+  async function remove() {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/api/templates/${template.id}`);
+      await api.delete(`/api/templates/${deleteTarget.id}`);
+      setDeleteTarget(null);
       await load();
       toast('success', t('模板已删除'));
     } catch (error) {
@@ -134,7 +136,7 @@ export default function TemplateSettings() {
                   >
                     <Pencil size={13} />
                   </button>
-                  <button type="button" className="icon-btn icon-btn-sm" title={t('删除')} aria-label={t('删除')} onClick={() => void remove(template)}>
+                  <button type="button" className="icon-btn icon-btn-sm" title={t('删除')} aria-label={t('删除')} onClick={() => setDeleteTarget(template)}>
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -198,6 +200,16 @@ export default function TemplateSettings() {
           </>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void remove()}
+        title={t('删除模板')}
+        description={deleteTarget ? t('删除模板“{name}”？', { name: deleteTarget.name }) : undefined}
+        confirmLabel={t('删除')}
+        danger
+      />
     </>
   );
 }

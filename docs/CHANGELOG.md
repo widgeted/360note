@@ -3,7 +3,31 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.41] — 2026-11-10
+
+通知、计数、图片说明与公开落地页体验修复。
+
+### Changed
+
+- 公开落地页保留为正式产品入口；文案迁移到统一翻译表，中文/英文不再维护两份硬拷贝；`DESIGN_SYSTEM` 新增 §6「公开落地页」主规则。
+- AppPage 内置模板正文改用 `t()`，会议/日记/项目模板共用同一套翻译。
+- 未读通知使用淡绿色背景与「未读」标记；默认显示标题和正文摘要，点击后展开完整内容并标记已读，操作按钮单独可点。
+- 「全部笔记」使用独立的全量计数，切换文件夹/标签/搜索时不再变成当前筛选结果的数量。
+- 图片说明在编辑器内以 figure/figcaption 显示；分享页与打印稿中的说明文字居中。
+- 图片预览「图片说明」按钮改为与「查看原图」一致的行内按钮样式，不再被关闭按钮的 34px 图标规则挤压。
+- 破坏性操作统一使用 `ConfirmDialog`：模板、成员/所有权、公开评论、上下文评论、备份删除、离线数据清除、对象存储恢复、退出并清除本机数据。
+- 下拉菜单仅在 pointerdown 落在面板外时关闭，页面滚动不再误关；通知轮询使用最新 load 引用。
+- 主题色统一为 `#17865b`，manifest 背景改为 `#F8F6F1`；favicon/apple-touch 版本由 Vite 构建脚本统一生成。
+- 新增 `--radius-xxs: 4px`、`--radius-xs-sm: 7px` 并替换硬编码圆角；`icon-btn-lg` 统一到 8px；身份选中态移除 ring；`--text-tertiary` 提高到 `#5c5950`。
+- 维护页加入 `noindex` 与暗色变体；`.gitignore` 补充构建/临时/编辑器目录。
+- 导入拖放区支持键盘与 label 触发；Avatar 增加可选 `ariaLabel`。
+
+### Known debt
+
+- 代码块硬编码高亮色、OCR/ENEX AdmZip 内存占用、万篇搜索 N+1、文件夹恢复 position、语音输入提示闪烁暂列技术债。
+
 ## [0.1.40] — 2026-11-10
+
 
 备份恢复流式化与发布收尾。
 

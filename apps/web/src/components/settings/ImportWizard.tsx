@@ -152,12 +152,22 @@ export function ImportWizard({ open, onClose, workspaceId }: { open: boolean; on
 
       {step === 'choose' && (
         <>
-          <div
+          <label
             onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(event.dataTransfer.files); }}
             className={dragging ? 'drag-over' : ''}
+            tabIndex={0}
+            role="button"
+            aria-label={t('选择要导入的文件')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                fileRef.current?.click();
+              }
+            }}
             style={{
+              display: 'block',
               border: '1px dashed var(--line-strong)',
               borderRadius: 10,
               padding: '30px 20px',
@@ -165,7 +175,6 @@ export function ImportWizard({ open, onClose, workspaceId }: { open: boolean; on
               background: 'var(--paper-50)',
               cursor: 'pointer',
             }}
-            onClick={() => fileRef.current?.click()}
           >
             <UploadCloud size={24} style={{ color: 'var(--text-tertiary)', margin: '0 auto 10px' }} />
             <div style={{ fontSize: 13, fontWeight: 570 }}>{isMobile ? t('点击选择文件') : t('拖入文件或点击选择')}</div>
@@ -178,11 +187,11 @@ export function ImportWizard({ open, onClose, workspaceId }: { open: boolean; on
               accept=".zip,.enex,.md,.markdown,.html,.htm,.csv,.json,.txt"
               onChange={(event) => event.target.files && addFiles(event.target.files)}
             />
-          </div>
+          </label>
           {files.length > 0 && (
             <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 5 }}>
               {files.map((file) => (
-                <div key={`${file.name}-${file.size}`} className="attachment-item" style={{ padding: '7px 9px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--surface)' }}>
+                <div key={`${file.name}-${file.size}`} className="attachment-item" style={{ padding: '7px 9px', border: '1px solid var(--line)', borderRadius: 'var(--radius-xs-sm)', background: 'var(--surface)' }}>
                   <span style={{ color: 'var(--text-tertiary)' }}><FileArchive size={14} /></span>
                   <div className="attachment-meta">
                     <div className="attachment-name">{file.name}</div>

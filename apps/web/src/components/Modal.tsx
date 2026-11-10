@@ -138,6 +138,7 @@ export function ConfirmDialog({
       title={title}
       description={description}
       size="sm"
+      closeOnOverlay={!loading}
       footer={
         <>
           <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} disabled={loading}>

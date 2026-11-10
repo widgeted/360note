@@ -18,3 +18,9 @@ scripts/*
 .s3rver/
 s3-data/
 *.nhbackup
+.vite/
+*.tmp
+*~
+.vscode/
+backups/
+.commandcode/

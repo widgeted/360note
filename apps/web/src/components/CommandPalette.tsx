@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
 import {
-  Archive,
+  Trash2,
   ArrowRight,
   Bot,
   CloudDownload,
@@ -288,7 +288,7 @@ export function CommandPalette() {
       id: 'trash',
       title: t('打开回收站'),
       description: t('恢复或永久删除'),
-      icon: <Archive size={15} />,
+      icon: <Trash2 size={15} />,
       keywords: 'trash recycle restore delete',
       run: () => {
         close();

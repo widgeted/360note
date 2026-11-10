@@ -150,7 +150,7 @@ export async function listingNotes(input: {
   q?: string;
   limit?: number;
   offset?: number;
-}): Promise<{ notes: NoteSummary[]; total: number }> {
+}): Promise<{ notes: NoteSummary[]; total: number; allTotal: number }> {
   await requireWorkspace(input.userId, input.workspaceId, 'read');
   const conditions: string[] = ['n.workspace_id = $1', 'n.deleted_at IS NULL'];
   const params: unknown[] = [input.workspaceId];
@@ -207,12 +207,23 @@ export async function listingNotes(input: {
   const limit = Math.min(Math.max(Number(input.limit) || 40, 1), 100);
   const offset = Math.max(Number(input.offset) || 0, 0);
   const where = conditions.join(' AND ');
-  const totalRow = await one<{ count: string }>(`SELECT count(*)::text AS count FROM notes n WHERE ${where}`, params);
+  const [totalRow, allTotalRow] = await Promise.all([
+    one<{ count: string }>(`SELECT count(*)::text AS count FROM notes n WHERE ${where}`, params),
+    one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM notes n
+       WHERE n.workspace_id = $1 AND n.deleted_at IS NULL AND n.trashed_at IS NULL`,
+      [input.workspaceId],
+    ),
+  ]);
   const rows = await many<NoteRow>(
     `SELECT ${SUMMARY_SELECT} FROM notes n WHERE ${where} ORDER BY ${order} LIMIT ${add(limit)} OFFSET ${add(offset)}`,
     params,
   );
-  return { notes: rows.map(mapSummary), total: Number(totalRow?.count ?? 0) };
+  return {
+    notes: rows.map(mapSummary),
+    total: Number(totalRow?.count ?? 0),
+    allTotal: Number(allTotalRow?.count ?? 0),
+  };
 }
 
 export async function getRecentFullNotes(workspaceId: string, userId: string, limit = 120): Promise<Note[]> {

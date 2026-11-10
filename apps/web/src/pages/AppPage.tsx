@@ -202,20 +202,15 @@ export default function AppPage() {
   }, []);
 
   async function useTemplate(template: 'meeting' | 'daily' | 'project') {
-    const zh = getLocale() === 'zh-CN';
-    const content =
-      template === 'meeting'
-        ? zh
-          ? `# 会议记录 · ${new Date().toLocaleDateString('zh-CN')}\n\n**参与人：**\n\n**目标：**\n\n## 议程\n\n1. \n\n## 讨论\n\n- \n\n## 决定\n\n- \n\n## 行动项\n\n- [ ] \n`
-          : `# Meeting notes · ${new Date().toLocaleDateString('en-US')}\n\n**Attendees:**\n\n**Goal:**\n\n## Agenda\n\n1. \n\n## Discussion\n\n- \n\n## Decisions\n\n- \n\n## Action items\n\n- [ ] \n`
-        : template === 'daily'
-          ? zh
-            ? `# ${new Date().toLocaleDateString('zh-CN')} · 日记\n\n## 今天发生了什么\n\n\n## 想法\n\n\n## 明天\n\n- [ ] \n`
-            : `# ${new Date().toLocaleDateString('en-US')} · Daily note\n\n## What happened\n\n\n## Thoughts\n\n\n## Tomorrow\n\n- [ ] \n`
-          : zh
-            ? `# 项目简报\n\n**一句话目标：**\n\n**为什么现在做：**\n\n## 范围\n\n- 包含：\n- 不包含：\n\n## 里程碑\n\n| 日期 | 交付物 | 负责人 |\n| --- | --- | --- |\n|  |  |  |\n\n## 风险\n\n- \n`
-            : `# Project brief\n\n**One-line goal:**\n\n**Why now:**\n\n## Scope\n\n- In:\n- Out:\n\n## Milestones\n\n| Date | Deliverable | Owner |\n| --- | --- | --- |\n|  |  |  |\n\n## Risks\n\n- \n`;
-    const created = await createNote({ title: template === 'meeting' ? t('会议记录') : template === 'daily' ? t('日报') : t('项目简报'), contentMd: content });
+    const date = new Date().toLocaleDateString(getLocale() === 'zh-CN' ? 'zh-CN' : 'en-US');
+    const content = t(
+      template === 'meeting' ? '会议记录模板' : template === 'daily' ? '日记模板' : '项目简报模板',
+      { date },
+    );
+    const created = await createNote({
+      title: template === 'meeting' ? t('会议记录') : template === 'daily' ? t('日报') : t('项目简报'),
+      contentMd: content,
+    });
     setShowTemplates(false);
     if (created) navigate(`/app/note/${created.id}`);
   }

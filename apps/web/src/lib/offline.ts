@@ -17,6 +17,7 @@ export interface WorkspaceSnapshot {
   folders: Folder[];
   tags: Tag[];
   total: number;
+  allTotal?: number;
   cachedAt: number;
 }
 

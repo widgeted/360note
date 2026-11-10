@@ -9,6 +9,7 @@ import { downloadBlob } from '../../lib/api';
 import { toast } from '../../stores/toast';
 import { ImportWizard } from './ImportWizard';
 import { BackupPanel } from './BackupPanel';
+import { ConfirmDialog } from '../Modal';
 
 export default function DataSettings() {
   const t = useT();
@@ -17,6 +18,7 @@ export default function DataSettings() {
   const workspace = useAuthStore((state) => state.workspaces.find((entry) => entry.id === workspaceId));
   const [importOpen, setImportOpen] = useState(params.get('import') === '1');
   const [exporting, setExporting] = useState<string | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
   const canManage = workspace?.role === 'owner' || workspace?.role === 'admin';
 
   useEffect(() => {
@@ -36,9 +38,9 @@ export default function DataSettings() {
   }
 
   async function clearLocalCache() {
-    if (!window.confirm(t('清除本机离线数据会删除本机缓存的笔记正文、草稿和未同步队列，且无法恢复。确定继续？'))) return;
     await clearSensitiveLocalData();
     setLocalWritesEnabled(true);
+    setClearOpen(false);
     toast('success', t('已清除本机离线数据'));
   }
 
@@ -130,7 +132,7 @@ export default function DataSettings() {
         <p className="setting-note">
           {t('在共用电脑上，请使用账户菜单中的“退出并清除本机数据”，或在下方立即清除。清除后未同步的编辑将无法恢复。')}
         </p>
-        <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => void clearLocalCache()}>
+        <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => setClearOpen(true)}>
           <Trash2 size={13} /> {t('清除本机离线数据')}
         </button>
       </section>
@@ -143,6 +145,16 @@ export default function DataSettings() {
       </div>
 
       <ImportWizard open={importOpen} onClose={closeImport} workspaceId={workspaceId} />
+
+      <ConfirmDialog
+        open={clearOpen}
+        onClose={() => setClearOpen(false)}
+        onConfirm={() => void clearLocalCache()}
+        title={t('清除本机离线数据')}
+        description={t('清除本机离线数据会删除本机缓存的笔记正文、草稿和未同步队列，且无法恢复。确定继续？')}
+        confirmLabel={t('清除')}
+        danger
+      />
     </>
   );
 }

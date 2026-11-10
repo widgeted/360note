@@ -409,3 +409,14 @@
 - 备份：`backup-limits-test.mjs` 验证条目数、单条目、压缩比、结构无效均被拒绝。
 - 缓存隔离：`cache-isolation-test.mjs` 验证切换账户清除旧缓存、显式登出清除 IndexedDB。
 - 客户端 IP：nginx 覆盖 `X-Forwarded-For` 为 `CF-Connecting-IP`，Fastify `TRUST_PROXY=127.0.0.1`；已用伪造 XFF 验证不会写入审计。
+
+- `tests/manual/notification-caption-smoke.mjs`：未读通知浅绿背景/摘要折叠/展开已读、全部笔记计数稳定、编辑器 caption 可见、分享/打印 caption 居中、图片预览按钮尺寸。
+- `tests/manual/authenticated-smoke.mjs`：管理员 6 个页签、2FA 重认证、移动设置 3 列、PWA SW。
+
+## 已知技术债（0.1.40 记录）
+
+- **代码块语法高亮颜色硬编码**：暂不迁移到 token，属于长期视觉技术债；如统一主题需同时检查 light/dark 两套高亮。
+- **OCR / ENEX 导入仍使用 AdmZip**：导入解析仍会把 ZIP 读入内存；工作区备份恢复已改为 yauzl 流式，导入侧后续再迁移。
+- **搜索 N+1 查询**：1 万篇规模下当前性能已达标，暂不重写；更大规模需改为单次聚合/物化视图。
+- **文件夹恢复丢失 position 号**：恢复后按现有排序回退，后续版本应持久化并恢复原 position。
+- **语音输入提示条闪烁风险**：理论存在，除非复现并影响核心编辑流程，暂不处理。

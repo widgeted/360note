@@ -13,7 +13,7 @@ import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { DOMOutputSpec, Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
   Bold,
@@ -125,7 +125,56 @@ export interface SlashItem {
   run: () => void;
 }
 
+function imageCaptionFromNode(node: ProseMirrorNode): string {
+  const alt = String(node.attrs.alt ?? '').trim();
+  const title = String(node.attrs.title ?? '').trim();
+  return title && title !== alt ? title : !title && alt ? alt : '';
+}
+
 const OptimizedImage = Image.extend({
+  addNodeView() {
+    return ({ node }) => {
+      let caption = imageCaptionFromNode(node);
+      const figure = caption ? document.createElement('figure') : null;
+      const img = document.createElement('img');
+      const setImage = (current: ProseMirrorNode) => {
+        const original = String(current.attrs.originalSrc || current.attrs.src || '');
+        img.src = attachmentThumbnailUrl(original);
+        img.alt = String(current.attrs.alt ?? '');
+        img.title = String(current.attrs.title ?? '');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.draggable = true;
+        img.setAttribute('data-original-src', original);
+      };
+      setImage(node);
+      let dom: HTMLElement = img;
+      if (figure) {
+        figure.className = 'prose-figure editor-figure';
+        figure.contentEditable = 'false';
+        const figcaption = document.createElement('figcaption');
+        figcaption.textContent = caption;
+        figure.append(img, figcaption);
+        dom = figure;
+      }
+      return {
+        dom,
+        update(updated) {
+          const nextCaption = imageCaptionFromNode(updated);
+          if (Boolean(nextCaption) !== Boolean(caption)) return false;
+          caption = nextCaption;
+          setImage(updated);
+          if (figure) {
+            const figcaption = figure.querySelector('figcaption');
+            if (figcaption) figcaption.textContent = nextCaption;
+          }
+          return true;
+        },
+        ignoreMutation: () => true,
+      };
+    };
+  },
+
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -139,7 +188,10 @@ const OptimizedImage = Image.extend({
 
   renderHTML({ HTMLAttributes }) {
     const original = String(HTMLAttributes['data-original-src'] || HTMLAttributes.src || '');
-    return [
+    const alt = String(HTMLAttributes.alt ?? '').trim();
+    const title = String(HTMLAttributes.title ?? '').trim();
+    const caption = title && title !== alt ? title : !title && alt ? alt : '';
+    const img: DOMOutputSpec = [
       'img',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         src: attachmentThumbnailUrl(original),
@@ -148,6 +200,13 @@ const OptimizedImage = Image.extend({
         decoding: 'async',
       }),
     ];
+    if (!caption) return img;
+    return [
+      'figure',
+      { class: 'prose-figure editor-figure' },
+      img,
+      ['figcaption', caption],
+    ] satisfies DOMOutputSpec;
   },
 });
 
