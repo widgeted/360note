@@ -190,6 +190,22 @@ export function renderMarkdown(markdown: string, options: { toc?: boolean; wikiL
       image.setAttribute('loading', 'lazy');
       image.setAttribute('decoding', 'async');
     }
+    const alt = (image.getAttribute('alt') ?? '').trim();
+    const title = (image.getAttribute('title') ?? '').trim();
+    const caption = title && title !== alt ? title : !title && alt ? alt : '';
+    if (!caption) return;
+    const figure = doc.createElement('figure');
+    figure.className = 'prose-figure';
+    const parent = image.parentElement;
+    if (parent && parent.tagName === 'P' && parent.children.length === 1 && !(parent.textContent ?? '').trim()) {
+      parent.replaceWith(figure);
+    } else {
+      image.replaceWith(figure);
+    }
+    figure.appendChild(image);
+    const captionEl = doc.createElement('figcaption');
+    captionEl.textContent = caption;
+    figure.appendChild(captionEl);
   });
   if (options.wikiLinks !== false) wikiLinkify(root);
   root.querySelectorAll('a[href]').forEach((anchor) => {

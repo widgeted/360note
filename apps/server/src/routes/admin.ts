@@ -9,9 +9,12 @@ import { getAiConfig, getSetting, saveAiConfig, setSetting } from '../services/s
 import { config } from '../config.js';
 import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite } from '../services/offsite.js';
 import { getNoteForUser } from '../services/notes.js';
+import { getObject, listObjectEntries } from '../lib/object-storage.js';
 import { readBackup } from '../lib/storage.js';
-import { decryptString, sha256 } from '../lib/crypto.js';
-import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, saveInstanceBackupSettings, uploadInstanceBackupToOffsite } from '../services/instance-backups.js';
+import { decryptBuffer, decryptString, sha256 } from '../lib/crypto.js';
+import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, runInstanceRestoreDrill, saveInstanceBackupSettings, uploadInstanceBackupToOffsite } from '../services/instance-backups.js';
+import { restoreOffsiteWorkspaceBackup, verifyOffsiteObject } from '../services/offsite-objects.js';
+import { createJob, runJob } from '../lib/jobs.js';
 import { attachmentMigrationRunning, cleanupLocalAttachmentCopies, getAttachmentStorageUsage, getLocalAttachmentUsage, startDisableAttachments, startEnableAttachments } from '../services/attachment-storage.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
@@ -310,6 +313,64 @@ export default async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.get('/api/admin/comments', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const params = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      request.query,
+    );
+    const where = `c.user_id IS NULL AND n.deleted_at IS NULL AND n.trashed_at IS NULL`;
+    const totalRow = await one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM comments c JOIN notes n ON n.id = c.note_id WHERE ${where}`,
+    );
+    const rows = await many<{
+      id: string;
+      note_id: string;
+      guest_name: string | null;
+      body: string;
+      ip: string | null;
+      created_at: Date;
+      note_title: string;
+    }>(
+      `SELECT c.id, c.note_id, c.guest_name, c.body, c.ip, c.created_at, n.title AS note_title
+       FROM comments c JOIN notes n ON n.id = c.note_id
+       WHERE ${where}
+       ORDER BY c.created_at DESC LIMIT $1 OFFSET $2`,
+      [params.limit, params.offset],
+    );
+    return {
+      total: Number(totalRow?.count ?? 0),
+      comments: rows.map((row) => ({
+        id: row.id,
+        noteId: row.note_id,
+        noteTitle: row.note_title,
+        authorName: row.guest_name ?? '访客',
+        body: row.body,
+        ip: row.ip,
+        createdAt: row.created_at.toISOString(),
+      })),
+    };
+  });
+
+  app.delete('/api/admin/comments/:id', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const row = await one<{ note_id: string; user_id: string | null }>(
+      'SELECT note_id, user_id FROM comments WHERE id = $1',
+      [id],
+    );
+    if (!row) throw errors.notFound('评论不存在');
+    if (row.user_id !== null) throw errors.forbidden('这里只能删除公开访客评论');
+    await query('DELETE FROM comments WHERE id = $1', [id]);
+    await audit({ actorId: auth.user.id, action: 'admin.comment.delete', targetType: 'comment', targetId: id, meta: { noteId: row.note_id }, ip: clientIp(request) });
+    return { ok: true };
+  });
+
   app.get('/api/admin/instance-backups', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
@@ -331,9 +392,22 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.post('/api/admin/instance-backups', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
-    const backup = await createInstanceBackup(auth.user.id);
-    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create', targetType: 'instance_backup', targetId: backup.id, meta: { size: backup.size }, ip: clientIp(request) });
-    return { backup };
+    try {
+      const backup = await createInstanceBackup(auth.user.id);
+      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create', targetType: 'instance_backup', targetId: backup.id, meta: { size: backup.size }, ip: clientIp(request) });
+      return { backup };
+    } catch (error) {
+      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create.failed', meta: { error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+      throw error;
+    }
+  });
+
+  app.post('/api/admin/instance-backups/drill', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const result = await runInstanceRestoreDrill(auth.user.id);
+    if (!result.ok) throw new AppError(500, 'INSTANCE_BACKUP_DRILL_FAILED', result.error ?? '恢复演练失败');
+    return { result, settings: await getInstanceBackupSettings() };
   });
 
   app.post('/api/admin/instance-backups/:id/upload', async (request) => {
@@ -341,8 +415,11 @@ export default async function adminRoutes(app: FastifyInstance) {
     await requireAdmin(auth.user.id);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const status = await uploadInstanceBackupToOffsite(id);
-    if (status === 'failed') throw new AppError(502, 'INSTANCE_BACKUP_UPLOAD_FAILED', '对象存储上传失败，请查看连接状态');
-    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.upload', targetType: 'instance_backup', targetId: id, meta: { status }, ip: clientIp(request) });
+    if (status === 'failed') {
+      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.upload', targetType: 'instance_backup', targetId: id, meta: { ok: false, status }, ip: clientIp(request) });
+      throw new AppError(502, 'INSTANCE_BACKUP_UPLOAD_FAILED', '对象存储上传失败，请查看连接状态');
+    }
+    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.upload', targetType: 'instance_backup', targetId: id, meta: { ok: true, status }, ip: clientIp(request) });
     return { status };
   });
 
@@ -364,9 +441,14 @@ export default async function adminRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    await deleteInstanceBackup(id);
-    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.delete', targetType: 'instance_backup', targetId: id, ip: clientIp(request) });
-    return { ok: true };
+    try {
+      await deleteInstanceBackup(id);
+      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.delete', targetType: 'instance_backup', targetId: id, meta: { ok: true }, ip: clientIp(request) });
+      return { ok: true };
+    } catch (error) {
+      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.delete', targetType: 'instance_backup', targetId: id, meta: { ok: false, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+      throw error;
+    }
   });
 
   app.get('/api/admin/settings', async (request) => {
@@ -421,6 +503,8 @@ export default async function adminRoutes(app: FastifyInstance) {
             enabled: z.boolean().optional(),
             frequencyHours: z.number().int().min(1).max(720).optional(),
             retentionCount: z.number().int().min(1).max(365).optional(),
+            drillEnabled: z.boolean().optional(),
+            drillFrequencyHours: z.number().int().min(1).max(720).optional(),
           })
           .optional(),
       }),
@@ -498,9 +582,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     const configValue = await getOffsiteConfig();
     try {
       await testOffsite(configValue);
+      await audit({ actorId: auth.user.id, action: 'admin.offsite.test', meta: { ok: true }, ip: clientIp(request) });
       return { ok: true };
     } catch (error) {
-      throw new AppError(502, 'OFFSITE_TEST_FAILED', (error as Error).message.slice(0, 300));
+      const message = (error as Error).message.slice(0, 300);
+      await audit({ actorId: auth.user.id, action: 'admin.offsite.test', meta: { ok: false, error: message }, ip: clientIp(request) });
+      throw new AppError(502, 'OFFSITE_TEST_FAILED', message);
     }
   });
 
@@ -511,10 +598,78 @@ export default async function adminRoutes(app: FastifyInstance) {
     return await getAttachmentStorageUsage(force === '1');
   });
 
+  app.get('/api/admin/offsite/objects', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { limit } = parse(z.object({ limit: z.coerce.number().int().min(1).max(500).default(200) }), request.query);
+    const objects = await listObjectEntries('', limit);
+    return {
+      objects: objects.map((entry) => ({
+        ...entry,
+        kind: entry.key.startsWith('attachments/')
+          ? 'attachment'
+          : /^backup-.*\.(3nb|nhbackup)$/i.test(entry.key)
+            ? 'workspace-backup'
+            : /^instance-.*\.(3nb|nhbackup)$/i.test(entry.key)
+              ? 'instance-backup'
+              : 'other',
+      })),
+    };
+  });
+
+  app.get('/api/admin/offsite/objects/download', async (request, reply) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { key } = parse(z.object({ key: z.string().min(1).max(1000) }), request.query);
+    const clean = key.replace(/^s3:/, '').replace(/^\/+/, '');
+    if (!clean || clean.includes('..') || clean.startsWith('/')) throw errors.badRequest('对象键无效');
+    let data = await getObject(`s3:${clean}`);
+    if (/\.(3nb|nhbackup)$/i.test(clean)) data = decryptBuffer(data, '360note:backup');
+    await audit({ actorId: auth.user.id, action: 'admin.offsite.object.download', meta: { key: clean, bytes: data.length }, ip: clientIp(request) });
+    return reply
+      .header('Content-Type', 'application/octet-stream')
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(clean.split('/').pop() ?? 'object')}`)
+      .header('Cache-Control', 'no-store')
+      .send(data);
+  });
+
+  app.post('/api/admin/offsite/objects/verify', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { key } = parse(z.object({ key: z.string().min(1).max(1000) }), request.body);
+    try {
+      const result = await verifyOffsiteObject(key);
+      await audit({ actorId: auth.user.id, action: 'admin.offsite.object.verify', meta: { ok: true, key }, ip: clientIp(request) });
+      return result;
+    } catch (error) {
+      await audit({ actorId: auth.user.id, action: 'admin.offsite.object.verify', meta: { ok: false, key, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+      throw error;
+    }
+  });
+
+  app.post('/api/admin/offsite/objects/restore', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const body = parse(z.object({ key: z.string().min(1).max(1000), mode: z.enum(['merge', 'replace']).default('merge') }), request.body);
+    const jobId = await createJob('offsite-restore', { key: body.key, mode: body.mode }, auth.user.id);
+    runJob(jobId, async () => {
+      try {
+        const result = await restoreOffsiteWorkspaceBackup({ key: body.key, mode: body.mode, jobId });
+        await audit({ actorId: auth.user.id, action: 'admin.offsite.object.restore', meta: { ok: true, key: body.key, mode: body.mode, jobId, workspaceId: result.workspaceId }, ip: clientIp(request) });
+        return result;
+      } catch (error) {
+        await audit({ actorId: auth.user.id, action: 'admin.offsite.object.restore', meta: { ok: false, key: body.key, mode: body.mode, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+        throw error;
+      }
+    });
+    await audit({ actorId: auth.user.id, action: 'admin.offsite.object.restore.start', meta: { key: body.key, mode: body.mode, jobId }, ip: clientIp(request) });
+    return { jobId };
+  });
+
   app.post('/api/admin/offsite/attachments/enable', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
-    const state = await startEnableAttachments();
+    const state = await startEnableAttachments(auth.user.id);
     await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.enable', ip: clientIp(request) });
     return { migration: state };
   });
@@ -523,16 +678,21 @@ export default async function adminRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
     if (attachmentMigrationRunning()) throw errors.conflict('附件迁移正在进行，请稍候');
-    const result = await cleanupLocalAttachmentCopies();
-    await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.cleanup_local', meta: result, ip: clientIp(request) });
-    return result;
+    try {
+      const result = await cleanupLocalAttachmentCopies();
+      await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.cleanup_local', meta: { ok: true, ...result }, ip: clientIp(request) });
+      return result;
+    } catch (error) {
+      await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.cleanup_local', meta: { ok: false, error: (error as Error).message.slice(0, 300) }, ip: clientIp(request) });
+      throw error;
+    }
   });
 
   app.post('/api/admin/offsite/attachments/disable', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
     const body = parse(z.object({ purgeRemote: z.boolean().optional() }), request.body ?? {});
-    const state = await startDisableAttachments(Boolean(body.purgeRemote));
+    const state = await startDisableAttachments(Boolean(body.purgeRemote), auth.user.id);
     await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.disable', meta: { purgeRemote: Boolean(body.purgeRemote) }, ip: clientIp(request) });
     return { migration: state };
   });

@@ -11,6 +11,7 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTRS: sanitizeHtml.IOptions['allowedAttributes'] = {
   a: ['href', 'title', 'target', 'rel', 'class', 'download', 'data-note-title'],
   img: ['src', 'alt', 'title', 'width', 'height', 'class'],
+  figure: ['class'],
   input: ['type', 'checked', 'disabled'],
   th: ['align', 'colspan', 'rowspan'],
   td: ['align', 'colspan', 'rowspan'],
@@ -21,10 +22,20 @@ const ALLOWED_ATTRS: sanitizeHtml.IOptions['allowedAttributes'] = {
   '*': ['id'],
 };
 
+function imageCaption(attrs: string): string {
+  const alt = /\balt="([^"]*)"/i.exec(attrs)?.[1]?.trim() ?? '';
+  const title = /\btitle="([^"]*)"/i.exec(attrs)?.[1]?.trim() ?? '';
+  return title && title !== alt ? title : !title && alt ? alt : '';
+}
+
 export function renderMarkdownHtml(markdown: string): string {
   let html = marked.parse(markdown, { gfm: true, breaks: false, async: false }) as string;
   html = html.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (_match, title: string, alias?: string) => {
     return `<a class="nh-wikilink" data-note-title="${escapeHtml(title.trim())}">${escapeHtml((alias || title).trim())}</a>`;
+  });
+  html = html.replace(/<p>\s*(<img\b([^>]*)>)\s*<\/p>/gi, (match, img: string, attrs: string) => {
+    const caption = imageCaption(attrs);
+    return caption ? `<figure class="prose-figure">${img}<figcaption>${caption}</figcaption></figure>` : match;
   });
   return sanitizeHtml(html, {
     allowedTags: ALLOWED_TAGS,
@@ -81,6 +92,9 @@ export function exportHtmlDocument(input: {
   th, td { border-bottom:1px solid var(--line); text-align:left; padding:10px 12px; vertical-align:top; }
   th { color:var(--muted); font-weight:600; font-size:13px; text-transform: uppercase; letter-spacing:.05em; }
   img { max-width:100%; height:auto; border-radius:8px; margin: 1em 0; }
+  .prose-figure { margin: 1.5em 0; }
+  .prose-figure img { margin: 0; }
+  .prose-figure figcaption { margin-top: 7px; color: var(--muted); font-size: 13px; line-height: 1.5; }
   hr { border:0; border-top:1px solid var(--line); margin: 3em 0; }
   input[type=checkbox] { margin-right:.5em; accent-color: var(--accent); }
   .attachments { margin-top: 56px; padding-top: 22px; border-top:1px solid var(--line); }
@@ -105,6 +119,7 @@ export function exportHtmlDocument(input: {
     pre code { font-size: 9pt; }
     .attachments { margin-top: 28pt; padding-top: 12pt; }
     .attachments h2, .attachments ul { font-size: 9.5pt; }
+    .prose-figure figcaption { font-size: 9pt; color: #666; }
     footer { margin-top: 28pt; padding-top: 10pt; font-size: 9pt; }
     a { color: inherit; }
     .nh-wikilink { border:0; }

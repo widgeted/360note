@@ -332,8 +332,10 @@ export default async function workspaceRoutes(app: FastifyInstance) {
           locale: normalizeLocale(request.headers['accept-language']),
         });
         emailSent = true;
+        await audit({ workspaceId: id, actorId: auth.user.id, action: 'mail.invite.sent', targetType: 'email', targetId: body.email, meta: { ok: true }, ip: clientIp(request) });
       } catch (error) {
         app.log.warn({ error, workspaceId: id }, 'failed to send workspace invitation email');
+        await audit({ workspaceId: id, actorId: auth.user.id, action: 'mail.invite.failed', targetType: 'email', targetId: body.email, meta: { ok: false, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
       }
     }
     return {

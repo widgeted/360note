@@ -71,16 +71,21 @@ export default function AdminSettings() {
   const [sharesTotal, setSharesTotal] = useState(0);
   const [sharesOffset, setSharesOffset] = useState(0);
   const [sharesLoading, setSharesLoading] = useState(false);
+  const [publicComments, setPublicComments] = useState<Array<{ id: string; noteId: string; noteTitle: string; authorName: string; body: string; ip: string | null; createdAt: string }>>([]);
+  const [commentsTotal, setCommentsTotal] = useState(0);
+  const [commentsOffset, setCommentsOffset] = useState(0);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [blockIp, setBlockIp] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
   const [runtime, setRuntime] = useState<{ uptimeSeconds: number; memoryBytes: number; nodeVersion: string } | null>(null);
   const [retention, setRetention] = useState(30);
   const [saving, setSaving] = useState(false);
-  const [adminTab, setAdminTab] = useState<'overview' | 'storage' | 'users' | 'shares' | 'logs'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'storage' | 'users' | 'shares' | 'comments' | 'logs'>('overview');
   const [instanceBackups, setInstanceBackups] = useState<Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>>([]);
-  const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7 });
+  const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7, drillEnabled: true, drillFrequencyHours: 24, lastDrillAt: null as string | null, lastDrillOk: null as boolean | null, lastDrillError: null as string | null, lastDrillBackup: null as string | null });
   const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
+  const [drillBusy, setDrillBusy] = useState(false);
 
   useEffect(() => {
     api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime; attachmentStorage: AttachmentStorageStats }>('/api/admin/stats').then((res) => {
@@ -96,6 +101,7 @@ export default function AdminSettings() {
     void refreshIpBlocks();
     void refreshInstanceBackups();
     void loadShares(0);
+    void loadPublicComments(0);
   }, []);
 
   async function refreshIpBlocks() {
@@ -183,6 +189,20 @@ export default function AdminSettings() {
     }
   }
 
+  async function runRestoreDrill() {
+    setDrillBusy(true);
+    try {
+      const response = await api.post<{ settings: typeof instanceBackupSettings }>('/api/admin/instance-backups/drill');
+      setInstanceBackupSettings(response.settings);
+      toast('success', t('恢复演练通过'), t('数据库导出与附件均可解密读取。'));
+    } catch (error) {
+      await refreshInstanceBackups();
+      toast('error', t('恢复演练失败'), (error as Error).message);
+    } finally {
+      setDrillBusy(false);
+    }
+  }
+
   async function removeInstanceBackup(id: string) {
     try {
       await api.delete(`/api/admin/instance-backups/${id}`);
@@ -203,6 +223,31 @@ export default function AdminSettings() {
       toast('error', t('加载失败'), (error as Error).message);
     } finally {
       setSharesLoading(false);
+    }
+  }
+
+  async function loadPublicComments(offset: number) {
+    setCommentsLoading(true);
+    try {
+      const response = await api.get<{ comments: typeof publicComments; total: number }>(`/api/admin/comments?limit=50&offset=${offset}`);
+      setPublicComments(response.comments);
+      setCommentsTotal(response.total);
+      setCommentsOffset(offset);
+    } catch (error) {
+      toast('error', t('加载失败'), (error as Error).message);
+    } finally {
+      setCommentsLoading(false);
+    }
+  }
+
+  async function deletePublicComment(id: string) {
+    if (!window.confirm(t('删除这条公开评论？'))) return;
+    try {
+      await api.delete(`/api/admin/comments/${id}`);
+      await loadPublicComments(commentsOffset);
+      toast('success', t('评论已删除'));
+    } catch (error) {
+      toast('error', t('删除评论失败'), (error as Error).message);
     }
   }
 
@@ -268,6 +313,7 @@ export default function AdminSettings() {
           ['storage', t('存储管理')],
           ['users', t('用户管理')],
           ['shares', t('公开链接')],
+          ['comments', t('公开评论')],
           ['logs', t('操作日志')],
         ] as const).map(([id, label]) => (
           <button key={id} type="button" className={cn('admin-tab', adminTab === id && 'active')} onClick={() => setAdminTab(id)}>
@@ -379,7 +425,21 @@ export default function AdminSettings() {
           <div className="field field-role"><label>{t('保留份数')}</label><input className="input" type="number" min={1} max={365} value={instanceBackupSettings.retentionCount} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, retentionCount: Number(event.target.value) }))} /></div>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => void saveInstanceBackupSettings()}>{t('保存')}</button>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => void createInstanceBackup()} disabled={instanceBackupBusy}>{instanceBackupBusy ? <span className="spinner" /> : <Database size={13} />} {t('立即备份整站')}</button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void runRestoreDrill()} disabled={drillBusy}>{drillBusy ? <span className="spinner" /> : <ShieldCheck size={13} />} {t('立即演练')}</button>
         </div>
+        <div className="setting-inline-form" style={{ marginTop: 8 }}>
+          <label className="checkbox-row" style={{ margin: 0 }}>
+            <input type="checkbox" checked={instanceBackupSettings.drillEnabled} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, drillEnabled: event.target.checked }))} />
+            <span>{t('自动恢复演练')}</span>
+          </label>
+          <div className="field field-role"><label>{t('演练频率（小时）')}</label><input className="input" type="number" min={1} max={720} value={instanceBackupSettings.drillFrequencyHours} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, drillFrequencyHours: Number(event.target.value) }))} /></div>
+          <span className={`badge ${instanceBackupSettings.lastDrillOk === true ? 'badge-green' : instanceBackupSettings.lastDrillOk === false ? 'badge-red' : 'badge-gray'}`}>
+            {instanceBackupSettings.lastDrillAt
+              ? `${instanceBackupSettings.lastDrillOk ? t('演练通过') : t('演练失败')} · ${formatRelativeShort(instanceBackupSettings.lastDrillAt)}`
+              : t('尚未演练')}
+          </span>
+        </div>
+        {instanceBackupSettings.lastDrillError && <div className="form-error" style={{ marginTop: 8 }}>{instanceBackupSettings.lastDrillError}</div>}
         <div className="admin-ip-list" style={{ marginTop: 10 }}>
           {instanceBackups.length === 0 ? <div className="context-empty">{t('暂无整站备份')}</div> : instanceBackups.map((backup) => (
             <div className="admin-ip-row" key={backup.id}>
@@ -536,6 +596,42 @@ export default function AdminSettings() {
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => void removeIpBlock(block.id)}>{t('解除')}</button>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="settings-section" hidden={adminTab !== 'comments'}>
+        <div className="settings-section-head">
+          <span className="settings-section-title">{t('公开评论')}</span>
+          <span className="settings-section-desc">{t('共 {n} 条', { n: commentsTotal })}</span>
+        </div>
+        <p className="setting-note">{t('显示公开分享页上的匿名评论。管理员可以删除滥用内容，但不能修改或冒充评论者。')}</p>
+        <div className="setting-card" style={{ padding: 0, overflowX: 'auto' }}>
+          <table className="data-table admin-comment-table">
+            <thead><tr><th>{t('评论内容')}</th><th>{t('评论者')}</th><th>{t('被评论笔记')}</th><th>{t('时间')}</th><th>{t('操作')}</th></tr></thead>
+            <tbody>
+              {commentsLoading ? (
+                <tr><td colSpan={5}><div className="loading-row"><span className="spinner" /> {t('加载中…')}</div></td></tr>
+              ) : publicComments.length === 0 ? (
+                <tr><td colSpan={5}><div className="context-empty">{t('暂无公开评论')}</div></td></tr>
+              ) : publicComments.map((comment) => (
+                <tr key={comment.id}>
+                  <td><div className="admin-comment-body">{comment.body}</div></td>
+                  <td>
+                    <div>{comment.authorName}</div>
+                    <div className="setting-note mono">{comment.ip ?? '—'}</div>
+                  </td>
+                  <td><div className="admin-comment-note">{comment.noteTitle || t('未命名笔记')}</div></td>
+                  <td className="setting-note">{formatFullDate(comment.createdAt)}</td>
+                  <td><button type="button" className="icon-btn icon-btn-sm" onClick={() => void deletePublicComment(comment.id)} title={t('删除评论')} aria-label={t('删除评论')}><Trash2 size={13} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="admin-log-pager">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadPublicComments(Math.max(0, commentsOffset - 50))} disabled={commentsLoading || commentsOffset === 0}>{t('上一页')}</button>
+          <span className="setting-note">{t('第 {page} 页', { page: Math.floor(commentsOffset / 50) + 1 })}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadPublicComments(commentsOffset + 50)} disabled={commentsLoading || commentsOffset + 50 >= commentsTotal}>{t('下一页')}</button>
         </div>
       </section>
 

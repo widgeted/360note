@@ -170,10 +170,11 @@ export async function createBackupDocument(workspaceId: string): Promise<{ buffe
         width: number | null;
         height: number | null;
         storage_key: string;
+        sha256: string;
         created_by: string;
         created_at: Date;
       }>(
-        `SELECT id, note_id, filename, mime, size_bytes, width, height, storage_key, created_by, created_at
+        `SELECT id, note_id, filename, mime, size_bytes, width, height, storage_key, sha256, created_by, created_at
          FROM attachments WHERE note_id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY created_at`,
         [noteIds],
       )
@@ -246,7 +247,7 @@ export async function createBackupDocument(workspaceId: string): Promise<{ buffe
       height: attachment.height,
       createdBy: attachment.created_by,
       createdAt: attachment.created_at.toISOString(),
-      zipPath: `attachments/${attachment.id}/${safeFilename(attachment.filename)}`,
+      zipPath: `attachments/${attachment.sha256}.bin`,
     })),
     versions: versions.map((version) => ({
       noteId: version.note_id,
@@ -277,10 +278,14 @@ export async function createBackupDocument(workspaceId: string): Promise<{ buffe
     counts: document.counts,
   }, null, 2)));
   zip.addFile('workspace.json', Buffer.from(JSON.stringify(document, null, 2)));
+  const addedPaths = new Set<string>();
   for (const attachment of attachmentRows) {
+    const zipPath = `attachments/${attachment.sha256}.bin`;
+    if (addedPaths.has(zipPath)) continue;
     try {
       const data = await readAttachment(attachment.storage_key);
-      zip.addFile(`attachments/${attachment.id}/${safeFilename(attachment.filename)}`, data);
+      zip.addFile(zipPath, data);
+      addedPaths.add(zipPath);
     } catch (error) {
       console.warn('[backup] could not read attachment', attachment.id, error);
     }
@@ -510,6 +515,21 @@ function readBackupZip(buffer: Buffer): { zip: AdmZip; manifest: Record<string, 
   }
   validateBackupDocument(document);
   return { zip, manifest, document };
+}
+
+export function inspectBackupBuffer(buffer: Buffer): {
+  workspaceId: string;
+  workspaceName: string;
+  counts: BackupDocument['counts'];
+  createdAt: string;
+} {
+  const { document } = readBackupZip(buffer);
+  return {
+    workspaceId: document.workspace.id,
+    workspaceName: document.workspace.name,
+    counts: document.counts,
+    createdAt: document.createdAt,
+  };
 }
 
 export function previewBackup(buffer: Buffer, targetWorkspaceId: string): BackupPreview {

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink, PencilLine, X } from 'lucide-react';
 import { translate } from '../lib/i18n';
 
 interface PreviewImage {
   src: string;
   alt?: string;
+  title?: string;
+  editable?: boolean;
 }
 
 export function ImageLightbox() {
@@ -50,6 +52,18 @@ export function ImageLightbox() {
         <a href={image.src} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
           <ExternalLink size={14} /> {translate('查看原图')}
         </a>
+        {image.editable && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              window.dispatchEvent(new CustomEvent('nh:edit-image-caption', { detail: image }));
+              setImage(null);
+            }}
+          >
+            <PencilLine size={14} /> {translate('图片说明')}
+          </button>
+        )}
         <button type="button" onClick={() => setImage(null)} aria-label={translate('关闭预览')}>
           <X size={18} />
         </button>

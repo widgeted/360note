@@ -327,7 +327,7 @@ export function TipTapEditor({
         const src = image?.getAttribute('data-original-src') || image?.getAttribute('src');
         if (!src) return false;
         event.preventDefault();
-        window.dispatchEvent(new CustomEvent('nh:open-image', { detail: { src, alt: image?.getAttribute('alt') || '' } }));
+        window.dispatchEvent(new CustomEvent('nh:open-image', { detail: { src, alt: image?.getAttribute('alt') || '', title: image?.getAttribute('title') || '', editable: true } }));
         return true;
       },
       handleDOMEvents: {
@@ -385,7 +385,7 @@ export function TipTapEditor({
     uploadFilesRef.current.delete(id);
     if (!current || !found) return;
     const content = result.mime.startsWith('image/')
-      ? { type: 'image', attrs: { src: result.url, alt: result.filename, title: result.filename } }
+      ? { type: 'image', attrs: { src: result.url, alt: '', title: '' } }
       : { type: 'text', text: result.filename, marks: [{ type: 'link', attrs: { href: result.url } }] };
     current.chain().focus()
       .insertContentAt({ from: found.pos, to: found.pos + found.node.nodeSize }, content, { updateSelection: true })

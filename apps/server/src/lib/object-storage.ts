@@ -228,6 +228,33 @@ export async function purgeObjects(prefix: string): Promise<number> {
   return deleted;
 }
 
+export async function listObjectEntries(prefix = '', limit = 500): Promise<Array<{ key: string; size: number; lastModified: string | null }>> {
+  const config = await getObjectStorageConfig();
+  if (!objectStorageConfigured(config)) return [];
+  const base = config.prefix.replace(/^\/+|\/+$/g, '');
+  let token: string | undefined;
+  const entries: Array<{ key: string; size: number; lastModified: string | null }> = [];
+  do {
+    const response = await client(config).send(new ListObjectsV2Command({
+      Bucket: config.bucket,
+      Prefix: listPrefix(config, prefix),
+      ContinuationToken: token,
+      MaxKeys: Math.min(1000, limit - entries.length),
+    }));
+    for (const item of response.Contents ?? []) {
+      if (!item.Key) continue;
+      entries.push({
+        key: base && item.Key.startsWith(`${base}/`) ? item.Key.slice(base.length + 1) : item.Key,
+        size: item.Size ?? 0,
+        lastModified: item.LastModified?.toISOString() ?? null,
+      });
+      if (entries.length >= limit) break;
+    }
+    token = entries.length < limit && response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (token);
+  return entries;
+}
+
 export async function testObjectStorage(config: ObjectStorageConfig): Promise<void> {
   if (!objectStorageConfigured(config)) throw new Error('对象存储配置不完整');
   await client(config).send(new ListObjectsV2Command({ Bucket: config.bucket, Prefix: config.prefix, MaxKeys: 1000 }));

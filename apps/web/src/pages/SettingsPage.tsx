@@ -4,6 +4,8 @@ import {
   CloudDownload,
   Code2,
   Keyboard,
+  LayoutTemplate,
+  MessageCircle,
   Palette,
   ServerCog,
   ShieldCheck,
@@ -21,6 +23,8 @@ import AppearanceSettings from '../components/settings/AppearanceSettings';
 import EditorSettings from '../components/settings/EditorSettings';
 import SecuritySettings from '../components/settings/SecuritySettings';
 import DataSettings from '../components/settings/DataSettings';
+import CommentSettings from '../components/settings/CommentSettings';
+import TemplateSettings from '../components/settings/TemplateSettings';
 import TeamSettings from '../components/settings/TeamSettings';
 import ApiSettings from '../components/settings/ApiSettings';
 import AiSettings from '../components/settings/AiSettings';
@@ -34,6 +38,8 @@ const SECTIONS = [
   { id: 'editor', icon: Keyboard, label: '编辑器', group: '个人' },
   { id: 'security', icon: ShieldCheck, label: '安全', group: '个人' },
   { id: 'data', icon: CloudDownload, label: '数据与备份', group: '数据' },
+  { id: 'comments', icon: MessageCircle, label: '评论管理', group: '数据' },
+  { id: 'templates', icon: LayoutTemplate, label: '模板', group: '数据' },
   { id: 'team', icon: Users, label: '空间', group: '数据' },
   { id: 'api', icon: Code2, label: 'API 与集成', group: '数据' },
   { id: 'ai', icon: Bot, label: 'AI 与隐私', group: '高级' },
@@ -105,6 +111,8 @@ export default function SettingsPage({ section }: { section: string }) {
             {current === 'editor' && <EditorSettings />}
             {current === 'security' && <SecuritySettings />}
             {current === 'data' && <DataSettings />}
+            {current === 'comments' && <CommentSettings />}
+            {current === 'templates' && <TemplateSettings />}
             {current === 'team' && <TeamSettings />}
             {current === 'api' && <ApiSettings />}
             {current === 'ai' && <AiSettings />}

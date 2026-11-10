@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { many, one } from '../db.js';
-import { requireAuth } from '../auth.js';
+import { clientIp, requireAuth } from '../auth.js';
 import { errors } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { getNoteForUser } from '../services/notes.js';
@@ -51,8 +51,8 @@ export default async function commentRoutes(app: FastifyInstance) {
     const body = parse(z.object({ body: z.string().trim().min(1).max(5000) }), request.body);
     await requireWorkspace(auth.user.id, note.workspaceId, 'read');
     const row = await one<{ id: string; created_at: Date; updated_at: Date }>(
-      `INSERT INTO comments (note_id, user_id, body) VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`,
-      [id, auth.user.id, body.body],
+      `INSERT INTO comments (note_id, user_id, body, ip) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
+      [id, auth.user.id, body.body, clientIp(request)],
     );
     if (note.createdBy !== auth.user.id) {
       await notify({
@@ -77,6 +77,60 @@ export default async function commentRoutes(app: FastifyInstance) {
         createdAt: row!.created_at.toISOString(),
         updatedAt: row!.updated_at.toISOString(),
       },
+    };
+  });
+
+  app.get('/api/comments/manage', async (request) => {
+    const auth = requireAuth(request);
+    const params = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      request.query,
+    );
+    const where = `n.deleted_at IS NULL AND (n.created_by = $1 OR c.user_id = $1)`;
+    const totalRow = await one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM comments c JOIN notes n ON n.id = c.note_id WHERE ${where}`,
+      [auth.user.id],
+    );
+    const rows = await many<{
+      id: string;
+      note_id: string;
+      user_id: string | null;
+      guest_name: string | null;
+      body: string;
+      resolved: boolean;
+      created_at: Date;
+      updated_at: Date;
+      display_name: string | null;
+      note_title: string;
+      note_created_by: string;
+    }>(
+      `SELECT c.id, c.note_id, c.user_id, c.guest_name, c.body, c.resolved, c.created_at, c.updated_at,
+        u.display_name, n.title AS note_title, n.created_by AS note_created_by
+       FROM comments c
+       JOIN notes n ON n.id = c.note_id
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE ${where}
+       ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
+      [auth.user.id, params.limit, params.offset],
+    );
+    return {
+      total: Number(totalRow?.count ?? 0),
+      comments: rows.map((row) => ({
+        id: row.id,
+        noteId: row.note_id,
+        noteTitle: row.note_title,
+        authorId: row.user_id,
+        authorName: row.display_name ?? row.guest_name ?? '访客',
+        isGuest: !row.user_id,
+        body: row.body,
+        resolved: row.resolved,
+        canDelete: row.user_id === auth.user.id || (row.user_id === null && row.note_created_by === auth.user.id),
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+      })),
     };
   });
 

@@ -10,6 +10,8 @@ import { attachmentThumbnailStorageKey, deleteBackupFile, readBackup, safeFilena
 import { attachmentStorageKeyFromObject, getObject } from '../lib/object-storage.js';
 import { getSetting, setSetting } from './settings.js';
 import { deleteOffsiteBackup, uploadOffsiteBackup } from './offsite.js';
+import { decryptBuffer } from '../lib/crypto.js';
+import { audit } from '../lib/audit.js';
 
 const exec = promisify(execFile);
 
@@ -17,6 +19,12 @@ export interface InstanceBackupSettings {
   enabled: boolean;
   frequencyHours: number;
   retentionCount: number;
+  drillEnabled: boolean;
+  drillFrequencyHours: number;
+  lastDrillAt: string | null;
+  lastDrillOk: boolean | null;
+  lastDrillError: string | null;
+  lastDrillBackup: string | null;
 }
 
 export async function getInstanceBackupSettings(): Promise<InstanceBackupSettings> {
@@ -25,6 +33,12 @@ export async function getInstanceBackupSettings(): Promise<InstanceBackupSetting
     enabled: value?.enabled === true,
     frequencyHours: Math.max(1, Number(value?.frequencyHours) || 24),
     retentionCount: Math.max(1, Number(value?.retentionCount) || 7),
+    drillEnabled: value?.drillEnabled !== false,
+    drillFrequencyHours: Math.max(1, Number(value?.drillFrequencyHours) || 24),
+    lastDrillAt: typeof value?.lastDrillAt === 'string' ? value.lastDrillAt : null,
+    lastDrillOk: typeof value?.lastDrillOk === 'boolean' ? value.lastDrillOk : null,
+    lastDrillError: typeof value?.lastDrillError === 'string' ? value.lastDrillError : null,
+    lastDrillBackup: typeof value?.lastDrillBackup === 'string' ? value.lastDrillBackup : null,
   };
 }
 
@@ -34,6 +48,12 @@ export async function saveInstanceBackupSettings(patch: Partial<InstanceBackupSe
     enabled: patch.enabled ?? current.enabled,
     frequencyHours: Math.max(1, Math.min(24 * 30, Math.round(patch.frequencyHours ?? current.frequencyHours))),
     retentionCount: Math.max(1, Math.min(365, Math.round(patch.retentionCount ?? current.retentionCount))),
+    drillEnabled: patch.drillEnabled ?? current.drillEnabled,
+    drillFrequencyHours: Math.max(1, Math.min(24 * 30, Math.round(patch.drillFrequencyHours ?? current.drillFrequencyHours))),
+    lastDrillAt: current.lastDrillAt,
+    lastDrillOk: current.lastDrillOk,
+    lastDrillError: current.lastDrillError,
+    lastDrillBackup: current.lastDrillBackup,
   };
   await setSetting('instanceBackup', next);
   return next;
@@ -163,6 +183,53 @@ export async function deleteInstanceBackup(id: string): Promise<void> {
   await query('DELETE FROM instance_backups WHERE id = $1', [id]);
 }
 
+export async function runInstanceRestoreDrill(actorId?: string | null): Promise<{ ok: boolean; backup: string | null; error: string | null }> {
+  const settings = await getInstanceBackupSettings();
+  const latest = await one<{ filename: string }>('SELECT filename FROM instance_backups ORDER BY created_at DESC LIMIT 1');
+  if (!latest) {
+    return { ok: false, backup: null, error: '没有可演练的整站备份' };
+  }
+  try {
+    const buffer = await readBackup(latest.filename);
+    const zip = new AdmZip(buffer);
+    const manifest = zip.getEntry('manifest.json');
+    const dump = zip.getEntry('database.dump');
+    if (!manifest || !dump) throw new Error('整站备份缺少 manifest 或 database.dump');
+    const dumpData = dump.getData();
+    if (dumpData.subarray(0, 5).toString() !== 'PGDMP') throw new Error('数据库导出格式无效');
+    const attachments = zip.getEntries().filter((entry) => entry.entryName.startsWith('attachments/') && !entry.isDirectory);
+    for (const entry of attachments.slice(0, 3)) {
+      decryptBuffer(entry.getData(), '360note:attachment');
+    }
+    const next = await saveInstanceBackupSettings({
+      drillEnabled: settings.drillEnabled,
+      drillFrequencyHours: settings.drillFrequencyHours,
+    });
+    const nextWithDrill = {
+      ...next,
+      lastDrillAt: new Date().toISOString(),
+      lastDrillOk: true,
+      lastDrillError: null,
+      lastDrillBackup: latest.filename,
+    };
+    await setSetting('instanceBackup', nextWithDrill);
+    await audit({ actorId, action: 'admin.instance_backup.drill', meta: { ok: true, backup: latest.filename, attachments: attachments.length }, ip: null });
+    return { ok: true, backup: latest.filename, error: null };
+  } catch (error) {
+    const message = (error as Error).message.slice(0, 500);
+    const next = await getInstanceBackupSettings();
+    await setSetting('instanceBackup', {
+      ...next,
+      lastDrillAt: new Date().toISOString(),
+      lastDrillOk: false,
+      lastDrillError: message,
+      lastDrillBackup: latest.filename,
+    });
+    await audit({ actorId, action: 'admin.instance_backup.drill', meta: { ok: false, backup: latest.filename, error: message }, ip: null });
+    return { ok: false, backup: latest.filename, error: message };
+  }
+}
+
 export async function runInstanceAutoBackup(): Promise<void> {
   const settings = await getInstanceBackupSettings();
   if (!settings.enabled) return;
@@ -171,4 +238,12 @@ export async function runInstanceAutoBackup(): Promise<void> {
   const admin = await one<{ id: string }>("SELECT id FROM users WHERE role = 'admin' AND deleted_at IS NULL ORDER BY created_at LIMIT 1");
   if (!admin) return;
   await createInstanceBackup(admin.id);
+}
+
+
+export async function runScheduledRestoreDrill(): Promise<void> {
+  const settings = await getInstanceBackupSettings();
+  if (!settings.enabled || !settings.drillEnabled) return;
+  if (settings.lastDrillAt && Date.now() - new Date(settings.lastDrillAt).getTime() < settings.drillFrequencyHours * 60 * 60 * 1000) return;
+  await runInstanceRestoreDrill(null);
 }

@@ -14,20 +14,33 @@ export default async function accountRoutes(app: FastifyInstance) {
     config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
   }, async (request) => {
     const auth = requireAuth(request);
-    const result = await createUserExport({
-      userId: auth.user.id,
-      email: auth.user.email,
-      displayName: auth.user.display_name,
-      prefs: auth.user.prefs,
-    });
-    await audit({
-      actorId: auth.user.id,
-      action: 'account.export',
-      targetType: 'user',
-      targetId: auth.user.id,
-      ip: clientIp(request),
-    });
-    return result;
+    try {
+      const result = await createUserExport({
+        userId: auth.user.id,
+        email: auth.user.email,
+        displayName: auth.user.display_name,
+        prefs: auth.user.prefs,
+      });
+      await audit({
+        actorId: auth.user.id,
+        action: 'account.export',
+        targetType: 'user',
+        targetId: auth.user.id,
+        meta: { ok: true },
+        ip: clientIp(request),
+      });
+      return result;
+    } catch (error) {
+      await audit({
+        actorId: auth.user.id,
+        action: 'account.export.failed',
+        targetType: 'user',
+        targetId: auth.user.id,
+        meta: { ok: false, error: (error as Error).message.slice(0, 500) },
+        ip: clientIp(request),
+      });
+      throw error;
+    }
   });
 
   app.delete('/api/me', async (request, reply) => {

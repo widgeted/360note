@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Cloud, CloudDownload, CloudUpload, HardDrive, PlugZap, Save, ShieldCheck } from 'lucide-react';
+import { Cloud, CloudDownload, CloudUpload, Download, HardDrive, PlugZap, RefreshCw, Save, ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';
 import { toast } from '../../stores/toast';
-import { formatBytes } from '../../lib/utils';
+import { formatBytes, formatRelativeShort } from '../../lib/utils';
 
 interface OffsiteConfig {
   enabled: boolean;
@@ -61,6 +61,10 @@ export function OffsiteSettings() {
   const [testing, setTesting] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [objects, setObjects] = useState<Array<{ key: string; size: number; lastModified: string | null; kind: string }>>([]);
+  const [objectsLoading, setObjectsLoading] = useState(false);
+  const [verifyState, setVerifyState] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [restoring, setRestoring] = useState<string | null>(null);
   const [secret, setSecret] = useState('');
   const [purgeRemote, setPurgeRemote] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -79,6 +83,7 @@ export function OffsiteSettings() {
     if (user?.role !== 'admin') return;
     api.get<{ offsite: OffsiteConfig }>('/api/admin/offsite').then((res) => setConfig(res.offsite)).catch(() => {});
     void loadUsage(true);
+    void loadObjects();
   }, [user?.role, loadUsage]);
 
   useEffect(() => {
@@ -116,6 +121,57 @@ export function OffsiteSettings() {
   }, [usage?.migration.running, loadUsage, t]);
 
   if (user?.role !== 'admin') return null;
+
+  async function loadObjects() {
+    setObjectsLoading(true);
+    try {
+      const response = await api.get<{ objects: Array<{ key: string; size: number; lastModified: string | null; kind: string }> }>('/api/admin/offsite/objects?limit=200');
+      setObjects(response.objects);
+    } catch {
+      /* storage may not be configured */
+    } finally {
+      setObjectsLoading(false);
+    }
+  }
+
+  async function verifyObject(key: string) {
+    try {
+      const result = await api.post<{ kind: string; bytes?: number; counts?: { notes: number; attachments: number } }>('/api/admin/offsite/objects/verify', { key });
+      setVerifyState((current) => ({
+        ...current,
+        [key]: {
+          ok: true,
+          text: result.kind === 'workspace-backup'
+            ? t('校验通过 · {notes} 篇笔记 / {attachments} 个附件', { notes: result.counts?.notes ?? 0, attachments: result.counts?.attachments ?? 0 })
+            : t('校验通过 · {size}', { size: formatBytes(result.bytes ?? 0) }),
+        },
+      }));
+    } catch (error) {
+      setVerifyState((current) => ({ ...current, [key]: { ok: false, text: (error as Error).message } }));
+    }
+  }
+
+  async function restoreObject(key: string) {
+    if (!window.confirm(t('把这份工作区备份恢复为副本？不会覆盖当前内容。'))) return;
+    setRestoring(key);
+    try {
+      const response = await api.post<{ jobId: string }>('/api/admin/offsite/objects/restore', { key, mode: 'merge' });
+      for (let i = 0; i < 240; i++) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const job = await api.get<{ job: { status: string; error: string | null } }>(`/api/jobs/${response.jobId}`);
+        if (job.job.status === 'done') {
+          toast('success', t('备份已恢复为副本'), t('新的副本会显示在对应工作区的笔记列表中。'));
+          return;
+        }
+        if (job.job.status === 'error') throw new Error(job.job.error || t('恢复失败'));
+      }
+      throw new Error(t('恢复超时，请稍后在任务列表查看'));
+    } catch (error) {
+      toast('error', t('恢复失败'), (error as Error).message);
+    } finally {
+      setRestoring(null);
+    }
+  }
 
   async function save() {
     if (!config) return;
@@ -395,6 +451,50 @@ export function OffsiteSettings() {
         <p className="setting-note">
           {t('附件通过站点域名加密代理访问，因此图片 URL 显示为 360biji.com 或 360note.com，而不是对象存储域名；实际文件保存在对象存储。')}
         </p>
+      </div>
+
+      <div className="setting-card" style={{ marginTop: 12 }}>
+        <div className="setting-row" style={{ paddingTop: 0 }}>
+          <div className="setting-row-main">
+            <div className="setting-row-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('对象存储文件')}</div>
+            <div className="setting-row-desc">{t('浏览、校验和恢复对象存储中的备份与附件。恢复工作区备份会以副本形式合并，不覆盖现有内容。')}</div>
+          </div>
+          <div className="setting-row-control">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadObjects()} disabled={objectsLoading}>
+              {objectsLoading ? <span className="spinner" /> : <RefreshCw size={13} />} {t('刷新文件')}
+            </button>
+          </div>
+        </div>
+        <div className="setting-card" style={{ padding: 0, overflowX: 'auto', marginTop: 8 }}>
+          <table className="data-table admin-object-table">
+            <thead><tr><th>{t('对象')}</th><th>{t('类型')}</th><th>{t('大小')}</th><th>{t('更新时间')}</th><th>{t('操作')}</th></tr></thead>
+            <tbody>
+              {objects.length === 0 ? (
+                <tr><td colSpan={5}><div className="context-empty">{objectsLoading ? t('加载中…') : t('没有对象或尚未配置连接')}</div></td></tr>
+              ) : objects.map((object) => (
+                <tr key={object.key}>
+                  <td><div className="admin-object-key" title={object.key}>{object.key}</div></td>
+                  <td>{object.kind === 'attachment' ? t('附件') : object.kind === 'workspace-backup' ? t('工作区备份') : object.kind === 'instance-backup' ? t('整站备份') : t('其他')}</td>
+                  <td>{formatBytes(object.size)}</td>
+                  <td className="setting-note">{object.lastModified ? formatRelativeShort(object.lastModified) : '—'}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void verifyObject(object.key)}>{t('校验')}</button>
+                      <a className="icon-btn icon-btn-sm" href={`/api/admin/offsite/objects/download?key=${encodeURIComponent(object.key)}`} title={t('下载')} aria-label={t('下载')}><Download size={13} /></a>
+                      {object.kind === 'workspace-backup' && (
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void restoreObject(object.key)} disabled={restoring === object.key}>
+                          {restoring === object.key ? <span className="spinner" /> : null} {t('恢复为副本')}
+                        </button>
+                      )}
+                    </div>
+                    {verifyState[object.key] && <div className={`setting-note ${verifyState[object.key].ok ? 'text-green' : 'text-red'}`} style={{ marginTop: 3 }}>{verifyState[object.key].text}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="setting-note" style={{ marginTop: 8 }}>{t('整站备份只支持校验和下载，数据库级恢复请按运维手册执行。')}</p>
       </div>
     </section>
   );

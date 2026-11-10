@@ -123,7 +123,7 @@ Fastify API (Node.js, TypeScript)
 | 表 | 关键字段 | 说明 |
 |---|---|---|
 | `share_links` | id, note_id, token_hash, token_cipher, permission(view/comment/edit), password_hash, expires_at, revoked_at, view_count, last_accessed_at | 分享链接 |
-| `comments` | id, note_id, user_id, guest_name, body, resolved, created_at | 评论 |
+| `comments` | id, note_id, user_id, guest_name, body, resolved, ip, created_at | 评论；公开访客评论记录 IP |
 
 分享 token：24 字节 CSPRNG base64url（192 bit）。只存 SHA-256 哈希用于查找；另以 AES-GCM 加密存一份，供笔记所有者再次复制链接。密码使用 scrypt；解锁后签发 2 小时 HMAC Token，写入 `nh_share_access` Cookie（Path=`/api/public`），用于后续 API/图片请求。
 
@@ -133,6 +133,7 @@ Fastify API (Node.js, TypeScript)
 |---|---|
 | `jobs` | 导入预览/执行、备份创建/恢复的异步任务；进度/结果/错误 |
 | `backups` | 工作区备份：filename, storage_key, kind(auto/manual/pre-restore), status, note_count, attachment_count, meta |
+| `templates` | id, user_id, name, description, title_template, content_template, created_at | 用户自定义模板与变量 |
 | `notifications` | 应用内通知（安全、邀请、评论、共享编辑） |
 | `api_tokens` | 个人 API 令牌（哈希存储、前缀、scope、最后使用、撤销） |
 | `instance_settings` | AI、备份策略等实例级设置；敏感值 AES-GCM 加密 |
@@ -317,6 +318,7 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 ```
 manifest.json        # format, version, createdAt, workspace, counts
 workspace.json       # folders, tags, notes, noteTags, attachments meta, versions, comments
+attachments/<sha256>.bin  # 相同内容只存一份（备份内去重）
 attachments/<attachmentId>/<filename>
 ```
 

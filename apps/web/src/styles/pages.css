@@ -904,6 +904,11 @@
     line-height: 1.7;
   }
 
+  .prose-figure figcaption {
+    color: #555 !important;
+    font-size: 9pt;
+  }
+
   .public-body .prose h1,
   .public-body .prose h2,
   .public-body .prose h3,
@@ -965,4 +970,19 @@
   .share-action-print {
     display: none;
   }
+}
+
+.prose-figure {
+  margin: 20px 0;
+}
+
+.prose-figure img {
+  margin: 0;
+}
+
+.prose-figure figcaption {
+  margin-top: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
 }

@@ -448,8 +448,8 @@ export default async function shareRoutes(app: FastifyInstance) {
     );
     if (!note) throw errors.notFound('笔记不存在');
     const row = await one<{ id: string; created_at: Date; updated_at: Date }>(
-      `INSERT INTO comments (note_id, guest_name, body) VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`,
-      [note.id, body.guestName || '访客', body.body],
+      `INSERT INTO comments (note_id, guest_name, body, ip) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
+      [note.id, body.guestName || '访客', body.body, clientIp(request)],
     );
     await notify({
       userId: note.created_by,

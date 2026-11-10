@@ -3,6 +3,7 @@ import path from 'node:path';
 import { paths } from '../config.js';
 import { many, one } from '../db.js';
 import { errors } from '../lib/errors.js';
+import { audit } from '../lib/audit.js';
 import {
   attachmentObjectStorageKey,
   attachmentStorageKeyFromObject,
@@ -35,6 +36,8 @@ export interface AttachmentMigrationState {
   error: string | null;
   message: string | null;
 }
+
+let migrationActorId: string | null = null;
 
 let state: AttachmentMigrationState = {
   phase: 'idle',
@@ -238,6 +241,11 @@ async function runEnable(): Promise<void> {
       );
     } else {
       const cleanup = await cleanupLocalAttachmentCopies();
+      void audit({
+        actorId: migrationActorId,
+        action: 'admin.offsite.attachments.enable.finish',
+        meta: { ok: true, processed: state.processed, cleanup },
+      });
       finishState(
         null,
         cleanup.retained > 0
@@ -246,6 +254,11 @@ async function runEnable(): Promise<void> {
       );
     }
   } catch (error) {
+    void audit({
+      actorId: migrationActorId,
+      action: 'admin.offsite.attachments.enable.finish',
+      meta: { ok: false, error: (error as Error).message.slice(0, 500) },
+    });
     finishState((error as Error).message.slice(0, 500), '迁移未完成，附件仍按各自记录的位置读取。');
   } finally {
     setAttachmentStorageMigrationMode(false);
@@ -284,24 +297,45 @@ async function runDisable(purgeRemote: boolean): Promise<void> {
       try {
         const deleted = await purgeObjects('attachments/');
         invalidateAttachmentUsage();
+        void audit({
+          actorId: migrationActorId,
+          action: 'admin.offsite.attachments.disable.finish',
+          meta: { ok: true, processed: state.processed, purged: deleted },
+        });
         finishState(null, `附件已全部取回本机，并清理对象存储中的 ${deleted} 个附件对象。`);
       } catch (error) {
+        void audit({
+          actorId: migrationActorId,
+          action: 'admin.offsite.attachments.disable.finish',
+          meta: { ok: false, processed: state.processed, error: (error as Error).message.slice(0, 300) },
+        });
         finishState(
           `附件已全部取回本机，但清理对象存储失败：${(error as Error).message.slice(0, 300)}`,
           '附件已安全保存在本机，可稍后手动清理对象存储。',
         );
       }
     } else {
+      void audit({
+        actorId: migrationActorId,
+        action: 'admin.offsite.attachments.disable.finish',
+        meta: { ok: true, processed: state.processed, purged: 0 },
+      });
       finishState(null, '附件已全部取回本机，对象存储中的旧副本保留未删除。');
     }
   } catch (error) {
+    void audit({
+      actorId: migrationActorId,
+      action: 'admin.offsite.attachments.disable.finish',
+      meta: { ok: false, error: (error as Error).message.slice(0, 500) },
+    });
     finishState((error as Error).message.slice(0, 500), '取回未完成，对象存储附件仍可正常读取。');
   } finally {
     setAttachmentStorageMigrationMode(false);
   }
 }
 
-export async function startEnableAttachments(): Promise<AttachmentMigrationState> {
+export async function startEnableAttachments(actorId?: string): Promise<AttachmentMigrationState> {
+  migrationActorId = actorId ?? null;
   if (state.running) throw errors.conflict('附件迁移正在进行，请稍候');
   const config = await getObjectStorageConfig();
   if (!objectStorageConfigured(config)) throw errors.badRequest('请先保存完整的对象存储连接配置');
@@ -313,7 +347,8 @@ export async function startEnableAttachments(): Promise<AttachmentMigrationState
   return getAttachmentMigrationState();
 }
 
-export async function startDisableAttachments(purgeRemote: boolean): Promise<AttachmentMigrationState> {
+export async function startDisableAttachments(purgeRemote: boolean, actorId?: string): Promise<AttachmentMigrationState> {
+  migrationActorId = actorId ?? null;
   if (state.running) throw errors.conflict('附件迁移正在进行，请稍候');
   const config = await getObjectStorageConfig();
   if (!objectStorageConfigured(config)) throw errors.badRequest('对象存储配置不完整，无法取回附件');

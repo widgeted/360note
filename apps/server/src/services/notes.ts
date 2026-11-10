@@ -240,9 +240,7 @@ export async function getNoteForUser(noteId: string, userId: string): Promise<{ 
 }
 
 function untitledTitle(): string {
-  const date = new Date();
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `未命名笔记 ${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  return '未命名笔记';
 }
 
 function deriveTitle(title: string | undefined, content: string): string {

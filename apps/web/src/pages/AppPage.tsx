@@ -12,6 +12,8 @@ import { EditorPane, EmptyEditorState } from '../components/editor/EditorPane';
 import SettingsPage from './SettingsPage';
 import { Modal } from '../components/Modal';
 import { toast } from '../stores/toast';
+import { api } from '../lib/api';
+import { applyCustomTemplate, type CustomTemplate } from '../lib/templates';
 import { cn } from '../lib/utils';
 
 export default function AppPage() {
@@ -40,8 +42,16 @@ export default function AppPage() {
   const sidebarMobileOpen = useAppStore((state) => state.sidebarMobileOpen);
   const setMobileSidebar = useAppStore((state) => state.setMobileSidebar);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const newNoteGuard = useRef(false);
   const autoOpenedNote = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!showTemplates) return;
+    api.get<{ templates: CustomTemplate[] }>('/api/templates')
+      .then((response) => setCustomTemplates(response.templates))
+      .catch(() => {});
+  }, [showTemplates]);
 
   const settingsMode = location.pathname.startsWith('/app/settings');
   const settingsSection = location.pathname.match(/^\/app\/settings\/([^/]+)/)?.[1] ?? 'account';
@@ -208,6 +218,20 @@ export default function AppPage() {
     if (created) navigate(`/app/note/${created.id}`);
   }
 
+  async function useCustomTemplate(template: CustomTemplate) {
+    const currentWorkspace = workspaces.find((entry) => entry.id === workspaceId);
+    const resolved = applyCustomTemplate(template, {
+      user: user?.displayName ?? '',
+      workspace: currentWorkspace?.name ?? '',
+    });
+    const created = await createNote({
+      title: resolved.title,
+      contentMd: resolved.contentMd,
+    });
+    setShowTemplates(false);
+    if (created) navigate(`/app/note/${created.id}`);
+  }
+
   const showEditor = Boolean(noteId);
   const appClass = cn(
     'app-root',
@@ -291,6 +315,30 @@ export default function AppPage() {
               <Plus size={14} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           ))}
+          {customTemplates.length > 0 && (
+            <>
+              <div className="setting-note" style={{ marginTop: 10 }}>{t('自定义模板')}</div>
+              {customTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="backlink-item"
+                  onClick={() => void useCustomTemplate(template)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}
+                >
+                  <span className="feature-icon" style={{ margin: 0, width: 30, height: 30 }}><FileText size={14} /></span>
+                  <span style={{ flex: 1 }}>
+                    <span className="backlink-title">{template.name}</span>
+                    <span className="backlink-excerpt">{template.description || t('自定义模板')}</span>
+                  </span>
+                  <Plus size={14} style={{ color: 'var(--text-tertiary)' }} />
+                </button>
+              ))}
+            </>
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setShowTemplates(false); navigate('/app/settings/templates'); }}>
+            {t('管理模板')}
+          </button>
         </div>
       </Modal>
 

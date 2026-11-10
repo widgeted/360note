@@ -25,10 +25,11 @@ import importRoutes from './routes/import.js';
 import backupRoutes from './routes/backups.js';
 import adminRoutes from './routes/admin.js';
 import accountRoutes from './routes/account.js';
+import templateRoutes from './routes/templates.js';
 import { resumePendingOcr } from './lib/ocr.js';
 import { recoverInterruptedJobs } from './lib/jobs.js';
 import { cleanupImportUploads, runAutoBackups } from './services/backups.js';
-import { runInstanceAutoBackup } from './services/instance-backups.js';
+import { runInstanceAutoBackup, runScheduledRestoreDrill } from './services/instance-backups.js';
 
 async function buildServer() {
   const app = Fastify({
@@ -138,6 +139,7 @@ async function buildServer() {
   await app.register(backupRoutes);
   await app.register(adminRoutes);
   await app.register(accountRoutes);
+  await app.register(templateRoutes);
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith('/api/')) {
@@ -202,6 +204,7 @@ async function start() {
       try {
         await runAutoBackups();
         await runInstanceAutoBackup();
+        await runScheduledRestoreDrill();
       } catch (error) {
         app.log.error({ error }, 'auto backup run failed');
       } finally {
@@ -213,6 +216,9 @@ async function start() {
   setInterval(() => {
     void cleanupImportUploads();
   }, 6 * 60 * 60 * 1000).unref();
+  setInterval(() => {
+    void runScheduledRestoreDrill().catch((error) => app.log.error({ error }, 'scheduled restore drill failed'));
+  }, 60 * 60 * 1000).unref();
 
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');

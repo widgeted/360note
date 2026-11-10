@@ -605,6 +605,13 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get('/api/notifications', async (request) => {
     const auth = requireAuth(request);
     const { many } = await import('../db.js');
+    const params = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      request.query,
+    );
     const rows = await many<{
       id: string;
       type: string;
@@ -613,11 +620,17 @@ export default async function authRoutes(app: FastifyInstance) {
       link: string | null;
       read_at: Date | null;
       created_at: Date;
-    }>('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [auth.user.id]);
-    const unread = await one<{ count: string }>(
-      'SELECT count(*)::text AS count FROM notifications WHERE user_id = $1 AND read_at IS NULL',
-      [auth.user.id],
-    );
+    }>('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3', [auth.user.id, params.limit, params.offset]);
+    const [unread, total] = await Promise.all([
+      one<{ count: string }>(
+        'SELECT count(*)::text AS count FROM notifications WHERE user_id = $1 AND read_at IS NULL',
+        [auth.user.id],
+      ),
+      one<{ count: string }>(
+        'SELECT count(*)::text AS count FROM notifications WHERE user_id = $1',
+        [auth.user.id],
+      ),
+    ]);
     return {
       notifications: rows.map((row) => ({
         id: row.id,
@@ -629,6 +642,7 @@ export default async function authRoutes(app: FastifyInstance) {
         createdAt: row.created_at.toISOString(),
       })),
       unread: Number(unread?.count ?? 0),
+      total: Number(total?.count ?? 0),
     };
   });
 

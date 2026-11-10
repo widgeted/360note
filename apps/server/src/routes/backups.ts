@@ -34,8 +34,13 @@ export default async function backupRoutes(app: FastifyInstance) {
     await requireWorkspace(auth.user.id, id, 'manage');
     const jobId = await createJob('backup-create', { workspaceId: id }, auth.user.id);
     runJob(jobId, async () => {
-      const backup = await createBackup({ workspaceId: id, userId: auth.user.id, kind: 'manual', jobId });
-      return { stage: 'done', backup };
+      try {
+        const backup = await createBackup({ workspaceId: id, userId: auth.user.id, kind: 'manual', jobId });
+        return { stage: 'done', backup };
+      } catch (error) {
+        await audit({ workspaceId: id, actorId: auth.user.id, action: 'backup.create.failed', targetType: 'workspace', targetId: id, meta: { jobId, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+        throw error;
+      }
     });
     await audit({ workspaceId: id, actorId: auth.user.id, action: 'backup.create', targetType: 'workspace', targetId: id, ip: clientIp(request) });
     return { jobId };
@@ -83,8 +88,13 @@ export default async function backupRoutes(app: FastifyInstance) {
     await requireWorkspace(auth.user.id, workspaceId, body.mode === 'replace' ? 'manage' : 'write');
     const jobId = await createJob('backup-restore', { workspaceId, backupId: id, mode: body.mode }, auth.user.id);
     runJob(jobId, async () => {
-      const buffer = await downloadBackupBuffer(record.filename);
-      return restoreBackup({ workspaceId, userId: auth.user.id, buffer, mode: body.mode, jobId });
+      try {
+        const buffer = await downloadBackupBuffer(record.filename);
+        return await restoreBackup({ workspaceId, userId: auth.user.id, buffer, mode: body.mode, jobId });
+      } catch (error) {
+        await audit({ workspaceId, actorId: auth.user.id, action: 'backup.restore.failed', targetType: 'backup', targetId: id, meta: { mode: body.mode, jobId, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+        throw error;
+      }
     });
     await audit({ workspaceId, actorId: auth.user.id, action: 'backup.restore', targetType: 'backup', targetId: id, meta: { mode: body.mode }, ip: clientIp(request) });
     return { jobId };
@@ -111,6 +121,7 @@ export default async function backupRoutes(app: FastifyInstance) {
       preview = previewBackup(buffer, id);
     } catch (error) {
       await fs.rm(storedPath, { force: true });
+      await audit({ workspaceId: id, actorId: auth.user.id, action: 'backup.upload.failed', targetType: 'workspace', targetId: id, meta: { error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
       throw error;
     }
     const jobId = await createJob(
@@ -149,6 +160,9 @@ export default async function backupRoutes(app: FastifyInstance) {
           mode: body.mode,
           jobId,
         });
+      } catch (error) {
+        await audit({ workspaceId: payload.workspaceId, actorId: auth.user.id, action: 'backup.restore.upload.failed', targetType: 'backup', targetId: uploadId, meta: { mode: body.mode, jobId, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
+        throw error;
       } finally {
         await fs.rm(payload.storedPath, { force: true }).catch(() => {});
       }

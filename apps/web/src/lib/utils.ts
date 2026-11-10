@@ -23,11 +23,14 @@ export function attachmentThumbnailUrl(src: string): string {
   return `${src}${src.includes('?') ? '&' : '?'}thumb=1`;
 }
 
-export function untitledNoteTitle(createdAt: string | Date = new Date()): string {
-  const date = new Date(createdAt);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-  return translate('未命名笔记 {date}', { date: stamp });
+export function untitledNoteTitle(_createdAt: string | Date = new Date()): string {
+  // Keep the default title short. The previous timestamp suffix wrapped to a
+  // second line on mobile and looked like part of the note title.
+  return translate('未命名笔记');
+}
+
+export function isAutoNoteTitle(title: string): boolean {
+  return /^(?:未命名笔记|Untitled note)(?:\s\d{14})?$/i.test(title.trim());
 }
 
 export function formatBytes(bytes: number): string {

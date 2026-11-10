@@ -42,6 +42,7 @@ import {
   formatFullDate,
   formatRelativeShort,
   shortcutLabel,
+  isAutoNoteTitle,
   untitledNoteTitle,
   wordCount,
 } from '../../lib/utils';
@@ -135,6 +136,20 @@ export function EditorPane({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [imageCaption, setImageCaption] = useState<{ src: string; alt: string; caption: string } | null>(null);
+
+  useEffect(() => {
+    function onEdit(event: Event) {
+      const detail = (event as CustomEvent<{ src?: string; alt?: string; title?: string }>).detail;
+      if (!detail?.src) return;
+      const alt = (detail.alt ?? '').trim();
+      const title = (detail.title ?? '').trim();
+      const auto = Boolean(alt && title && alt === title);
+      setImageCaption({ src: detail.src, alt: auto ? '' : alt, caption: auto ? '' : title });
+    }
+    window.addEventListener('nh:edit-image-caption', onEdit);
+    return () => window.removeEventListener('nh:edit-image-caption', onEdit);
+  }, []);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const contentRef = useRef(content);
@@ -172,17 +187,18 @@ export function EditorPane({
   useEffect(() => {
     if (!note) return;
     const fresh = useAppStore.getState().freshNoteId === note.id;
-    setTitle(fresh ? '' : note.title);
+    const showEmptyTitle = isAutoNoteTitle(note.title);
+    setTitle(showEmptyTitle ? '' : note.title);
     const normalized = stripDuplicateTitle(note.contentMd, note.title);
     setContent(normalized);
     contentRef.current = normalized;
-    titleValueRef.current = fresh ? '' : note.title;
+    titleValueRef.current = showEmptyTitle ? '' : note.title;
     baseVersionRef.current = note.version;
     dirtyRef.current = false;
     setRichSeed((value) => value + 1);
     if (fresh) {
       useAppStore.setState({ freshNoteId: null });
-      requestAnimationFrame(() => titleRef.current?.focus());
+      if (showEmptyTitle) requestAnimationFrame(() => titleRef.current?.focus());
     }
     let active = true;
     readDraft(note.id).then((stored) => {
@@ -433,6 +449,33 @@ export function EditorPane({
     contentRef.current = next;
     scheduleSave();
     scheduleDraft();
+  }
+
+  function saveImageCaption() {
+    if (!imageCaption) return;
+    const current = editorHandle?.editor;
+    if (current) {
+      let target: number | null = null;
+      current.state.doc.descendants((node, position) => {
+        if (
+          node.type.name === 'image' &&
+          (node.attrs.src === imageCaption.src || node.attrs.originalSrc === imageCaption.src)
+        ) {
+          target = position;
+          return false;
+        }
+        return true;
+      });
+      if (target !== null) {
+        current
+          .chain()
+          .focus()
+          .setNodeSelection(target)
+          .updateAttributes('image', { alt: imageCaption.alt.trim(), title: imageCaption.caption.trim() })
+          .run();
+      }
+    }
+    setImageCaption(null);
   }
 
   async function toggleMode() {
@@ -895,6 +938,50 @@ export function EditorPane({
           {focusMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />} {focusMode ? t('退出聚焦') : t('聚焦')}
         </button>
       </div>
+
+      <Modal
+        open={Boolean(imageCaption)}
+        onClose={() => setImageCaption(null)}
+        title={t('图片说明')}
+        description={t('说明文字会显示在分享页和打印稿的图片下方；留空则不占额外空间。')}
+        size="sm"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setImageCaption(null)}>{t('取消')}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={saveImageCaption}>{t('保存')}</button>
+          </>
+        }
+      >
+        {imageCaption && (
+          <>
+            <div className="field">
+              <label>{t('替代文本（alt）')}</label>
+              <input
+                className="input"
+                value={imageCaption.alt}
+                onChange={(event) => setImageCaption({ ...imageCaption, alt: event.target.value })}
+                placeholder={t('给无法显示图片的读者')}
+                maxLength={300}
+              />
+            </div>
+            <div className="field" style={{ marginTop: 10 }}>
+              <label>{t('图片说明')}</label>
+              <textarea
+                className="input"
+                rows={3}
+                value={imageCaption.caption}
+                onChange={(event) => setImageCaption({ ...imageCaption, caption: event.target.value })}
+                placeholder={t('例如：会议现场白板记录')}
+                maxLength={500}
+                style={{ height: 'auto', paddingTop: 8, paddingBottom: 8 }}
+              />
+            </div>
+            <p className="setting-note" style={{ marginTop: 8 }}>
+              {t('只填写替代文本时也会作为说明显示；两者都留空则保持现状。')}
+            </p>
+          </>
+        )}
+      </Modal>
 
       <Modal
         open={showExport}

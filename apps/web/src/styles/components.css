@@ -2544,3 +2544,53 @@ a.btn {
   background: var(--accent, var(--green));
   transition: width 0.25s ease;
 }
+
+.admin-comment-table td {
+  vertical-align: top;
+}
+
+.admin-comment-table th,
+.admin-comment-table td {
+  white-space: nowrap;
+}
+
+.admin-comment-table td:first-child {
+  min-width: 280px;
+  max-width: 560px;
+  white-space: normal;
+}
+
+.admin-comment-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.admin-comment-note {
+  display: block;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.admin-object-table td {
+  vertical-align: top;
+}
+
+.admin-object-key {
+  min-width: 260px;
+  max-width: 520px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.text-green {
+  color: var(--green);
+}
+
+.text-red {
+  color: var(--red);
+}

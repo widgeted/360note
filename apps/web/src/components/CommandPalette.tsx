@@ -287,7 +287,7 @@ export function CommandPalette() {
     {
       id: 'templates',
       title: t('从模板创建'),
-      description: t('会议记录、日报、项目简报'),
+      description: t('内置模板与自定义模板'),
       icon: <Wand2 size={15} />,
       keywords: 'template meeting daily project',
       run: () => {
