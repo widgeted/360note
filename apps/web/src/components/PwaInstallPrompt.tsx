@@ -121,9 +121,7 @@ export function PwaInstallPrompt() {
         <div className="pwa-install-text">
           {mode === 'ios' ? (
             <>
-              <MoreHorizontal size={13} /> {t('点击“更多”')}{t('，再点击菜单中的')}
-              <Share size={13} /> {t('“共享”')}{t('，然后选择')}
-              <SquarePlus size={13} /> {t('“添加到主屏幕”')}
+              {t('点击')}{' '}<MoreHorizontal size={13} />{' '}{t('“更多”')}{t('，再点击菜单中的')}{' '}<Share size={13} />{' '}{t('“共享”')}{t('，然后选择')}{' '}<SquarePlus size={13} />{' '}{t('“添加到主屏幕”')}
             </>
           ) : (
             t('安装后可以像 App 一样打开，离线草稿仍会保留。')

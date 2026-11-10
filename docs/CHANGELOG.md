@@ -3,6 +3,15 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.38] — 2026-11-10
+
+iOS 安装提示图标排版。
+
+### Fixed
+
+- “更多”“共享”“添加到主屏幕”图标分别放在对应文字前方，而不是放在“点击”前方。
+- 每个内联图标前后都有明确空格，避免文字与图标粘连。
+
 ## [0.1.37] — 2026-11-10
 
 安装提示图标与空间菜单对齐修正。
