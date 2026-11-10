@@ -131,17 +131,17 @@ export async function deleteObject(storageKey: string): Promise<void> {
   await client(config).send(new DeleteObjectCommand({ Bucket: config.bucket, Key: keyFor(config, storageKey) }));
 }
 
-export async function headObject(storageKey: string): Promise<{ exists: boolean; size: number }> {
+export async function headObject(storageKey: string): Promise<{ exists: boolean; size: number; etag: string | null }> {
   const config = await getObjectStorageConfig();
-  if (!objectStorageConfigured(config)) return { exists: false, size: 0 };
+  if (!objectStorageConfigured(config)) return { exists: false, size: 0, etag: null };
   try {
     const response = await client(config).send(
       new HeadObjectCommand({ Bucket: config.bucket, Key: keyFor(config, storageKey) }),
     );
-    return { exists: true, size: Number(response.ContentLength ?? 0) };
+    return { exists: true, size: Number(response.ContentLength ?? 0), etag: response.ETag?.replace(/^"|"$/g, '') ?? null };
   } catch (error) {
     const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
-    if (status === 404) return { exists: false, size: 0 };
+    if (status === 404) return { exists: false, size: 0, etag: null };
     throw error;
   }
 }

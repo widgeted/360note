@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { config, paths } from '../config.js';
-import { encryptBuffer, decryptBuffer } from './crypto.js';
+import { encryptBuffer, decryptBuffer, encryptFile, decryptFile } from './crypto.js';
 import { attachmentObjectStorageKey, attachmentStorageKeyFromObject, deleteObject, getObject, getObjectStorageConfig, objectExists, objectStorageConfigured, putObject, attachmentStorageMigrationMode } from './object-storage.js';
 
 const ATTACHMENT_AAD = '360note:attachment';
@@ -36,8 +36,14 @@ export async function saveAttachment(
   data: Buffer,
   target?: 'local' | 's3',
 ): Promise<string> {
-  const config = await getObjectStorageConfig();
-  const wantS3 = target === 's3' || (target === undefined && config.attachmentsEnabled && objectStorageConfigured(config) && !attachmentStorageMigrationMode());
+  let config: Awaited<ReturnType<typeof getObjectStorageConfig>> | null = null;
+  try {
+    config = await getObjectStorageConfig();
+  } catch (error) {
+    // A broken offsite secret must never stop local attachments from working.
+    console.warn('[storage] object storage config unavailable', (error as Error).message);
+  }
+  const wantS3 = target === 's3' || (target === undefined && config?.attachmentsEnabled === true && objectStorageConfigured(config) && !attachmentStorageMigrationMode());
   const effectiveKey = storageKey.startsWith('s3:') || !wantS3 ? storageKey : attachmentObjectStorageKey(storageKey);
   const encrypted = encryptBuffer(data, ATTACHMENT_AAD);
   if (effectiveKey.startsWith('s3:')) {
@@ -100,8 +106,33 @@ export async function saveBackup(filename: string, data: Buffer): Promise<number
   const target = path.join(paths.backups, backupStorageKey(filename));
   assertInside(paths.backups, target);
   const encrypted = encryptBuffer(data, BACKUP_AAD);
-  await fsp.writeFile(target, encrypted, { mode: 0o600 });
+  await fsp.writeFile(target, encrypted, { mode: 0o600, flag: 'wx' });
   return encrypted.length;
+}
+
+/** Encrypt an on-disk archive into the backup store without buffering it. */
+export async function saveBackupFromFile(filename: string, sourcePath: string): Promise<number> {
+  const target = path.join(paths.backups, backupStorageKey(filename));
+  assertInside(paths.backups, target);
+  const temp = `${target}.tmp-${crypto.randomUUID()}`;
+  try {
+    const size = await encryptFile(sourcePath, temp, BACKUP_AAD);
+    // link() is exclusive: a colliding backup name must fail instead of
+    // overwriting another workspace's archive.
+    await fsp.link(temp, target);
+    await fsp.rm(temp, { force: true });
+    return size;
+  } catch (error) {
+    await fsp.rm(temp, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+/** Decrypt a stored backup into a temporary file for preview/restore. */
+export async function readBackupToFile(filename: string, outputPath: string): Promise<void> {
+  const target = path.join(paths.backups, backupStorageKey(filename));
+  assertInside(paths.backups, target);
+  await decryptFile(target, outputPath, BACKUP_AAD);
 }
 
 export async function readBackup(filename: string): Promise<Buffer> {
@@ -151,9 +182,10 @@ export function sendFileHeaders(
   mime: string,
   etag?: string,
 ): Record<string, string> {
+  const active = /html|svg|xml|javascript|application\/octet-stream/i.test(mime || '');
   const headers: Record<string, string> = {
     'Content-Type': mime || 'application/octet-stream',
-    'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(safeFilename(filename))}`,
+    'Content-Disposition': `${active ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(safeFilename(filename))}`,
     'X-Content-Type-Options': 'nosniff',
     'Cache-Control': 'private, max-age=300',
   };
@@ -180,7 +212,7 @@ export function sniffMime(buffer: Buffer, filename: string, provided?: string): 
   if (lower.endsWith('.csv')) return 'text/csv';
   if (lower.endsWith('.json')) return 'application/json';
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'text/html';
-  if (provided && /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(provided)) return provided;
+  if (provided && /^(application\/(pdf|json|zip|msword|vnd\.)|text\/(plain|csv|markdown))[a-z0-9.+-]*$/i.test(provided)) return provided;
   return 'application/octet-stream';
 }
 

@@ -1,24 +1,25 @@
-import { useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuthStore } from './stores/auth';
 import { useAppStore } from './stores/app';
 import { ToastViewport } from './components/Toasts';
 import { ImageLightbox } from './components/ImageLightbox';
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt';
 import { LogoLockup } from './components/Logo';
 import { getLocale } from './lib/i18n';
 import { requestPersistentStorage } from './lib/offline';
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import RecoverPage from './pages/RecoverPage';
-import SharePage from './pages/SharePage';
-import InvitePage from './pages/InvitePage';
-import LegalPage from './pages/LegalPage';
-import AboutPage from './pages/AboutPage';
-import NotFoundPage from './pages/NotFoundPage';
-import AppPage from './pages/AppPage';
-import ClipPage from './pages/ClipPage';
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const RecoverPage = lazy(() => import('./pages/RecoverPage'));
+const SharePage = lazy(() => import('./pages/SharePage'));
+const InvitePage = lazy(() => import('./pages/InvitePage'));
+const LegalPage = lazy(() => import('./pages/LegalPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const AppPage = lazy(() => import('./pages/AppPage'));
+const ClipPage = lazy(() => import('./pages/ClipPage'));
 
 function Splash() {
   return (
@@ -137,6 +138,7 @@ export default function App() {
 
   return (
     <>
+      <Suspense fallback={<Splash />}>
       <Routes>
         <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={status === 'authenticated' ? <Navigate to="/app" replace /> : <LoginPage />} />
@@ -154,7 +156,9 @@ export default function App() {
         <Route path="/app/*" element={<Protected><AppPage /></Protected>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </Suspense>
       <ToastViewport />
+      <PwaUpdatePrompt />
       <ImageLightbox />
     </>
   );

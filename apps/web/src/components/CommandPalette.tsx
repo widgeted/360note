@@ -101,6 +101,18 @@ export function CommandPalette() {
     return () => window.clearTimeout(timer);
   }, [query, open, workspaceId, storeNotes]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, setOpen]);
+
   if (!open) return null;
 
   function close() {

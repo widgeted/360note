@@ -28,8 +28,11 @@ export default function SecuritySettings() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [setup, setSetup] = useState<{ secret: string; qr: string; otpauthUrl: string } | null>(null);
   const [setupCode, setSetupCode] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [setupBusy, setSetupBusy] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [disableOpen, setDisableOpen] = useState(false);
   const [disablePassword, setDisablePassword] = useState('');
   const [disableCode, setDisableCode] = useState('');
@@ -49,34 +52,50 @@ export default function SecuritySettings() {
     try {
       const response = await api.get<{ sessions: SessionInfo[] }>('/api/auth/sessions');
       setSessions(response.sessions);
-    } catch {
-      /* ignore */
+      setSessionsError(null);
+    } catch (error) {
+      setSessionsError((error as Error).message);
     }
   }
 
-  async function openSetup() {
+  function openSetup() {
     setSetupOpen(true);
     setSetup(null);
     setSetupCode('');
+    setSetupPassword('');
+    setSetupError(null);
     setBackupCodes(null);
+  }
+
+  async function beginSetup() {
+    setSetupBusy(true);
+    setSetupError(null);
     try {
-      const response = await api.post<{ secret: string; qr: string; otpauthUrl: string }>('/api/auth/2fa/setup');
+      const response = await api.post<{ secret: string; qr: string; otpauthUrl: string }>('/api/auth/2fa/setup', {
+        password: setupPassword,
+      });
       setSetup(response);
     } catch (error) {
-      toast('error', t('无法开始设置'), (error as Error).message);
-      setSetupOpen(false);
+      setSetupError((error as Error).message);
+    } finally {
+      setSetupBusy(false);
     }
   }
 
   async function enableTwoFactor() {
     setSetupBusy(true);
+    setSetupError(null);
     try {
-      const response = await api.post<{ backupCodes: string[] }>('/api/auth/2fa/enable', { code: setupCode });
+      const response = await api.post<{ backupCodes: string[] }>('/api/auth/2fa/enable', {
+        password: setupPassword,
+        code: setupCode,
+      });
       setBackupCodes(response.backupCodes);
+      setSetupPassword('');
       if (user) setUser({ ...user, totpEnabled: true });
       toast('success', t('两步验证已开启'));
     } catch (error) {
-      toast('error', t('验证码不正确'), (error as Error).message);
+      setSetupError((error as Error).message);
     } finally {
       setSetupBusy(false);
     }
@@ -212,7 +231,13 @@ export default function SecuritySettings() {
           <button type="button" className="btn btn-ghost btn-sm" onClick={revokeOthers}>{t('退出其他设备')}</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {sessions.length === 0 && <div className="context-empty">{t('暂无登录设备')}</div>}
+          {sessionsError && (
+            <div className="form-error">
+              <AlertCircle size={14} /> {sessionsError}
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadSessions()}>{t('重试')}</button>
+            </div>
+          )}
+          {!sessionsError && sessions.length === 0 && <div className="context-empty">{t('暂无登录设备')}</div>}
           {sessions.map((session) => (
             <div key={session.id} className="setting-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: 12 }}>
               <span style={{ color: 'var(--text-tertiary)', marginTop: 1 }}>
@@ -287,19 +312,32 @@ export default function SecuritySettings() {
 
       <Modal
         open={setupOpen}
-        onClose={() => { setSetupOpen(false); setSetupCode(''); setBackupCodes(null); }}
+        onClose={() => { setSetupOpen(false); setSetupCode(''); setSetupPassword(''); setSetupError(null); setBackupCodes(null); }}
         title={backupCodes ? t('保存备用码') : t('开启两步验证')}
-        description={backupCodes ? t('每个备用码只能使用一次。请离线保存。') : t('使用身份验证器应用扫描二维码，然后输入 6 位验证码。')}
+        description={
+          backupCodes
+            ? t('每个备用码只能使用一次。请离线保存。')
+            : setup
+              ? t('使用身份验证器应用扫描二维码，然后输入 6 位验证码。')
+              : t('为确认是你本人，请先输入当前密码。')
+        }
         size="sm"
+        closeOnOverlay={false}
         footer={
           backupCodes ? (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => { setSetupOpen(false); setBackupCodes(null); }}>{t('完成')}</button>
           ) : (
             <>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSetupOpen(false)}>{t('取消')}</button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={enableTwoFactor} disabled={setupBusy || setupCode.length !== 6}>
-                {setupBusy ? <span className="spinner" /> : <Check size={13} />} {t('验证并开启')}
-              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSetupOpen(false); setSetupPassword(''); setSetupError(null); }}>{t('取消')}</button>
+              {setup ? (
+                <button type="button" className="btn btn-primary btn-sm" onClick={enableTwoFactor} disabled={setupBusy || setupCode.length !== 6}>
+                  {setupBusy ? <span className="spinner" /> : <Check size={13} />} {t('验证并开启')}
+                </button>
+              ) : (
+                <button type="button" className="btn btn-primary btn-sm" onClick={beginSetup} disabled={setupBusy || !setupPassword}>
+                  {setupBusy ? <span className="spinner" /> : <ShieldCheck size={13} />} {t('继续')}
+                </button>
+              )}
             </>
           )
         }
@@ -329,6 +367,10 @@ export default function SecuritySettings() {
                 <Download size={13} /> {t('下载')}
               </button>
             </div>
+            <div className="banner banner-warning" style={{ marginTop: 12 }}>
+              <AlertCircle size={14} />
+              <div>{t('关闭此窗口后将无法再次查看备用码。')}</div>
+            </div>
           </div>
         ) : setup ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -343,9 +385,16 @@ export default function SecuritySettings() {
               <label>{t('验证码')}</label>
               <input className="totp-code-input" value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" inputMode="numeric" autoFocus />
             </div>
+            {setupError && <div className="form-error"><AlertCircle size={14} /> {setupError}</div>}
           </div>
         ) : (
-          <div className="loading-row"><span className="spinner" /> {t('正在生成二维码…')}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="field">
+              <label>{t('当前密码')}</label>
+              <input className="input" type="password" value={setupPassword} onChange={(event) => setSetupPassword(event.target.value)} autoComplete="current-password" autoFocus onKeyDown={(event) => { if (event.key === 'Enter' && setupPassword) void beginSetup(); }} />
+            </div>
+            {setupError && <div className="form-error"><AlertCircle size={14} /> {setupError}</div>}
+          </div>
         )}
       </Modal>
 
@@ -374,6 +423,7 @@ export default function SecuritySettings() {
         title={t('更新恢复密钥')}
         description={t('输入密码后生成新的恢复密钥。旧密钥会立即作废。')}
         size="sm"
+        closeOnOverlay={!newRecoveryKey}
         footer={
           newRecoveryKey ? (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => { setRecoveryOpen(false); setNewRecoveryKey(null); }}>{t('完成')}</button>

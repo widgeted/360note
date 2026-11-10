@@ -303,7 +303,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     if (!access) {
       return reply.header('Cache-Control', 'no-store').send({
         token,
-        note: { id: note.id, title: note.title, contentMd: '', updatedAt: note.updated_at.toISOString(), version: note.version, encrypted: false, attachments: [] },
+        note: { id: '', title: '', contentMd: '', updatedAt: note.updated_at.toISOString(), version: 0, encrypted: false, attachments: [] },
         permission: share.permission,
         requiresPassword: Boolean(share.password_hash),
         hasAccess: false,
@@ -330,7 +330,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         updated_at: Date;
       }>(
         `SELECT id, note_id, guest_name, body, resolved, created_at, updated_at
-         FROM comments WHERE note_id = $1 ORDER BY created_at ASC`,
+         FROM comments WHERE note_id = $1 AND user_id IS NULL ORDER BY created_at ASC`,
         [note.id],
       );
       comments = rows.map((row) => ({
@@ -418,6 +418,7 @@ export default async function shareRoutes(app: FastifyInstance) {
       contentMd: canonicalContent,
       reason: 'auto',
     });
+    await audit({ action: 'share.public_edit', targetType: 'note', targetId: note.id, meta: { guestName: body.guestName || '访客' }, ip: clientIp(request) });
     await notify({
       userId: note.created_by,
       type: 'share_edit',
@@ -451,6 +452,7 @@ export default async function shareRoutes(app: FastifyInstance) {
       `INSERT INTO comments (note_id, guest_name, body, ip) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
       [note.id, body.guestName || '访客', body.body, clientIp(request)],
     );
+    await audit({ action: 'share.public_comment', targetType: 'note', targetId: note.id, meta: { guestName: body.guestName || '访客' }, ip: clientIp(request) });
     await notify({
       userId: note.created_by,
       type: 'comment',
@@ -492,7 +494,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     }>(
       `SELECT a.filename, a.mime, a.sha256, a.storage_key
        FROM attachments a JOIN notes n ON n.id = a.note_id
-       WHERE a.id = $1 AND a.note_id = $2 AND a.deleted_at IS NULL
+       WHERE a.id = $1 AND a.note_id = $2 AND a.workspace_id = n.workspace_id AND a.deleted_at IS NULL
          AND n.deleted_at IS NULL AND n.trashed_at IS NULL`,
       [attachmentId, share.note_id],
     );

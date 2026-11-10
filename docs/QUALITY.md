@@ -67,7 +67,7 @@
 | 类型检查 | `tsc --noEmit`（shared/server/web） | 全仓 |
 | 构建 | `npm run build` | Web PWA + API |
 | 单元（规划） | Vitest | 密码/TOTP/合并/导入解析/导出命名/权限 |
-| API 集成（规划） | Vitest + 测试 PostgreSQL | 注册/登录/2FA/笔记 CRUD/冲突 409/分享/备份/导入 |
+| API 集成 | 测试 PostgreSQL + 临时 API | 注册/登录/2FA/越权/分享评论过滤/备份唯一性/跨区恢复拒绝/注销保留内容/令牌撤销 |
 | E2E | Playwright | 登录、新建、自动保存、搜索、分享、公开页、回收站、设置、移动端、备份/导入 |
 | 安全 smoke | 手动/脚本 | CSRF、越权、路径穿越、上传 MIME、限流、Cookie |
 | 备份演练 | 手动/脚本 | 创建→下载→预览→合并/替换→验证 |

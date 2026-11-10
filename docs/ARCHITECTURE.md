@@ -152,8 +152,8 @@ Fastify API (Node.js, TypeScript)
 
 ### 3.2 2FA
 
-- `POST /api/auth/2fa/setup`：生成 base32 secret，AES-GCM 加密存 DB；返回 otpauth URL + QR data URL。
-- `POST /api/auth/2fa/enable`：校验 TOTP（±1 step），记录 `totp_last_step` 防重放；生成 10 个备用码，SHA-256 存储。
+- `POST /api/auth/2fa/setup`：要求当前密码重新认证；生成 base32 secret，AES-GCM 加密存 DB；返回 otpauth URL + QR data URL。
+- `POST /api/auth/2fa/enable`：再次校验当前密码与 TOTP（±1 step），记录 `totp_last_step` 防重放；生成 10 个备用码，SHA-256 存储。
 - 登录：密码正确但启用 2FA 时返回 5 分钟签名 challenge token；`POST /api/auth/login/2fa` 校验 TOTP 或备用码；成功后创建会话。
 - 禁用：需密码 + TOTP/备用码。
 - 账号恢复：恢复密钥 + 新密码；禁用 2FA，撤销所有会话，生成新恢复密钥。
@@ -430,7 +430,7 @@ attachments/<attachmentId>/<filename>
 
 - systemd `360note.service` 运行 Node（127.0.0.1:8787）；
 - Nginx 终止 TLS，代理 `/` 到 Fastify；HTTP 重定向 HTTPS；
-- Let's Encrypt（certbot）为 `360note.com` / `www.360note.com` 签发；
+- Let's Encrypt（BT Panel 证书路径）为 `360note.com` / `www.360note.com` 签发；
 - PostgreSQL 本地；
 - 数据目录 `/var/lib/360note`，权限 0700；
 - 环境文件 `/etc/360note/360note.env`（0600），包含 `DATABASE_URL`、`SESSION_SECRET`、`NOTE360_MASTER_KEY`、`PUBLIC_ORIGIN=https://360note.com`；
@@ -456,7 +456,7 @@ attachments/<attachmentId>/<filename>
 1. **E2EE 未提供**：服务端可读正文；隐私政策明确。
 2. **离线仅缓存打开过的笔记**：未预取全库；附件离线不可上传。
 3. **没有实时协作/CRDT**：多人同时编辑同一笔记时会保留冲突快照到版本历史；分享编辑为保存式。
-4. **没有异地备份**：备份在同一服务器；建议定期下载。
+4. **已支持可选的 S3 兼容异地备份与对象存储附件**：备份在同一服务器；建议定期下载。
 5. **搜索中文依赖 ILIKE/trigram**：未接中文分词；超大规模库可能变慢。
 6. **OCR 需服务器安装 tesseract/pdftotext**；默认关闭，按环境开启。
 7. **账户邮件**：注册/找回依赖邮箱验证码；恢复密钥可作为离线备用方式。

@@ -8,6 +8,7 @@ import { useIsMobile } from '../../lib/useMediaQuery';
 import { copyText, formatRelativeShort } from '../../lib/utils';
 import { Modal } from '../Modal';
 import { toast } from '../../stores/toast';
+import { LoadFailure } from '../LoadFailure';
 
 export default function ApiSettings() {
   const t = useT();
@@ -15,10 +16,11 @@ export default function ApiSettings() {
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [writeAccess, setWriteAccess] = useState(true);
+  const [writeAccess, setWriteAccess] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
   const [revokeId, setRevokeId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -28,8 +30,9 @@ export default function ApiSettings() {
     try {
       const response = await api.get<{ tokens: ApiToken[] }>('/api/tokens');
       setTokens(response.tokens);
-    } catch {
-      /* ignore */
+      setLoadError(null);
+    } catch (error) {
+      setLoadError((error as Error).message);
     }
   }
 
@@ -99,7 +102,9 @@ export default function ApiSettings() {
             <span className="field-hint" style={{ display: 'block' }}>{t('关闭后令牌只能读取笔记、搜索和导出。')}</span>
           </span>
         </label>
-        {tokens.length === 0 ? (
+        {loadError ? (
+          <LoadFailure message={loadError} onRetry={() => void load()} />
+        ) : tokens.length === 0 ? (
           <div className="context-empty">{t('暂无令牌')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -185,6 +190,7 @@ export default function ApiSettings() {
         title={t('令牌只显示一次')}
         description={t('请立即复制并保存在安全位置。关闭后无法再次查看。')}
         size="sm"
+        closeOnOverlay={false}
         footer={<button type="button" className="btn btn-primary btn-sm" onClick={() => setNewToken(null)}>{t('我已保存')}</button>}
       >
         <div className="share-link-box">

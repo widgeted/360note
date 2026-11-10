@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
-  Check,
   ChevronRight,
-  Clock3,
   Copy,
   Download,
   FileCode2,
@@ -19,7 +17,6 @@ import {
   Mic,
   MoreHorizontal,
   PanelRight,
-  PenLine,
   Pin,
   PinOff,
   RotateCcw,
@@ -58,6 +55,7 @@ import { TipTapEditor, type EditorHandle, type UploadedAttachment } from './TipT
 import { EditorTagBar } from './EditorTagBar';
 import { ShareDialog } from './ShareDialog';
 import { SummaryDialog } from './SummaryDialog';
+import { EmptyEditorState } from './EmptyEditorState';
 
 export function EditorPane({
   noteId,
@@ -158,6 +156,9 @@ export function EditorPane({
   const dirtyRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const saveQueuedRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => { mountedRef.current = false; }, []);
   const saveTimer = useRef<number | null>(null);
   const draftTimer = useRef<number | null>(null);
   const saveNowRef = useRef<(reason?: 'auto' | 'manual') => Promise<void>>(async () => {});
@@ -236,8 +237,8 @@ export function EditorPane({
   }, [reloadTick, note?.id]);
 
   useEffect(() => {
-    if (note) baseVersionRef.current = note.version;
-  }, [note?.version]);
+    if (note && !dirtyRef.current) baseVersionRef.current = note.version;
+  }, [note?.version, note?.id]);
 
   useEffect(() => {
     if (note) document.title = `${title || t('未命名笔记')} — ${getLocale() === 'zh-CN' ? '360笔记' : '360note'}`;
@@ -308,6 +309,7 @@ export function EditorPane({
   const saveNow = useCallback(
     async (reason: 'auto' | 'manual' = 'auto') => {
       if (!note || note.trashedAt || !note.canEdit) return;
+      const noteId = note.id;
       if (saveInFlightRef.current) {
         saveQueuedRef.current = true;
         return;
@@ -320,29 +322,30 @@ export function EditorPane({
         const effectiveTitle = currentTitle.trim() || untitledNoteTitle(note.createdAt);
         dirtyRef.current = false;
         const result = await saveNote({
+          noteId,
           title: effectiveTitle,
           contentMd: currentContent,
           baseVersion: baseVersionRef.current,
           reason,
         });
         if (result.ok && result.note) {
-          baseVersionRef.current = result.note.version;
+          if (useAppStore.getState().note?.id === noteId) baseVersionRef.current = result.note.version;
           if (titleValueRef.current === currentTitle && contentRef.current === currentContent) {
             dirtyRef.current = false;
             await clearDraft(note.id);
           }
-        } else if (!result.queued) {
+        } else if (!result.queued && result.error !== 'note-changed') {
           dirtyRef.current = true;
         }
       } finally {
         saveInFlightRef.current = false;
         if (saveQueuedRef.current) {
           saveQueuedRef.current = false;
-          if (dirtyRef.current) {
+          if (dirtyRef.current && mountedRef.current && useAppStore.getState().note?.id === noteId) {
             if (saveTimer.current) window.clearTimeout(saveTimer.current);
             saveTimer.current = window.setTimeout(() => {
               saveTimer.current = null;
-              void saveNowRef.current('auto');
+              if (mountedRef.current && useAppStore.getState().note?.id === noteId) void saveNowRef.current('auto');
             }, 0);
           }
         }
@@ -453,6 +456,10 @@ export function EditorPane({
 
   function saveImageCaption() {
     if (!imageCaption) return;
+    if (!imageCaption.alt.trim() && !imageCaption.caption.trim()) {
+      setImageCaption(null);
+      return;
+    }
     const current = editorHandle?.editor;
     if (current) {
       let target: number | null = null;
@@ -775,7 +782,7 @@ export function EditorPane({
                 <MenuItem icon={<FileCode2 size={14} />} onClick={() => { close(); void exportNote('html'); }}>{t('导出为 HTML')}</MenuItem>
                 <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportNote('pdf'); }}>{t('导出为 PDF')}</MenuItem>
                 <div className="menu-separator" />
-                <MenuItem icon={<Share2 size={14} />} onClick={() => { close(); setShowShare(true); }}>{t('分享笔记')}</MenuItem>
+                {canShare && <MenuItem icon={<Share2 size={14} />} onClick={() => { close(); setShowShare(true); }}>{t('分享笔记')}</MenuItem>}
                 <MenuItem icon={<Link2 size={14} />} onClick={() => { close(); setShowWiki(true); }}>{t('双向链接')}</MenuItem>
                 <MenuItem icon={<span className="mono" style={{ fontSize: 13 }}>{mode === 'rich' ? 'M↓' : 'Aa'}</span>} onClick={() => { close(); void toggleMode(); }}>{mode === 'rich' ? t('Markdown 模式') : t('富文本模式')}</MenuItem>
                 <div className="menu-separator" />
@@ -815,7 +822,11 @@ export function EditorPane({
               <strong>{t('发现未保存的草稿')}</strong> · {formatRelativeShort(new Date(draft.updatedAt).toISOString())}
             </div>
             <div className="banner-actions">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>{t('恢复草稿')}</button>
+              {readOnly ? (
+                <span className="setting-note">{t('只读状态下无法恢复草稿')}</span>
+              ) : (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={restoreDraft}>{t('恢复草稿')}</button>
+              )}
               <button type="button" className="btn btn-ghost btn-sm" onClick={discardDraft}>{t('丢弃')}</button>
             </div>
           </div>
@@ -1154,39 +1165,6 @@ function flattenFolders(folders: ReturnType<typeof useAppStore.getState>['folder
   }
   walk(null, 0);
   return output;
-}
-
-export function EmptyEditorState() {
-  const t = useT();
-  const navigate = useNavigate();
-  const createNote = useAppStore((state) => state.createNote);
-  return (
-    <div className="editor-empty">
-      <div className="editor-empty-mark"><PenLine size={21} /></div>
-      <div className="editor-empty-title">{t('从这里开始。')}</div>
-      <p className="editor-empty-text">{t('选择左侧的笔记，或写下此刻想到的第一句话。')}</p>
-      <div className="editor-empty-actions">
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={async () => {
-            const note = await createNote();
-            if (note) navigate(`/app/note/${note.id}`);
-          }}
-        >
-          {t('新建笔记')}
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}>
-          {t('打开命令面板')} <kbd>{shortcutLabel('Mod+K')}</kbd>
-        </button>
-      </div>
-      <div className="editor-empty-hints">
-        <span><Check size={12} /> {t('自动保存')} · {t('离线可写')}</span>
-        <span><Clock3 size={12} /> {t('历史版本与冲突副本')}</span>
-        <span><FileText size={12} /> {t('Markdown 随时导出')}</span>
-      </div>
-    </div>
-  );
 }
 
 // Minimal Web Speech API shapes to avoid depending on lib.dom experimental types.

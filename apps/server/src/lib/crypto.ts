@@ -1,4 +1,7 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import { once } from 'node:events';
 import { config } from '../config.js';
 
 function masterKey(): Buffer {
@@ -9,6 +12,10 @@ function masterKey(): Buffer {
   }
   if (config.env === 'production') throw new Error('NOTE360_MASTER_KEY is required in production');
   return crypto.createHash('sha256').update('360note-development-master-key').digest();
+}
+
+export function validateCryptoConfig(): void {
+  masterKey();
 }
 
 const KEY = () => masterKey();
@@ -24,16 +31,95 @@ export function encryptBuffer(plain: Buffer, aad = '360note'): Buffer {
 }
 
 export function decryptBuffer(payload: Buffer, aad = '360note'): Buffer {
-  if (payload.length < 30) throw new Error('Invalid encrypted payload');
+  if (payload.length < 29) throw new Error('Invalid encrypted payload');
   const version = payload[0];
-  if (version !== 1) throw new Error('Unsupported encrypted payload version');
+  if (version !== 1 && version !== 2) throw new Error('Unsupported encrypted payload version');
   const iv = payload.subarray(1, 13);
-  const tag = payload.subarray(13, 29);
-  const data = payload.subarray(29);
+  // v1 stores the tag before the ciphertext; v2 stores it after so both
+  // encryption and decryption can run as streams.
+  const tag = version === 1 ? payload.subarray(13, 29) : payload.subarray(payload.length - 16);
+  const data = version === 1 ? payload.subarray(29) : payload.subarray(13, payload.length - 16);
+  if (data.length === 0) throw new Error('Invalid encrypted payload');
   const decipher = crypto.createDecipheriv('aes-256-gcm', KEY(), iv);
   decipher.setAAD(Buffer.from(aad));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]);
+}
+
+async function writeAll(stream: fs.WriteStream, chunk: Buffer): Promise<void> {
+  if (!chunk.length) return;
+  if (!stream.write(chunk)) await once(stream, 'drain');
+}
+
+/** Streaming AES-256-GCM: [version=2][iv 12][ciphertext][tag 16]. */
+export async function encryptFile(inputPath: string, outputPath: string, aad = '360note'): Promise<number> {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', KEY(), iv);
+  cipher.setAAD(Buffer.from(aad));
+  const write = fs.createWriteStream(outputPath, { mode: 0o600, flags: 'wx' });
+  try {
+    write.write(Buffer.from([2]));
+    write.write(iv);
+    for await (const chunk of fs.createReadStream(inputPath, { highWaterMark: 1024 * 1024 })) {
+      await writeAll(write, cipher.update(chunk as Buffer));
+    }
+    await writeAll(write, cipher.final());
+    write.end(cipher.getAuthTag());
+    await once(write, 'finish');
+    return (await fsp.stat(outputPath)).size;
+  } catch (error) {
+    write.destroy();
+    await fsp.rm(outputPath, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+/** Decrypt a v1 or v2 payload to a file without holding the whole archive. */
+export async function decryptFile(inputPath: string, outputPath: string, aad = '360note'): Promise<void> {
+  const handle = await fsp.open(inputPath, 'r');
+  let version: number;
+  try {
+    const header = Buffer.alloc(1);
+    await handle.read(header, 0, 1, 0);
+    version = header[0];
+  } finally {
+    await handle.close();
+  }
+  if (version === 1) {
+    const plain = decryptBuffer(await fsp.readFile(inputPath), aad);
+    await fsp.writeFile(outputPath, plain, { mode: 0o600 });
+    return;
+  }
+  if (version !== 2) throw new Error('Unsupported encrypted payload version');
+  const size = (await fsp.stat(inputPath)).size;
+  if (size < 30) throw new Error('Invalid encrypted payload');
+  const ivHandle = await fsp.open(inputPath, 'r');
+  let iv: Buffer;
+  let tag: Buffer;
+  try {
+    iv = Buffer.alloc(12);
+    tag = Buffer.alloc(16);
+    await ivHandle.read(iv, 0, 12, 1);
+    await ivHandle.read(tag, 0, 16, size - 16);
+  } finally {
+    await ivHandle.close();
+  }
+  const decipher = crypto.createDecipheriv('aes-256-gcm', KEY(), iv);
+  decipher.setAAD(Buffer.from(aad));
+  decipher.setAuthTag(tag);
+  const write = fs.createWriteStream(outputPath, { mode: 0o600, flags: 'wx' });
+  try {
+    for await (const chunk of fs.createReadStream(inputPath, { start: 13, end: size - 17, highWaterMark: 1024 * 1024 })) {
+      await writeAll(write, decipher.update(chunk as Buffer));
+    }
+    await writeAll(write, decipher.final());
+    write.end();
+    await once(write, 'finish');
+  } catch (error) {
+    write.destroy();
+    await fsp.rm(outputPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 export function encryptString(plain: string, aad = '360note'): string {

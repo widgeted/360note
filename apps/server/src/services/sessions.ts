@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import { one } from '../db.js';
+import { one, query } from '../db.js';
 import { randomToken, sha256 } from '../lib/crypto.js';
 import { config } from '../config.js';
 import type { DbSession } from '../lib/users.js';
@@ -30,6 +30,10 @@ export async function revokeAllSessions(userId: string, exceptSessionId?: string
      WHERE user_id = $1 AND revoked_at IS NULL ${exceptSessionId ? 'AND id <> $2' : ''} RETURNING id`,
     exceptSessionId ? [userId, exceptSessionId] : [userId],
   );
+}
+
+export async function revokeAllApiTokens(userId: string): Promise<void> {
+  await query('UPDATE api_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
 }
 
 export async function listSessions(userId: string, currentSessionId?: string) {

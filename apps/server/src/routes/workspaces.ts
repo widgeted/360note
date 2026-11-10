@@ -13,6 +13,7 @@ import { deleteAttachment, deleteBackupFile } from '../lib/storage.js';
 import type { DbUser } from '../lib/users.js';
 import { originFromRequest } from '../lib/origin.js';
 import { mailEnabled, normalizeLocale, sendWorkspaceInviteEmail } from '../lib/mailer.js';
+import { deleteOffsiteBackup } from '../services/offsite.js';
 
 const roleSchema = z.enum(['admin', 'editor', 'viewer']);
 const memberRoleSchema = z.enum(['owner', 'admin', 'editor', 'viewer']);
@@ -150,9 +151,11 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const backups = await many<{ filename: string }>('SELECT filename FROM backups WHERE workspace_id = $1', [id]);
     await audit({ workspaceId: id, actorId: auth.user.id, action: 'workspace.delete', targetType: 'workspace', targetId: id, meta: { name: workspace?.name }, ip: clientIp(request) });
     await one('DELETE FROM workspaces WHERE id = $1 RETURNING id', [id]);
+    await query("DELETE FROM jobs WHERE payload->>'workspaceId' = $1", [id]);
     await Promise.all([
       ...attachments.map((row) => deleteAttachment(row.storage_key).catch(() => {})),
       ...backups.map((row) => deleteBackupFile(row.filename).catch(() => {})),
+      ...backups.map((row) => deleteOffsiteBackup(row.filename).catch(() => {})),
     ]);
     return { ok: true };
   });

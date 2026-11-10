@@ -59,6 +59,39 @@ async function req(path, { method = 'GET', cookie, body } = {}) {
   return { status: response.status, json, text, headers: response.headers };
 }
 
+async function waitJob(jobId, cookie, timeoutMs = 30_000) {
+  const started = Date.now();
+  let job = null;
+  while (Date.now() - started < timeoutMs) {
+    job = await req(`/api/jobs/${jobId}`, { cookie });
+    if (job.json?.job?.status === 'done' || job.json?.job?.status === 'error') return job.json.job;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  return job?.json?.job ?? null;
+}
+
+async function downloadBackup(workspaceId, backupId, cookie) {
+  const response = await fetch(`${base}/api/backups/${backupId}/download?workspaceId=${workspaceId}`, {
+    headers: { cookie },
+  });
+  const data = Buffer.from(await response.arrayBuffer());
+  return { status: response.status, data, filename: /filename\*=UTF-8''([^;]+)/.exec(response.headers.get('content-disposition') || '')?.[1] };
+}
+
+async function uploadBackup(workspaceId, cookie, filename, data) {
+  const form = new FormData();
+  form.append('file', new Blob([new Uint8Array(data)]), filename || 'backup.3nb');
+  const response = await fetch(`${base}/api/workspaces/${workspaceId}/backups/upload`, {
+    method: 'POST',
+    headers: { cookie, 'x-360note-csrf': '1' },
+    body: form,
+  });
+  const text = await response.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { /* ignore */ }
+  return { status: response.status, json, text };
+}
+
 async function register(email, code) {
   await pool.query(
     `INSERT INTO email_codes (email, purpose, code_hash, expires_at)
@@ -139,6 +172,58 @@ async function main() {
   assert.equal(preview.status, 200, preview.text);
   assert.ok(preview.json.preview.counts.notes >= 1);
 
+  const backupAgain = await req(`/api/workspaces/${spaceA.id}/backups`, { method: 'POST', cookie: a.cookie });
+  assert.equal(backupAgain.status, 200, backupAgain.text);
+  const backupAgainJob = await waitJob(backupAgain.json.jobId, a.cookie);
+  assert.equal(backupAgainJob?.status, 'done', JSON.stringify(backupAgainJob));
+  const backupsAgain = await req(`/api/workspaces/${spaceA.id}/backups`, { cookie: a.cookie });
+  const names = backupsAgain.json.backups.map((entry) => entry.filename);
+  assert.equal(new Set(names).size, names.length, 'backup filenames must be unique');
+  console.log('PASS  concurrent backup names never collide');
+
+  const shareResponse = await req(`/api/notes/${noteId}/shares`, {
+    method: 'POST',
+    cookie: a.cookie,
+    body: { permission: 'comment' },
+  });
+  assert.equal(shareResponse.status, 200, shareResponse.text);
+  const shareToken = shareResponse.json.share.token;
+  const internalComment = await req(`/api/notes/${noteId}/comments`, {
+    method: 'POST',
+    cookie: a.cookie,
+    body: { body: 'INTERNAL-ONLY-COMMENT' },
+  });
+  assert.equal(internalComment.status, 200, internalComment.text);
+  const guestComment = await req(`/api/public/shares/${shareToken}/comments`, {
+    method: 'POST',
+    body: { body: 'GUEST-COMMENT', guestName: 'Visitor' },
+  });
+  assert.equal(guestComment.status, 200, guestComment.text);
+  const publicShare = await fetch(`${base}/api/public/shares/${shareToken}`);
+  const publicBody = await publicShare.json();
+  assert.equal(publicShare.status, 200, JSON.stringify(publicBody));
+  assert.ok(publicBody.comments.some((comment) => comment.body === 'GUEST-COMMENT'), 'guest comments stay visible');
+  assert.ok(!publicBody.comments.some((comment) => comment.body === 'INTERNAL-ONLY-COMMENT'), 'internal comments must not leak to public shares');
+  console.log('PASS  public share exposes guest comments only');
+
+  const backupBytes = await downloadBackup(spaceA.id, backup.id, a.cookie);
+  assert.equal(backupBytes.status, 200);
+  assert.ok(backupBytes.data.length > 100, 'backup download must return the encrypted archive');
+  const bSpace = b.workspaces.find((workspace) => workspace.kind === 'personal');
+  const crossUpload = await uploadBackup(bSpace.id, b.cookie, `${backup.filename}`, backupBytes.data);
+  assert.equal(crossUpload.status, 200, crossUpload.text);
+  assert.equal(crossUpload.json.preview.sameWorkspace, false, 'foreign workspace backup must be marked as a merge copy');
+  const crossRestore = await req(`/api/backups/uploads/${crossUpload.json.uploadId}/restore`, {
+    method: 'POST',
+    cookie: b.cookie,
+    body: { mode: 'replace' },
+  });
+  assert.equal(crossRestore.status, 200, crossRestore.text);
+  const crossJob = await waitJob(crossRestore.json.jobId, b.cookie);
+  assert.equal(crossJob?.status, 'error', 'cross-workspace replace must be rejected');
+  assert.match(crossJob?.error || '', /只能替换恢复到备份来源的工作区/);
+  console.log('PASS  cross-workspace backup upload cannot replace another workspace');
+
   // Invitation identity: a known invitee stays bound by user id after an email
   // change, while a different account that later owns the old address cannot
   // see or accept the invitation.
@@ -190,6 +275,60 @@ async function main() {
   );
   assert.equal(pendingRows.rows[0].count, 1);
   console.log('PASS  concurrent duplicate invitations leave exactly one pending row');
+
+  const cInvite = await req(`/api/workspaces/${teamId}/invitations`, {
+    method: 'POST',
+    cookie: a.cookie,
+    body: { email: emailB, role: 'editor' },
+  });
+  assert.equal(cInvite.status, 200, cInvite.text);
+  const cInbox = await req('/api/invitations', { cookie: c.cookie });
+  const cPending = cInbox.json.invitations.find((entry) => entry.workspaceId === teamId);
+  assert.ok(cPending?.token, 'invitation token must be visible to the invitee');
+  const cAccept = await req(`/api/invitations/${cPending.token}/accept`, { method: 'POST', cookie: c.cookie });
+  assert.equal(cAccept.status, 200, cAccept.text);
+  const cNote = await req('/api/notes', {
+    method: 'POST',
+    cookie: c.cookie,
+    body: { workspaceId: teamId, title: 'Content from deleted member', contentMd: 'survives account deletion' },
+  });
+  assert.equal(cNote.status, 200, cNote.text);
+  const cDelete = await req('/api/me', {
+    method: 'DELETE',
+    cookie: c.cookie,
+    body: { password: 'K9m!tR4#vQ2@2026', confirm: 'DELETE' },
+  });
+  assert.equal(cDelete.status, 200, cDelete.text);
+  const survived = await req(`/api/notes/${cNote.json.note.id}`, { cookie: a.cookie });
+  assert.equal(survived.status, 200, 'notes authored by a deleted member must survive in the owner workspace');
+  assert.equal(survived.json.note.createdBy, a.user.id, 'deleted member content is reassigned to the workspace owner');
+  console.log('PASS  account deletion preserves content in workspaces owned by others');
+
+  const token = await req('/api/tokens', {
+    method: 'POST',
+    cookie: a.cookie,
+    body: { name: 'integration token', scopes: ['notes:read'] },
+  });
+  assert.equal(token.status, 200, token.text);
+  const bearerRead = await fetch(`${base}/api/notes?workspaceId=${spaceA.id}&filter=all`, {
+    headers: { authorization: `Bearer ${token.json.token}`, 'x-360note-csrf': '1' },
+  });
+  assert.equal(bearerRead.status, 200, 'API token must work before password change');
+  const passwordChange = await req('/api/auth/password', {
+    method: 'POST',
+    cookie: a.cookie,
+    body: { currentPassword: 'K9m!tR4#vQ2@2026', newPassword: 'N3w!securePass@2026' },
+  });
+  assert.equal(passwordChange.status, 200, passwordChange.text);
+  const revokedRead = await fetch(`${base}/api/notes?workspaceId=${spaceA.id}&filter=all`, {
+    headers: { authorization: `Bearer ${token.json.token}`, 'x-360note-csrf': '1' },
+  });
+  assert.equal(revokedRead.status, 401, 'password change must revoke API tokens');
+  console.log('PASS  password change revokes API tokens');
+
+  const setupWithoutPassword = await req('/api/auth/2fa/setup', { method: 'POST', cookie: a.cookie, body: {} });
+  assert.equal(setupWithoutPassword.status, 400, '2FA setup must require re-authentication');
+  console.log('PASS  2FA setup requires the current password');
 
   console.log('PASS  register/login, workspace isolation, notes and backup round-trip');
 }

@@ -119,7 +119,7 @@ const copy = {
     domainsTitle: 'Two domains. One account.',
     domainsLead: '360biji.com is the Chinese edition and 360note.com is the English edition. Accounts, notes, attachments and team workspaces are fully shared.',
     domains: [
-      { host: '360biji.com', label: '中文版', body: '中文界面、中文邮件与提示，适合中文写作与阅读。' },
+      { host: '360biji.com', label: 'Chinese edition', body: 'Chinese interface, emails and guidance for Chinese writing and reading.' },
       { host: '360note.com', label: 'English', body: 'An English interface with the same account, notes and workspaces.' },
     ],
     securityTitle: 'Security is a default, not an afterthought.',

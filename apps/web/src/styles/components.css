@@ -1325,7 +1325,7 @@ a.btn {
 
   .audit-time {
     grid-column: 1 / -1;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .audit-actor {
@@ -1339,7 +1339,7 @@ a.btn {
 
   .audit-ip {
     grid-column: 1 / -1;
-    font-size: 12px;
+    font-size: 13px;
   }
 }
 
@@ -1544,7 +1544,7 @@ a.btn {
 }
 
 .share-item-url:hover {
-  text-decoration: underline;
+  color: var(--blue-strong);
 }
 
 .share-item-url.is-missing {
@@ -1561,7 +1561,7 @@ a.btn {
 
 .share-item-meta {
   margin-top: 7px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.45;
   color: var(--text-tertiary);
 }
@@ -1570,7 +1570,7 @@ a.btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-tertiary);
 }
 
@@ -2472,7 +2472,7 @@ a.btn {
   color: var(--blue);
   text-decoration: none;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -2575,7 +2575,7 @@ a.btn {
   min-width: 260px;
   max-width: 520px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   overflow-wrap: anywhere;
   line-height: 1.45;
 }
@@ -2629,7 +2629,7 @@ a.btn {
 
 .pwa-install-text {
   margin-top: 3px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.45;
   color: var(--text-tertiary);
 }
@@ -2641,10 +2641,7 @@ a.btn {
   vertical-align: -2px;
 }
 
-.pwa-install-text svg {
-  display: inline;
-  vertical-align: -1px;
-}
+
 
 .pwa-install-actions {
   display: flex;
@@ -2676,4 +2673,10 @@ a.btn {
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.4;
+}
+
+/* Update prompt sits above the safe area and never fights the install hint. */
+.pwa-update {
+  top: calc(12px + env(safe-area-inset-top));
+  bottom: auto;
 }

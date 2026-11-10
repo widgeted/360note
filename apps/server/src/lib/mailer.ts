@@ -69,6 +69,7 @@ export async function sendMail(options: {
   replyTo?: string;
 }): Promise<void> {
   if (!mailEnabled()) throw new Error('mail transport is not configured');
+  if (isReservedMailAddress(options.to)) throw new Error('refusing to send mail to a reserved/test address');
   await getTransporter().sendMail({
     from: fromHeader(),
     to: options.to,

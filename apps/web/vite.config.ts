@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'favicon.png', 'favicon.ico', 'icons/apple-touch-icon.png', 'icons/apple-touch-icon-152.png', 'icons/apple-touch-icon-167.png'],
       manifest: {
         name: '360note · 360笔记',
@@ -41,7 +41,8 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        skipWaiting: false,
         clientsClaim: true,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/s\//],
@@ -64,5 +65,21 @@ export default defineConfig({
       '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true }
     }
   },
-  build: { outDir: 'dist', sourcemap: false, target: 'es2022' }
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('@tiptap')) return 'tiptap';
+          if (id.includes('prosemirror')) return 'prosemirror';
+          if (id.includes('lowlight') || id.includes('highlight.js')) return 'highlight';
+          if (id.includes('lucide-react')) return 'icons';
+          return undefined;
+        },
+      },
+    },
+  }
 });

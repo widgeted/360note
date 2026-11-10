@@ -702,6 +702,18 @@ apps/web/src/styles/tokens.css        设计 token
 - 空间菜单展开右对齐（align=end, width=trigger），收起左对齐（align=start, auto）。
 - 设计文档已从“全宽触发器统一左对齐”改为上述规则。
 
+## 2026-11-10 · v0.1.39 发布质量修复
+
+- 备份/恢复：跨工作区 ID 校验、循环文件夹检测、附件先落盘再原子替换、工作区 advisory lock；备份创建改为 archiver 写临时文件 + v2 流式 AES-256-GCM，下载解密到临时文件后流式发送；上传/导入先落盘；账号导出与实例备份同样走流式归档。
+- 唯一性：备份文件名含工作区 ID、毫秒与随机后缀；迁移 `013_backup_unique.sql` 建唯一索引；加密备份使用 `link()` 独占落盘，冲突时失败而非覆盖。
+- 权限：API token 在改密/找回/关闭 2FA/管理员撤会话后撤销；2FA setup/enable 需当前密码；公开分享只返回 `user_id IS NULL` 的评论，公开编辑/评论进审计。
+- 账户注销：重分配其他空间中的 note/attachment/share 作者，保留评论作者名，删除 jobs/export rows，清理本地与异地备份。
+- 前端：`saveNote` 带 noteId 守卫，迟到保存丢弃；脏编辑器不再推进 baseVersion；列表失败显示重试；设置/管理加载失败不再伪装空状态；2FA/令牌/恢复密钥弹窗防误关。
+- PWA：更新提示（waiting worker + SKIP_WAITING）、maskable 图标不透明、OG 图、安全区；Workbox 缓存上限 8 MiB；设置移动端 3 列网格。
+- 构建：路由 lazy + TipTap/ProseMirror/highlight 独立 chunk，消除 >500 kB 警告。
+- 验证：`npm run typecheck`、`npm test`（server 20、web 4）、`npm run build`、集成测试（postgres-api、jobs-recovery、backup-restore-drill）、backup-limits 全部通过。
+- 未部署：生产仍为 v0.1.38；本次改动未提交/未发布。
+
 ## 2026-11-10 · v0.1.38 PWA 图标排版
 
 - 安装提示图标必须放在对应词前方，前后留空格：点击 [More] “更多”，再点击 [Share] “共享”，然后选择 [Plus] “添加到主屏幕”。

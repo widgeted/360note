@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowDownUp,
   Check,
   CheckSquare,
@@ -40,6 +41,7 @@ export function NoteListPane() {
   const total = useAppStore((state) => state.total);
   const currentNote = useAppStore((state) => state.note);
   const loading = useAppStore((state) => state.loadingList);
+  const listError = useAppStore((state) => state.listError);
   const filter = useAppStore((state) => state.filter);
   const folderId = useAppStore((state) => state.folderId);
   const tagId = useAppStore((state) => state.tagId);
@@ -290,7 +292,20 @@ export function NoteListPane() {
       <div className="list-body app-scroll">
         {loading && notes.length === 0 && <ListSkeleton />}
 
-        {!loading && notes.length === 0 && (
+        {!loading && listError && notes.length === 0 && (
+          <div className="list-empty">
+            <div className="list-empty-icon"><AlertCircle size={17} /></div>
+            <div className="list-empty-title">{t('笔记列表加载失败')}</div>
+            <div className="list-empty-text">{t('请检查网络或稍后重试。你的本地草稿不会丢失。')}</div>
+            <div className="list-empty-actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void refreshList()}>
+                <RotateCcw size={13} /> {t('重试')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!loading && !listError && notes.length === 0 && (
           <div className="list-empty">
             <div className="list-empty-icon">
               {query ? <Search size={17} /> : filter === 'trash' ? <Trash2 size={17} /> : <FilePlus2 size={17} />}
@@ -324,6 +339,7 @@ export function NoteListPane() {
                     onClick={() => {
                       setSearchValue('');
                       setQuery('');
+                      void refreshList();
                     }}
                   >
                     <X size={13} /> {t('清除搜索')}
@@ -469,6 +485,7 @@ function NoteItem({
       tabIndex={0}
       onClick={selectionMode ? onToggleSelect : onOpen}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           if (selectionMode) onToggleSelect();

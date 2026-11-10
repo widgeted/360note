@@ -74,7 +74,7 @@ interface AppState {
   reloadNote: () => Promise<void>;
   closeNote: () => void;
   createNote: (input?: { title?: string; contentMd?: string; folderId?: string | null; tagNames?: string[]; tagIds?: string[] }) => Promise<Note | null>;
-  saveNote: (input: { title: string; contentMd: string; baseVersion: number; reason?: 'auto' | 'manual' }) => Promise<{ ok: boolean; note?: Note; queued?: boolean; error?: string }>;
+  saveNote: (input: { noteId: string; title: string; contentMd: string; baseVersion: number; reason?: 'auto' | 'manual' }) => Promise<{ ok: boolean; note?: Note; queued?: boolean; error?: string }>;
   updateNoteMeta: (patch: { title?: string; folderId?: string | null; isFavorite?: boolean; isPinned?: boolean; tagIds?: string[] }) => Promise<void>;
   toggleFavorite: (noteId?: string) => Promise<void>;
   togglePinned: (noteId?: string) => Promise<void>;
@@ -275,11 +275,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (outbox.length) void get().flushOutbox();
       window.setTimeout(() => void prefetchOfflineBundle(workspaceId), 2500);
     } catch (error) {
+      const network = !navigator.onLine || isNetworkError(error);
       set({
         loadingList: false,
-        offline: !navigator.onLine || isNetworkError(error),
-        syncState: 'offline',
-        syncMessage: translate('离线'),
+        offline: network,
+        syncState: network ? 'offline' : 'error',
+        syncMessage: network ? translate('离线') : null,
         listError: cached ? null : (error as Error).message,
         initializedWorkspace: workspaceId,
       });
@@ -529,9 +530,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         note,
         notes: upsertSummary(get().notes, note),
-        filter: 'all',
-        folderId: null,
-        tagId: null,
         query: '',
         syncState: 'saved',
         lastSavedAt: Date.now(),
@@ -620,9 +618,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  saveNote: async ({ title, contentMd, baseVersion, reason = 'auto' }) => {
+  saveNote: async ({ noteId, title, contentMd, baseVersion, reason = 'auto' }) => {
     const current = get().note;
-    if (!current) return { ok: false, error: 'no-note' };
+    if (!current || current.id !== noteId) return { ok: false, error: 'note-changed' };
     const { workspaceId } = current;
     if (isLocalNote(current.id)) {
       const local: Note = { ...current, title, contentMd, excerpt: contentMd.slice(0, 160), updatedAt: new Date().toISOString() };
@@ -768,11 +766,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleFavorite: async (noteId) => {
     const target = noteId ? get().notes.find((note) => note.id === noteId) : get().note;
     if (!target) return;
+    const nextFavorite = !target.isFavorite;
     if (get().note?.id === target.id) {
-      await get().updateNoteMeta({ isFavorite: !target.isFavorite });
+      await get().updateNoteMeta({ isFavorite: nextFavorite });
     } else {
-      await api.patch(`/api/notes/${target.id}`, { isFavorite: !target.isFavorite });
-      set({ notes: get().notes.map((note) => (note.id === target.id ? { ...note, isFavorite: !note.isFavorite } : note)) });
+      await api.patch(`/api/notes/${target.id}`, { isFavorite: nextFavorite });
+      set({ notes: get().notes.map((note) => (note.id === target.id ? { ...note, isFavorite: nextFavorite } : note)) });
+    }
+    if (!nextFavorite && get().filter === 'favorites') {
+      set({ notes: get().notes.filter((note) => note.id !== target.id), total: Math.max(0, get().total - 1) });
     }
   },
 

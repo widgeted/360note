@@ -210,19 +210,21 @@ export default async function folderRoutes(app: FastifyInstance) {
     await transaction(async (client) => {
       await client.query(
         `WITH RECURSIVE descendants AS (
-           SELECT id FROM folders WHERE id = $1
-           UNION ALL SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           WHERE f.workspace_id = $2
          )
          UPDATE folders SET trashed_at = now() WHERE id IN (SELECT id FROM descendants)`,
-        [id],
+        [id, folder.workspace_id],
       );
       await client.query(
         `WITH RECURSIVE descendants AS (
-           SELECT id FROM folders WHERE id = $1
-           UNION ALL SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           WHERE f.workspace_id = $2
          )
          UPDATE notes SET trashed_at = now() WHERE folder_id IN (SELECT id FROM descendants) AND trashed_at IS NULL`,
-        [id],
+        [id, folder.workspace_id],
       );
     });
     return { ok: true };
@@ -237,19 +239,21 @@ export default async function folderRoutes(app: FastifyInstance) {
     await transaction(async (client) => {
       await client.query(
         `WITH RECURSIVE descendants AS (
-           SELECT id FROM folders WHERE id = $1
-           UNION ALL SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           WHERE f.workspace_id = $2
          )
          UPDATE folders SET trashed_at = NULL WHERE id IN (SELECT id FROM descendants)`,
-        [id],
+        [id, folder.workspace_id],
       );
       await client.query(
         `WITH RECURSIVE descendants AS (
-           SELECT id FROM folders WHERE id = $1
-           UNION ALL SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           WHERE f.workspace_id = $2
          )
          UPDATE notes SET trashed_at = NULL WHERE folder_id IN (SELECT id FROM descendants)`,
-        [id],
+        [id, folder.workspace_id],
       );
     });
     return { ok: true };
@@ -258,26 +262,29 @@ export default async function folderRoutes(app: FastifyInstance) {
   app.delete('/api/folders/:id/permanent', async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    const folder = await one<{ workspace_id: string }>('SELECT workspace_id FROM folders WHERE id = $1', [id]);
+    const folder = await one<{ workspace_id: string; trashed_at: Date | null }>('SELECT workspace_id, trashed_at FROM folders WHERE id = $1', [id]);
     if (!folder) throw errors.notFound('文件夹不存在');
     await requireWorkspace(auth.user.id, folder.workspace_id, 'write');
+    if (!folder.trashed_at) throw errors.badRequest('请先将文件夹移到回收站，再永久删除');
     const keys = await many<{ storage_key: string }>(
       `WITH RECURSIVE descendants AS (
-         SELECT id FROM folders WHERE id = $1
-         UNION ALL SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+         SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+         UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+         WHERE f.workspace_id = $2
        )
        SELECT a.storage_key FROM attachments a JOIN notes n ON n.id = a.note_id
        WHERE n.folder_id IN (SELECT id FROM descendants)`,
-      [id],
+      [id, folder.workspace_id],
     );
     await transaction(async (client) => {
       await client.query(
         `WITH RECURSIVE descendants AS (
-           SELECT id FROM folders WHERE id = $1
-           UNION ALL SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+           WHERE f.workspace_id = $2
          )
          DELETE FROM notes WHERE folder_id IN (SELECT id FROM descendants)`,
-        [id],
+        [id, folder.workspace_id],
       );
       await client.query('DELETE FROM folders WHERE id = $1', [id]);
     });

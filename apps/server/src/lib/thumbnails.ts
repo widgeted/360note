@@ -42,7 +42,7 @@ function cacheSet(key: string, value: Buffer): void {
 }
 
 export async function buildAttachmentThumbnail(buffer: Buffer): Promise<Buffer> {
-  return sharp(buffer, { animated: false })
+  return sharp(buffer, { animated: false, limitInputPixels: 40_000_000 })
     .rotate()
     .resize({ width: THUMBNAIL_MAX, height: THUMBNAIL_MAX, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: THUMBNAIL_QUALITY })

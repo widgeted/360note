@@ -1708,6 +1708,7 @@ kbd {
   white-space: pre-wrap;
 }
 
+@media (min-width: 901px) {
 /* Sidebar collapsed mode */
 .app-root.sidebar-collapsed .sidebar {
   width: 56px;
@@ -1802,6 +1803,8 @@ kbd {
   height: 22px;
 }
 
+
+}
 
 /* Shared shell for settings / secondary pages inside app */
 .page-shell {
@@ -1934,17 +1937,6 @@ kbd {
 
 .tree-folder-row.is-editing {
   background: var(--sidebar-bg-hover);
-}
-
-.tag-edit-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: var(--sidebar-bg-hover);
-  color: var(--sidebar-text);
 }
 
 .brand-lockup-inverse {

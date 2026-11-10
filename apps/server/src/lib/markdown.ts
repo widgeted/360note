@@ -130,7 +130,7 @@ export function exportHtmlDocument(input: {
 <div class="wrap">
   <div class="brand"><strong>360note</strong><span>360note.com</span></div>
   <h1>${escapeHtml(input.title)}</h1>
-  ${input.meta ? `<div class="meta">${input.meta}</div>` : ''}
+  ${input.meta ? `<div class="meta">${escapeHtml(input.meta)}</div>` : ''}
   <article>${input.contentHtml}</article>
   ${input.footer || ''}
   <footer><span>Exported from 360note</span><span>${new Date().toISOString().slice(0, 10)}</span></footer>

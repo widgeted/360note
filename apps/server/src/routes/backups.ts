@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 import { clientIp, requireAuth } from '../auth.js';
 import { errors } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
@@ -12,14 +15,16 @@ import {
   backupRecord,
   createBackup,
   deleteBackupRecord,
-  downloadBackupBuffer,
   listBackups,
-  previewBackup,
+  previewBackupFile,
   restoreBackup,
+  BACKUP_LIMITS,
+  UPLOAD_BACKUP_LIMITS,
 } from '../services/backups.js';
 import { paths, config } from '../config.js';
-import { safeFilename } from '../lib/storage.js';
+import { readBackupToFile, safeFilename } from '../lib/storage.js';
 import { audit } from '../lib/audit.js';
+import { getSetting } from '../services/settings.js';
 
 export default async function backupRoutes(app: FastifyInstance) {
   app.get('/api/workspaces/:id/backups', async (request) => {
@@ -52,12 +57,22 @@ export default async function backupRoutes(app: FastifyInstance) {
     const { workspaceId } = parse(z.object({ workspaceId: z.string().uuid() }), request.query);
     const record = await backupRecord(id, workspaceId, auth.user.id);
     await requireWorkspace(auth.user.id, workspaceId, 'manage');
-    const buffer = await downloadBackupBuffer(record.filename);
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-download-'));
+    const decrypted = path.join(tempDir, 'backup.zip');
+    try {
+      await readBackupToFile(record.filename, decrypted);
+    } catch (error) {
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      throw error;
+    }
     await audit({ workspaceId, actorId: auth.user.id, action: 'backup.download', targetType: 'backup', targetId: id, ip: clientIp(request) });
+    const stream = fsSync.createReadStream(decrypted);
+    stream.on('close', () => { void fs.rm(tempDir, { recursive: true, force: true }); });
+    stream.on('error', () => { void fs.rm(tempDir, { recursive: true, force: true }); });
     return reply
       .header('Content-Type', 'application/zip')
       .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(record.filename.replace(/\.(nhbackup|3nb)$/, '.3nb'))}`)
-      .send(buffer);
+      .send(stream);
   });
 
   app.delete('/api/backups/:id', async (request) => {
@@ -74,9 +89,15 @@ export default async function backupRoutes(app: FastifyInstance) {
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const { workspaceId } = parse(z.object({ workspaceId: z.string().uuid() }), request.query);
     const record = await backupRecord(id, workspaceId, auth.user.id);
-    await requireWorkspace(auth.user.id, workspaceId, 'read');
-    const buffer = await downloadBackupBuffer(record.filename);
-    return { preview: previewBackup(buffer, workspaceId) };
+    await requireWorkspace(auth.user.id, workspaceId, 'manage');
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-preview-'));
+    const decrypted = path.join(tempDir, 'backup.zip');
+    try {
+      await readBackupToFile(record.filename, decrypted);
+      return { preview: previewBackupFile(decrypted, workspaceId, BACKUP_LIMITS) };
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   app.post('/api/backups/:id/restore', async (request) => {
@@ -88,12 +109,16 @@ export default async function backupRoutes(app: FastifyInstance) {
     await requireWorkspace(auth.user.id, workspaceId, body.mode === 'replace' ? 'manage' : 'write');
     const jobId = await createJob('backup-restore', { workspaceId, backupId: id, mode: body.mode }, auth.user.id);
     runJob(jobId, async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-restore-'));
+      const decrypted = path.join(tempDir, 'backup.zip');
       try {
-        const buffer = await downloadBackupBuffer(record.filename);
-        return await restoreBackup({ workspaceId, userId: auth.user.id, buffer, mode: body.mode, jobId });
+        await readBackupToFile(record.filename, decrypted);
+        return await restoreBackup({ workspaceId, userId: auth.user.id, filePath: decrypted, mode: body.mode, jobId, limits: BACKUP_LIMITS });
       } catch (error) {
         await audit({ workspaceId, actorId: auth.user.id, action: 'backup.restore.failed', targetType: 'backup', targetId: id, meta: { mode: body.mode, jobId, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
         throw error;
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       }
     });
     await audit({ workspaceId, actorId: auth.user.id, action: 'backup.restore', targetType: 'backup', targetId: id, meta: { mode: body.mode }, ip: clientIp(request) });
@@ -106,19 +131,20 @@ export default async function backupRoutes(app: FastifyInstance) {
     await requireWorkspace(auth.user.id, id, 'manage');
     const part = await request.file({ limits: { fileSize: 600 * 1024 * 1024, files: 1 } });
     if (!part) throw errors.badRequest('请选择备份文件');
-    let buffer: Buffer;
-    try {
-      buffer = await part.toBuffer();
-    } catch {
-      throw errors.payloadTooLarge('备份文件不能超过 600 MB');
-    }
     const uploadId = crypto.randomUUID();
     const storedPath = path.join(paths.imports, `upload-${uploadId}.3nb`);
     await fs.mkdir(paths.imports, { recursive: true, mode: 0o700 });
-    await fs.writeFile(storedPath, buffer, { mode: 0o600 });
+    try {
+      await pipeline(part.file, fsSync.createWriteStream(storedPath, { mode: 0o600, flags: 'wx' }));
+      if (part.file.truncated) throw errors.payloadTooLarge('备份文件不能超过 600 MB');
+    } catch (error) {
+      await fs.rm(storedPath, { force: true }).catch(() => {});
+      if (error instanceof Error && error.name === 'AppError') throw error;
+      throw errors.payloadTooLarge('备份文件不能超过 600 MB');
+    }
     let preview;
     try {
-      preview = previewBackup(buffer, id);
+      preview = previewBackupFile(storedPath, id, UPLOAD_BACKUP_LIMITS);
     } catch (error) {
       await fs.rm(storedPath, { force: true });
       await audit({ workspaceId: id, actorId: auth.user.id, action: 'backup.upload.failed', targetType: 'workspace', targetId: id, meta: { error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
@@ -152,13 +178,13 @@ export default async function backupRoutes(app: FastifyInstance) {
     );
     runJob(jobId, async () => {
       try {
-        const buffer = await fs.readFile(payload.storedPath);
         return await restoreBackup({
           workspaceId: payload.workspaceId,
           userId: auth.user.id,
-          buffer,
+          filePath: payload.storedPath,
           mode: body.mode,
           jobId,
+          limits: UPLOAD_BACKUP_LIMITS,
         });
       } catch (error) {
         await audit({ workspaceId: payload.workspaceId, actorId: auth.user.id, action: 'backup.restore.upload.failed', targetType: 'backup', targetId: uploadId, meta: { mode: body.mode, jobId, error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
@@ -174,6 +200,7 @@ export default async function backupRoutes(app: FastifyInstance) {
   // Retention info is surfaced in the UI; values are environment-controlled.
   app.get('/api/backups/retention', async (request) => {
     requireAuth(request);
-    return { retentionDays: config.backupRetentionDays, autoKeep: 14 };
+    const backup = await getSetting<{ retentionDays?: number }>('backup');
+    return { retentionDays: Math.max(1, Number(backup?.retentionDays) || config.backupRetentionDays), autoKeep: 14 };
   });
 }

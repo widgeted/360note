@@ -1,7 +1,8 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { decryptString, encryptString } from '../lib/crypto.js';
 import { paths } from '../config.js';
-import { readFile } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import { backupStorageKey, safeFilename } from '../lib/storage.js';
 import { getSetting, setSetting } from './settings.js';
@@ -113,12 +114,13 @@ export async function uploadOffsiteBackup(filename: string): Promise<'uploaded' 
   }
   try {
     const filePath = path.join(paths.backups, backupStorageKey(filename));
-    const data = await readFile(filePath);
+    const fileStat = await stat(filePath);
     await client(config).send(
       new PutObjectCommand({
         Bucket: config.bucket,
         Key: keyFor(config, filename),
-        Body: data,
+        Body: fsSync.createReadStream(filePath),
+        ContentLength: fileStat.size,
         ContentType: 'application/octet-stream',
         Metadata: { app: '360note', encryption: 'aes-256-gcm' },
       }),

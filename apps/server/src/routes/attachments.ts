@@ -40,7 +40,11 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         const size = imageSize(buffer);
         width = size.width ?? null;
         height = size.height ?? null;
-      } catch {
+        if ((width ?? 0) > 12_000 || (height ?? 0) > 12_000) {
+          throw errors.badRequest('图片尺寸过大，请压缩后再上传');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AppError') throw error;
         /* not a decodable image */
       }
     }

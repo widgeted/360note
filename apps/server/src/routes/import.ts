@@ -1,9 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { requireAuth } from '../auth.js';
 import { errors } from '../lib/errors.js';
+import { withWorkspaceLock } from '../lib/workspace-lock.js';
 import { parse } from '../lib/validate.js';
 import { requireWorkspace } from '../services/workspaces.js';
 import { createJob, getJob, runJob, updateJob } from '../lib/jobs.js';
@@ -28,12 +31,13 @@ export default async function importRoutes(app: FastifyInstance) {
         limits: { fileSize: 120 * 1024 * 1024, files: 40, fields: 10, parts: 60 },
       })) {
         if (part.type !== 'file') continue;
-        const data = await part.toBuffer();
-        totalBytes += data.length;
-        if (totalBytes > MAX_IMPORT_BYTES) throw errors.payloadTooLarge('一次导入不能超过 250 MB');
         const filename = `${uploads.length}-${safeFilename(part.filename)}`;
         const storedPath = path.join(jobDir, filename);
-        await fs.writeFile(storedPath, data, { mode: 0o600 });
+        await pipeline(part.file, fsSync.createWriteStream(storedPath, { mode: 0o600, flags: 'wx' }));
+        if (part.file.truncated) throw errors.payloadTooLarge('单个导入文件不能超过 120 MB');
+        const size = (await fs.stat(storedPath)).size;
+        totalBytes += size;
+        if (totalBytes > MAX_IMPORT_BYTES) throw errors.payloadTooLarge('一次导入不能超过 250 MB');
         uploads.push({ originalName: part.filename, storedPath });
       }
     } catch (error) {
@@ -106,14 +110,14 @@ export default async function importRoutes(app: FastifyInstance) {
     );
     runJob(executeJobId, async () => {
       try {
-        return await executeImport({
+        return await withWorkspaceLock(payload.workspaceId, () => executeImport({
           jobId: executeJobId,
           jobDir,
           userId: auth.user.id,
           workspaceId: payload.workspaceId,
           targetFolderId: body.folderId ?? null,
           parsed,
-        });
+        }));
       } finally {
         await cleanupJobDir(jobId).catch(() => {});
       }

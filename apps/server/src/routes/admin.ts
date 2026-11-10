@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { many, one, query } from '../db.js';
+import { many, one, query, transaction } from '../db.js';
 import { clientIp, requireAuth } from '../auth.js';
 import { audit } from '../lib/audit.js';
 import { AppError, errors } from '../lib/errors.js';
@@ -8,6 +8,7 @@ import { parse } from '../lib/validate.js';
 import { getAiConfig, getSetting, saveAiConfig, setSetting } from '../services/settings.js';
 import { config } from '../config.js';
 import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite } from '../services/offsite.js';
+import { revokeAllApiTokens } from '../services/sessions.js';
 import { getNoteForUser } from '../services/notes.js';
 import { getObject, listObjectEntries } from '../lib/object-storage.js';
 import { readBackup } from '../lib/storage.js';
@@ -153,17 +154,20 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const body = parse(z.object({ role: z.enum(['user', 'admin']) }), request.body);
     if (id === auth.user.id && body.role !== 'admin') throw errors.badRequest('不能移除自己的管理员权限');
-    if (body.role === 'user') {
-      const admins = await one<{ count: string }>(
-        `SELECT count(*)::text AS count FROM users WHERE role = 'admin' AND deleted_at IS NULL`,
+    await transaction(async (client) => {
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext('360note:role-change'))`);
+      if (body.role === 'user') {
+        const admins = await client.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM users WHERE role = 'admin' AND deleted_at IS NULL`,
+        );
+        if (Number(admins.rows[0]?.count ?? 0) <= 1) throw errors.badRequest('实例至少需要保留一个管理员');
+      }
+      const updated = await client.query<{ id: string }>(
+        'UPDATE users SET role = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id',
+        [id, body.role],
       );
-      if (Number(admins?.count ?? 0) <= 1) throw errors.badRequest('实例至少需要保留一个管理员');
-    }
-    const updated = await one<{ id: string }>(
-      'UPDATE users SET role = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id',
-      [id, body.role],
-    );
-    if (!updated) throw errors.notFound('用户不存在');
+      if (!updated.rowCount) throw errors.notFound('用户不存在');
+    });
     await audit({ actorId: auth.user.id, action: 'admin.user.role', targetType: 'user', targetId: id, meta: { role: body.role }, ip: clientIp(request) });
     return { ok: true };
   });
@@ -174,6 +178,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     if (id === auth.user.id) throw errors.badRequest('请在账户安全页退出自己的其他设备');
     await query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
+    await revokeAllApiTokens(id);
     await audit({ actorId: auth.user.id, action: 'admin.user.sessions', targetType: 'user', targetId: id, ip: clientIp(request) });
     return { ok: true };
   });
@@ -202,6 +207,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       await query('UPDATE users SET disabled_at = CASE WHEN $2 THEN now() ELSE NULL END, updated_at = now() WHERE id = $1', [id, body.disabled]);
       if (body.disabled) {
         await query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
+        await revokeAllApiTokens(id);
         await query('UPDATE share_links SET revoked_at = now() WHERE created_by = $1 AND revoked_at IS NULL', [id]);
       }
     }

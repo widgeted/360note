@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { paths } from '../config.js';
 import { many, one } from '../db.js';
 import { errors } from '../lib/errors.js';
@@ -97,6 +98,15 @@ async function localSize(storageKey: string): Promise<number | null> {
   }
 }
 
+async function localMd5(storageKey: string): Promise<string | null> {
+  try {
+    const data = await fs.readFile(localPathForKey(storageKey));
+    return crypto.createHash('md5').update(data).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let index = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -114,7 +124,8 @@ async function migrateLocalAttachment(row: { id: string; storage_key: string }):
   if (localBytes === null) throw new Error(`本机附件文件缺失：${localKey}`);
   const objectKey = attachmentObjectStorageKey(localKey);
   const remote = await headObject(objectKey);
-  if (!remote.exists || remote.size !== localBytes) {
+  const md5 = await localMd5(localKey);
+  if (!remote.exists || remote.size !== localBytes || (remote.etag && md5 && remote.etag !== md5)) {
     const data = await readAttachment(localKey);
     await saveAttachment(objectKey, data, 's3');
   }
@@ -123,7 +134,8 @@ async function migrateLocalAttachment(row: { id: string; storage_key: string }):
   if (localThumbBytes !== null) {
     const objectThumb = attachmentObjectStorageKey(localThumb);
     const remoteThumb = await headObject(objectThumb);
-    if (!remoteThumb.exists || remoteThumb.size !== localThumbBytes) {
+    const thumbMd5 = await localMd5(localThumb);
+    if (!remoteThumb.exists || remoteThumb.size !== localThumbBytes || (remoteThumb.etag && thumbMd5 && remoteThumb.etag !== thumbMd5)) {
       const thumbnail = await readAttachment(localThumb);
       await saveAttachment(objectThumb, thumbnail, 's3');
     }
@@ -205,7 +217,8 @@ export async function cleanupLocalAttachmentCopies(): Promise<{ deleted: number;
     if (localBytes === null) continue;
     try {
       const remote = await headObject(row.storage_key);
-      if (!remote.exists || remote.size !== localBytes) {
+      const md5 = await localMd5(localKey);
+      if (!remote.exists || remote.size !== localBytes || (remote.etag && md5 && remote.etag !== md5)) {
         retained += 1;
         continue;
       }

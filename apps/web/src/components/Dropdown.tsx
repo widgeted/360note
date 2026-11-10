@@ -36,6 +36,11 @@ export function Dropdown({
 
   useEffect(() => {
     if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      const node = (triggerRef.current?.firstElementChild as HTMLElement | null) ?? triggerRef.current;
+      void node;
+      panelRef.current?.querySelector<HTMLElement>('.menu-item:not(:disabled)')?.focus();
+    });
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
@@ -70,10 +75,16 @@ export function Dropdown({
       document.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onScroll);
+      window.cancelAnimationFrame(frame);
     };
   }, [open]);
 
   const close = () => setOpen(false);
+  const closeAndFocus = () => {
+    setOpen(false);
+    const node = (triggerRef.current?.firstElementChild as HTMLElement | null) ?? triggerRef.current;
+    window.requestAnimationFrame(() => node?.focus());
+  };
 
   return (
     <>
@@ -83,7 +94,14 @@ export function Dropdown({
           event.stopPropagation();
           setOpen((value) => !value);
         }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
         style={{ display: 'inline-flex' }}
+        aria-haspopup="menu"
         aria-expanded={open}
       >
         {trigger}
@@ -95,6 +113,27 @@ export function Dropdown({
             className={cn('popover', className)}
             style={{ top: style.top, left: style.left, ...(style.width ? { width: style.width } : {}) }}
             onClick={(event) => event.stopPropagation()}
+            role="menu"
+            onKeyDown={(event) => {
+              const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('.menu-item:not(:disabled)') ?? []);
+              if (!items.length) return;
+              const index = items.indexOf(document.activeElement as HTMLElement);
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                closeAndFocus();
+              } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const delta = event.key === 'ArrowDown' ? 1 : -1;
+                items[(index + delta + items.length) % items.length]?.focus();
+              } else if (event.key === 'Home' || event.key === 'End') {
+                event.preventDefault();
+                items[event.key === 'Home' ? 0 : items.length - 1]?.focus();
+              } else if (event.key === 'Tab') {
+                event.preventDefault();
+                const delta = event.shiftKey ? -1 : 1;
+                items[(index + delta + items.length) % items.length]?.focus();
+              }
+            }}
           >
             {children(close)}
           </div>,
@@ -124,6 +163,7 @@ export function MenuItem({
   return (
     <button
       type="button"
+      role="menuitem"
       className={cn('menu-item', danger && 'danger')}
       onClick={onClick}
       disabled={disabled}

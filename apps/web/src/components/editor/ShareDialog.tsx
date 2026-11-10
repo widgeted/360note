@@ -40,6 +40,12 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
   useEffect(() => {
     if (!open) return;
     setNewShare(null);
+    setPermission('view');
+    setPassword('');
+    setExpiry('never');
+    setCustomDate('');
+    setAdvanced(false);
+    setRevokeId(null);
     setLoading(true);
     api
       .get<{ shares: ShareLink[] }>(`/api/notes/${note.id}/shares`)
@@ -105,6 +111,7 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
   }
 
   const activeShares = shares.filter((share) => !share.revokedAt);
+  const customExpiryValid = expiry !== 'custom' || Boolean(customDate && new Date(customDate).getTime() > Date.now());
 
   return (
     <Modal
@@ -117,7 +124,7 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
       {note.encrypted ? (
         <div className="banner banner-warning">
           <ShieldAlert size={15} />
-          <div>{t('端到端加密笔记不能创建公开分享。')}</div>
+          <div>{t('这篇笔记启用了加密，暂不支持公开分享。')}</div>
         </div>
       ) : (
         <>
@@ -181,7 +188,7 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
-            <button type="button" className="btn btn-primary" onClick={create} disabled={creating}>
+            <button type="button" className="btn btn-primary" onClick={create} disabled={creating || !customExpiryValid}>
               {creating ? <span className="spinner" /> : <Plus size={14} />}
               {t('创建分享链接')}
             </button>

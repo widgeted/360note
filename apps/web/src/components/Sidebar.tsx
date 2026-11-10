@@ -282,6 +282,7 @@ export function Sidebar() {
               aria-label={folder.name}
               aria-expanded={children.length > 0 ? isOpen : undefined}
               onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   setExpanded((current) => {
@@ -552,7 +553,7 @@ export function Sidebar() {
                     />
                   </div>
                 )}
-                {tags.slice(0, 30).map((tag) =>
+                {tags.map((tag) =>
                   editingTag?.id === tag.id ? (
                     <div className="tag-edit-row" key={tag.id}>
                       <span className="tag-hash" style={{ color: 'var(--sidebar-muted)' }}>#</span>

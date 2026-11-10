@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Check, Download, Mail, Save, Trash2, X } from 'lucide-react';
 import { api } from '../../lib/api';
+import { clearSensitiveLocalData } from '../../lib/offline';
 import { useAuthStore } from '../../stores/auth';
 import { useAppStore } from '../../stores/app';
 import { getLocale, useT } from '../../lib/i18n';
@@ -35,6 +36,7 @@ export default function AccountSettings() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [emailEditing, setEmailEditing] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [emailCode, setEmailCode] = useState('');
@@ -130,13 +132,18 @@ export default function AccountSettings() {
 
   async function deleteAccount() {
     setDeleting(true);
-    setError(null);
+    setDeleteError(null);
     try {
       await api.delete('/api/me', { password: deletePassword, confirm: 'DELETE' });
+      await clearSensitiveLocalData().catch(() => {});
+      localStorage.removeItem('nh-auth-cache');
+      localStorage.removeItem('nh-last-user-id');
+      localStorage.removeItem('nh-workspace');
+      useAppStore.getState().reset();
       useAuthStore.setState({ user: null, workspaces: [], status: 'anonymous' });
       navigate('/', { replace: true });
     } catch (error) {
-      setError((error as Error).message);
+      setDeleteError((error as Error).message);
       setDeleting(false);
     }
   }
@@ -342,6 +349,7 @@ export default function AccountSettings() {
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {deleteError && <div className="form-error"><AlertCircle size={14} /> {deleteError}</div>}
           <div className="field">
             <label>{t('密码')}</label>
             <input className="input" type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} autoComplete="current-password" />

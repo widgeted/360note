@@ -13,7 +13,7 @@ import { emailSchema, parse, passwordSchema } from '../lib/validate.js';
 import { audit } from '../lib/audit.js';
 import { publicUser, type DbUser } from '../lib/users.js';
 import { avatarColor, welcomeSeed } from '../lib/seed.js';
-import { createSession, listSessions, notify, revokeAllSessions, revokeSession } from '../services/sessions.js';
+import { createSession, listSessions, notify, revokeAllApiTokens, revokeAllSessions, revokeSession } from '../services/sessions.js';
 import { createNote } from '../services/notes.js';
 import { consumeEmailCode, issueEmailCode } from '../services/email-codes.js';
 import { normalizeLocale, sendEmailChangedEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../lib/mailer.js';
@@ -175,7 +175,16 @@ export default async function authRoutes(app: FastifyInstance) {
         const countRow = await client.query<{ count: string }>(
           'SELECT count(*)::text AS count FROM users WHERE deleted_at IS NULL',
         );
-        const isFirstUser = Number(countRow.rows[0]?.count ?? 0) === 0;
+        const currentCount = Number(countRow.rows[0]?.count ?? 0);
+        if (currentCount > 0 && config.registrationMode === 'invite') {
+          if (!config.inviteCode || body.inviteCode !== config.inviteCode) {
+            throw errors.forbidden('当前仅接受邀请注册');
+          }
+        }
+        if (currentCount === 0 && config.bootstrapAdminEmail && body.email.toLowerCase() !== config.bootstrapAdminEmail) {
+          throw errors.forbidden('实例尚未初始化，请使用管理员邮箱完成首次注册');
+        }
+        const isFirstUser = currentCount === 0;
         const row = await client.query<DbUser>(
           `INSERT INTO users (email, display_name, password_hash, role, avatar_color, recovery_key_hash, email_verified_at, prefs)
            VALUES ($1, $2, $3, $4, $5, $6, now(), $7::jsonb) RETURNING *`,
@@ -473,6 +482,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const hash = await hashPassword(body.newPassword);
     await one('UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1 RETURNING id', [auth.user.id, hash]);
     await revokeAllSessions(auth.user.id, auth.session?.id);
+    await revokeAllApiTokens(auth.user.id);
     await audit({ actorId: auth.user.id, action: 'auth.password.change', ip: clientIp(request) });
     return reply.send({ ok: true });
   });
@@ -513,6 +523,7 @@ export default async function authRoutes(app: FastifyInstance) {
     );
     await query('DELETE FROM totp_backup_codes WHERE user_id = $1', [user.id]);
     await revokeAllSessions(user.id);
+    await revokeAllApiTokens(user.id);
     await audit({ actorId: user.id, action: 'auth.recover', ip: clientIp(request), meta: { twoFactorReset: true } });
     void sendPasswordChangedEmail(user.email, normalizeLocale(body.locale)).catch((error) => {
       app.log.warn({ error, userId: user.id }, 'failed to send password reset email');
@@ -537,6 +548,8 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/2fa/setup', async (request) => {
     const auth = requireAuth(request);
     if (auth.user.totp_enabled) throw errors.badRequest('两步验证已开启');
+    const body = parse(z.object({ password: z.string().min(1).max(200) }), request.body);
+    if (!(await verifyPassword(body.password, auth.user.password_hash))) throw errors.badRequest('密码不正确');
     const secret = generateTotpSecret();
     await one('UPDATE users SET totp_secret_enc = $2 WHERE id = $1 RETURNING id', [
       auth.user.id,
@@ -549,7 +562,8 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/api/auth/2fa/enable', async (request) => {
     const auth = requireAuth(request);
-    const body = parse(z.object({ code: z.string().min(6).max(6) }), request.body);
+    const body = parse(z.object({ password: z.string().min(1).max(200), code: z.string().min(6).max(6) }), request.body);
+    if (!(await verifyPassword(body.password, auth.user.password_hash))) throw errors.badRequest('密码不正确');
     const row = await one<{ totp_secret_enc: string | null; totp_enabled: boolean }>(
       'SELECT totp_secret_enc, totp_enabled FROM users WHERE id = $1',
       [auth.user.id],
@@ -598,6 +612,7 @@ export default async function authRoutes(app: FastifyInstance) {
       [auth.user.id],
     );
     await query('DELETE FROM totp_backup_codes WHERE user_id = $1', [auth.user.id]);
+    await revokeAllApiTokens(auth.user.id);
     await audit({ actorId: auth.user.id, action: 'auth.2fa.disable', ip: clientIp(request) });
     return { ok: true };
   });

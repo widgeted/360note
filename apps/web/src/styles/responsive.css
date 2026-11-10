@@ -553,7 +553,7 @@
 
   .theme-option-label {
     gap: 3px;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .theme-option-label > svg {
@@ -612,5 +612,60 @@
   .sidebar .sidebar-user-more svg {
     width: 15px;
     height: 15px;
+  }
+}
+
+/* iOS Safari zooms the viewport when focusing controls below 16px. */
+@media (max-width: 760px) {
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Standalone PWA: keep content clear of notches and the home indicator. */
+.app-root {
+  box-sizing: border-box;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-top: env(safe-area-inset-top);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    top: env(safe-area-inset-top);
+    bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    box-sizing: border-box;
+  }
+
+  .context-panel {
+    top: env(safe-area-inset-top);
+    bottom: env(safe-area-inset-bottom);
+    right: env(safe-area-inset-right);
+  }
+}
+
+/* Mobile settings are a 3-column grid, matching the documented 3×3 model:
+   every section stays one tap away instead of hiding behind horizontal scroll. */
+@media (max-width: 760px) {
+  .settings-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: calc(10px + var(--header-height)) 12px 10px;
+    overflow: visible;
+  }
+
+  .settings-nav-group {
+    display: contents;
+  }
+
+  .settings-nav-item {
+    width: 100%;
+    height: 34px;
+    justify-content: flex-start;
+    padding: 0 9px;
   }
 }

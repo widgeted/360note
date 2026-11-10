@@ -42,6 +42,7 @@ export default function SharePage() {
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
 
   async function load() {
     if (!token) return;
@@ -66,7 +67,7 @@ export default function SharePage() {
   }, [token]);
 
   const rendered = useMemo(
-    () => renderMarkdown(stripDuplicateTitle(share?.note.contentMd ?? '', share?.note.title ?? ''), { toc: true, wikiLinks: true }),
+    () => renderMarkdown(stripDuplicateTitle(share?.note.contentMd ?? '', share?.note.title ?? ''), { toc: true, wikiLinks: false }),
     [share?.note.contentMd],
   );
 
@@ -97,6 +98,7 @@ export default function SharePage() {
     if (!token || !commentBody.trim()) return;
     if (guestName.trim()) localStorage.setItem('nh-guest-name', guestName.trim());
     setPosting(true);
+    setCommentError(null);
     try {
       const response = await api.post<{ comment: NonNullable<PublicShare['comments']>[number] }>(
         `/api/public/shares/${token}/comments`,
@@ -107,7 +109,7 @@ export default function SharePage() {
       );
       setCommentBody('');
     } catch (error) {
-      setError((error as Error).message);
+      setCommentError((error as Error).message);
     } finally {
       setPosting(false);
     }
@@ -182,11 +184,12 @@ export default function SharePage() {
         <div className="public-gate">
           <div className="public-gate-icon"><LockKeyhole size={22} /></div>
           <h1>{t('此分享需要密码')}</h1>
-          <p>{share.note.title}</p>
+          <p>{share.note.title || t('受密码保护的分享')}</p>
           <form onSubmit={unlock}>
             <input
               className="input"
               type="password"
+              aria-label={t('输入密码查看')}
               placeholder={t('输入密码查看')}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -355,17 +358,20 @@ export default function SharePage() {
                   <form className="public-comment-form" onSubmit={submitComment}>
                     <input
                       placeholder={t('你的名字（可选）')}
+                      aria-label={t('你的名字（可选）')}
                       value={guestName}
                       onChange={(event) => setGuestName(event.target.value)}
                       maxLength={80}
                     />
                     <textarea
                       placeholder={t('留下一条评论…')}
+                      aria-label={t('留下一条评论…')}
                       value={commentBody}
                       onChange={(event) => setCommentBody(event.target.value)}
                       maxLength={5000}
                       required
                     />
+                    {commentError && <div className="form-error"><AlertCircle size={14} /> {commentError}</div>}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{t('评论会通知笔记作者')}</span>
                       <button type="submit" className="btn btn-primary btn-sm" disabled={posting || !commentBody.trim()}>

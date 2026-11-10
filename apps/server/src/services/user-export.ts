@@ -1,10 +1,14 @@
-import AdmZip from 'adm-zip';
+import archiver from 'archiver';
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { many, one, query } from '../db.js';
 import { errors } from '../lib/errors.js';
-import { deleteBackupFile, safeFilename, saveBackup } from '../lib/storage.js';
+import { deleteBackupFile, safeFilename, saveBackupFromFile } from '../lib/storage.js';
 import { randomToken, sha256 } from '../lib/crypto.js';
 import { isReservedMailAddress, normalizeLocale, sendUserExportEmail } from '../lib/mailer.js';
-import { createBackupDocument } from './backups.js';
+import { createBackupArchive } from './backups.js';
 import { config } from '../config.js';
 
 const EXPORT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -43,26 +47,45 @@ export async function createUserExport(input: {
     await query('DELETE FROM user_export_links WHERE id = $1', [row.id]);
   }
 
-  const archive = new AdmZip();
-  archive.addFile('README.txt', Buffer.from(
-    '360note data export\n\nThis archive contains one .3nb per workspace owned by the account. Keep it private.\n',
-    'utf8',
-  ));
-  const used = new Set<string>();
-  for (const workspace of workspaces) {
-    const { buffer, name } = await createBackupDocument(workspace.id);
-    let entry = safeFilename(name);
-    let index = 2;
-    while (used.has(entry)) {
-      entry = safeFilename(name.replace(/\.3nb$/, `-${index}.3nb`));
-      index += 1;
-    }
-    used.add(entry);
-    archive.addFile(entry, buffer);
-  }
-
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-user-export-'));
+  const archivePath = path.join(tempDir, 'export.zip');
+  const output = fsSync.createWriteStream(archivePath, { mode: 0o600, flags: 'wx' });
+  const archive = archiver('zip', { zlib: { level: 6 } });
+  const finished = new Promise<void>((resolve, reject) => {
+    output.on('close', () => resolve());
+    output.on('error', reject);
+    archive.on('error', reject);
+  });
+  archive.pipe(output);
   const filename = `user-export-${input.userId}-${Date.now()}.3nb`;
-  await saveBackup(filename, archive.toBuffer());
+  try {
+    archive.append(
+      '360note data export\n\nThis archive contains one .3nb per workspace owned by the account. Keep it private.\n',
+      { name: 'README.txt' },
+    );
+    const used = new Set<string>();
+    for (const [index, workspace] of workspaces.entries()) {
+      const innerPath = path.join(tempDir, `workspace-${index}.zip`);
+      const { name } = await createBackupArchive(workspace.id, innerPath);
+      let entry = safeFilename(name);
+      let suffix = 2;
+      while (used.has(entry)) {
+        entry = safeFilename(name.replace(/\.3nb$/, `-${suffix}.3nb`));
+        suffix += 1;
+      }
+      used.add(entry);
+      archive.file(innerPath, { name: entry });
+    }
+    await archive.finalize();
+    await finished;
+    await saveBackupFromFile(filename, archivePath);
+  } catch (error) {
+    archive.abort();
+    output.destroy();
+    throw error;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
   const token = randomToken(24);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const row = await one<{ id: string }>(

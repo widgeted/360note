@@ -1,12 +1,14 @@
 import AdmZip from 'adm-zip';
+import archiver from 'archiver';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import crypto from 'node:crypto';
 import { config, paths } from '../config.js';
 import { many, one, query } from '../db.js';
-import { attachmentThumbnailStorageKey, deleteBackupFile, readBackup, safeFilename, saveBackup } from '../lib/storage.js';
+import { attachmentThumbnailStorageKey, deleteBackupFile, readBackup, safeFilename, saveBackupFromFile } from '../lib/storage.js';
 import { attachmentStorageKeyFromObject, getObject } from '../lib/object-storage.js';
 import { getSetting, setSetting } from './settings.js';
 import { deleteOffsiteBackup, uploadOffsiteBackup } from './offsite.js';
@@ -85,15 +87,6 @@ export async function createInstanceBackup(userId: string): Promise<{ id: string
   await fs.mkdir(tempDir, { recursive: true, mode: 0o700 });
   try {
     await databaseDump(dumpPath);
-    const zip = new AdmZip();
-    zip.addFile('manifest.json', Buffer.from(JSON.stringify({
-      format: '360note-instance-backup',
-      version: 2,
-      appVersion: config.version,
-      createdAt: new Date().toISOString(),
-      note: 'database.dump is pg_dump custom format; attachments/ contains AES-256-GCM encrypted attachment files from the instance data directory.',
-    }, null, 2)));
-    zip.addLocalFile(dumpPath);
     // Object-storage-only attachments are not on disk. Copy the local
     // encrypted files, then overlay every remote object so the archive is a
     // complete instance snapshot regardless of where each attachment lives.
@@ -116,10 +109,30 @@ export async function createInstanceBackup(userId: string): Promise<{ id: string
         /* Thumbnails can be regenerated; a missing one must not block disaster recovery. */
       }
     }
-    await fs.access(attachmentDir).then(() => zip.addLocalFolder(attachmentDir, 'attachments')).catch(() => {});
+    const archivePath = path.join(tempDir, 'archive.zip');
+    const output = fsSync.createWriteStream(archivePath, { mode: 0o600, flags: 'wx' });
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    const finished = new Promise<void>((resolve, reject) => {
+      output.on('close', () => resolve());
+      output.on('error', reject);
+      archive.on('error', reject);
+    });
+    archive.pipe(output);
+    archive.append(JSON.stringify({
+      format: '360note-instance-backup',
+      version: 2,
+      appVersion: config.version,
+      createdAt: new Date().toISOString(),
+      note: 'database.dump is pg_dump custom format; attachments/ contains AES-256-GCM encrypted attachment files from the instance data directory.',
+    }, null, 2), { name: 'manifest.json' });
+    archive.file(dumpPath, { name: 'database.dump' });
+    const hasAttachments = await fs.access(attachmentDir).then(() => true).catch(() => false);
+    if (hasAttachments) archive.directory(attachmentDir, 'attachments');
+    await archive.finalize();
+    await finished;
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
-    const filename = `instance-${safeFilename(config.publicOrigin.replace(/^https?:\/\//, '').replace(/[^a-z0-9.-]/gi, '_'))}-${stamp}.3nb`;
-    const size = await saveBackup(filename, zip.toBuffer());
+    const filename = `instance-${safeFilename(config.publicOrigin.replace(/^https?:\/\//, '').replace(/[^a-z0-9.-]/gi, '_'))}-${stamp}-${crypto.randomUUID().slice(0, 8)}.3nb`;
+    const size = await saveBackupFromFile(filename, archivePath);
     const row = await one<{ id: string }>(
       `INSERT INTO instance_backups (filename, storage_key, size_bytes, status, created_by)
        VALUES ($1, $2, $3, 'ready', $4) RETURNING id`,

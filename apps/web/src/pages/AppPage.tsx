@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FileText, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
@@ -9,8 +9,9 @@ import { NoteListPane } from '../components/NoteListPane';
 import { ContextPanel } from '../components/ContextPanel';
 import { CommandPalette } from '../components/CommandPalette';
 import { PwaInstallPrompt } from '../components/PwaInstallPrompt';
-import { EditorPane, EmptyEditorState } from '../components/editor/EditorPane';
-import SettingsPage from './SettingsPage';
+import { EmptyEditorState } from '../components/editor/EmptyEditorState';
+const EditorPane = lazy(() => import('../components/editor/EditorPane').then((module) => ({ default: module.EditorPane })));
+const SettingsPage = lazy(() => import('./SettingsPage'));
 import { Modal } from '../components/Modal';
 import { toast } from '../stores/toast';
 import { api } from '../lib/api';
@@ -246,19 +247,23 @@ export default function AppPage() {
     <div className={appClass}>
       <Sidebar />
       {settingsMode ? (
-        <SettingsPage section={settingsSection} />
+        <Suspense fallback={<div className="page-shell"><div className="editor-empty"><span className="spinner spinner-lg" /></div></div>}>
+          <SettingsPage section={settingsSection} />
+        </Suspense>
       ) : (
         <>
           <NoteListPane />
           <main className="main-pane">
             {showEditor ? (
               note && note.id === noteId ? (
-                <EditorPane
-                  key={note.id}
-                  noteId={note.id}
-                  reloadTick={reloadTick}
-                  onMobileBack={() => navigate('/app')}
-                />
+                <Suspense fallback={<div className="editor-empty"><span className="spinner spinner-lg" /></div>}>
+                  <EditorPane
+                    key={note.id}
+                    noteId={note.id}
+                    reloadTick={reloadTick}
+                    onMobileBack={() => navigate('/app')}
+                  />
+                </Suspense>
               ) : loadingNote ? (
                 <div className="editor-empty">
                   <span className="spinner spinner-lg" />

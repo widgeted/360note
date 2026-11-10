@@ -1,8 +1,10 @@
 import type { Attachment, FolderPathItem, Note, NoteSummary, Role, TagRef } from '@360note/shared';
+import crypto from 'node:crypto';
 import { many, one, transaction, type Queryable } from '../db.js';
 import { errors } from '../lib/errors.js';
 import { excerpt as makeExcerpt, extractWikiLinks, stripTitleHeading, wordCount } from '../lib/text.js';
 import { requireWorkspace } from './workspaces.js';
+import { attachmentStorageKey, deleteAttachment, readAttachment, saveAttachment } from '../lib/storage.js';
 
 interface NoteRow {
   id: string;
@@ -543,16 +545,20 @@ export async function propagateTitleRename(
     );
     const content = row.content_md.replace(pattern, (_match, alias: string | undefined) => `[[${newTitle}${alias ?? ''}]]`);
     if (content === row.content_md) continue;
+    let changed = false;
     await transaction(async (client) => {
       const version = row.version + 1;
-      await client.query(
-        `UPDATE notes SET content_md = $2, excerpt = $3, version = $4, updated_by = $5, updated_at = now() WHERE id = $1`,
-        [row.id, content, makeExcerpt(content), version, userId],
+      const updated = await client.query(
+        `UPDATE notes SET content_md = $2, excerpt = $3, version = $4, updated_by = $5, updated_at = now()
+         WHERE id = $1 AND version = $6 RETURNING id`,
+        [row.id, content, makeExcerpt(content), version, userId, row.version],
       );
+      if (!updated.rowCount) return;
+      changed = true;
       await rebuildLinks(client, row.id, workspaceId, content);
       await snapshotVersion(client, row.id, version, row.title, content, userId, 'auto', false);
     });
-    count++;
+    if (changed) count++;
   }
   return count;
 }
@@ -585,6 +591,7 @@ export async function deleteNotePermanently(noteId: string, userId: string): Pro
   const row = await getNoteRow(noteId);
   if (!row) throw errors.notFound('笔记不存在');
   await requireWorkspace(userId, row.workspace_id, 'write');
+  if (!row.trashed_at) throw errors.badRequest('请先将笔记移到回收站，再永久删除');
   const attachments = await many<{ storage_key: string }>(
     'SELECT storage_key FROM attachments WHERE note_id = $1',
     [noteId],
@@ -601,6 +608,11 @@ export async function emptyTrash(workspaceId: string, userId: string): Promise<s
     [workspaceId],
   );
   await one('DELETE FROM notes WHERE workspace_id = $1 AND trashed_at IS NOT NULL RETURNING id', [workspaceId]);
+  await one(
+    `UPDATE folders SET parent_id = NULL
+     WHERE workspace_id = $1 AND trashed_at IS NULL AND parent_id IN (SELECT id FROM folders WHERE workspace_id = $1 AND trashed_at IS NOT NULL)`,
+    [workspaceId],
+  );
   await one('DELETE FROM folders WHERE workspace_id = $1 AND trashed_at IS NOT NULL RETURNING id', [workspaceId]);
   return attachments.map((attachment) => attachment.storage_key);
 }
@@ -700,14 +712,51 @@ export async function getBacklinks(noteId: string, userId: string) {
 export async function duplicateNote(noteId: string, userId: string): Promise<Note> {
   const { row } = await getNoteForUser(noteId, userId);
   const tags = await many<{ tag_id: string }>('SELECT tag_id FROM note_tags WHERE note_id = $1', [noteId]);
-  return createNote({
+  const originalAttachments = await many<{
+    id: string;
+    filename: string;
+    mime: string;
+    width: number | null;
+    height: number | null;
+    storage_key: string;
+  }>(
+    'SELECT id, filename, mime, width, height, storage_key FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at',
+    [noteId],
+  );
+  let contentMd = row.content_md;
+  const copied: Array<{ id: string; filename: string; mime: string; size: number; sha256: string; width: number | null; height: number | null; storageKey: string }> = [];
+  for (const attachment of originalAttachments) {
+    const data = await readAttachment(attachment.storage_key);
+    const id = crypto.randomUUID();
+    const localKey = attachmentStorageKey(row.workspace_id, id);
+    const storageKey = await saveAttachment(localKey, data);
+    copied.push({ id, filename: attachment.filename, mime: attachment.mime, size: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex'), width: attachment.width, height: attachment.height, storageKey });
+    contentMd = contentMd.replaceAll(`/api/attachments/${attachment.id}/content`, `/api/attachments/${id}/content`);
+  }
+  const created = await createNote({
     workspaceId: row.workspace_id,
     userId,
     title: `${row.title} 副本`,
-    contentMd: row.content_md,
+    contentMd,
     folderId: row.folder_id,
     tagIds: tags.map((tag) => tag.tag_id),
   });
+  try {
+    for (const item of copied) {
+      await one(
+        `INSERT INTO attachments (id, workspace_id, note_id, filename, mime, size_bytes, sha256, storage_key, width, height, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          item.id, row.workspace_id, created.id, item.filename, item.mime, item.size,
+          item.sha256, item.storageKey, item.width, item.height, userId,
+        ],
+      );
+    }
+  } catch (error) {
+    await Promise.all(copied.map((item) => deleteAttachment(item.storageKey).catch(() => {})));
+    throw error;
+  }
+  return (await getNoteForUser(created.id, userId)).note;
 }
 
 export async function updateLastOpened(noteId: string, userId: string): Promise<void> {

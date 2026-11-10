@@ -15,7 +15,7 @@ Internet
 Nginx  (TLS, HTTP→HTTPS, proxy, 600MB body, streaming)
   │ 127.0.0.1:8787
   ▼
-systemd: 360note.service  (User=360note)
+systemd: 360note.service  (User=note360)
   │
   ├── PostgreSQL 15 (127.0.0.1:5432)
   └── /var/lib/360note
@@ -27,8 +27,8 @@ systemd: 360note.service  (User=360note)
 
 - 应用目录：`/opt/360note`
 - 环境文件：`/etc/360note/360note.env`（0600）
-- 数据目录：`/var/lib/360note`（0700，`360note:360note`）
-- 运行用户：`360note`（非 root）
+- 数据目录：`/var/lib/360note`（0700，`note360:note360`）
+- 运行用户：`note360`（非 root）
 - 监听：`127.0.0.1:8787`，不直接对外
 
 ---
@@ -50,10 +50,10 @@ apt-get install -y nginx postgresql postgresql-contrib certbot python3-certbot-n
 ### 2.2 系统用户与目录
 
 ```bash
-id 360note >/dev/null 2>&1 || useradd --system --home /opt/360note --shell /usr/sbin/nologin 360note
-install -d -m 700 -o 360note -g 360note /var/lib/360note
-install -d -m 700 -o 360note -g 360note /var/lib/360note/{attachments,backups,imports,tmp}
-install -d -m 750 -o root -g 360note /etc/360note
+id note360 >/dev/null 2>&1 || useradd --system --home /opt/360note --shell /usr/sbin/nologin note360
+install -d -m 700 -o note360 -g note360 /var/lib/360note
+install -d -m 700 -o note360 -g note360 /var/lib/360note/{attachments,backups,imports,tmp}
+install -d -m 750 -o root -g note360 /etc/360note
 ```
 
 ### 2.3 数据库
@@ -61,9 +61,9 @@ install -d -m 750 -o root -g 360note /etc/360note
 ```bash
 DB_PASS="$(openssl rand -base64 30 | tr -d '/+=' | head -c 32)"
 sudo -u postgres psql <<SQL
-CREATE ROLE 360note LOGIN PASSWORD '${DB_PASS}';
-CREATE DATABASE 360note OWNER 360note;
-GRANT ALL ON SCHEMA public TO 360note;
+CREATE ROLE note360 LOGIN PASSWORD '${DB_PASS}';
+CREATE DATABASE note360 OWNER note360;
+GRANT ALL ON SCHEMA public TO note360;
 SQL
 echo "保存数据库密码到密码管理器：${DB_PASS}"
 ```
@@ -85,7 +85,7 @@ openssl rand -base64 32  # NOTE360_MASTER_KEY（必须 32 字节）
 编辑 `/etc/360note/360note.env`：
 
 - `PUBLIC_ORIGIN=https://360note.com`（必须与真实访问域名一致，否则分享链接/书签脚本会错）
-- `DATABASE_URL=postgres://360note:<上一步密码>@127.0.0.1:5432/360note`
+- `DATABASE_URL=postgres://note360:<上一步密码>@127.0.0.1:5432/note360`
 - `NOTE360_DATA_DIR=/var/lib/360note`
 - `WEB_DIST=/opt/360note/apps/web/dist`
 - `NOTE360_ENV_FILE=/etc/360note/360note.env`
@@ -144,7 +144,7 @@ systemctl daemon-reload && systemctl restart 360note
 
 ```bash
 # 1) 先启用 HTTP-only 配置，确保 ACME challenge 与应用可访问
-cp deploy/nginx-360note-http-only.conf /etc/nginx/sites-available/360note
+cp deploy/nginx-360note-dual-domain.conf /etc/nginx/sites-available/360note
 ln -sf /etc/nginx/sites-available/360note /etc/nginx/sites-enabled/360note
 rm -f /etc/nginx/sites-enabled/default
 mkdir -p /var/www/html/.well-known/acme-challenge
@@ -162,7 +162,7 @@ cp deploy/errors/maintenance.html /var/www/360note-errors/maintenance.html
 chmod 644 /var/www/360note-errors/maintenance.html
 
 # 4) 切换到完整 TLS 配置
-cp deploy/nginx-360note.conf /etc/nginx/sites-available/360note
+# 生产模板为 deploy/nginx-360note-dual-domain.conf（双域名 + BT 证书路径）
 nginx -t && systemctl reload nginx
 ```
 
@@ -202,7 +202,7 @@ ss -tlnp
 
 ```bash
 curl -fsS https://360note.com/health | jq .
-# {"ok":true,"version":"0.1.5","time":"...","database":true}
+# {"ok":true,"version":"0.1.38","time":"...","database":true}
 ```
 
 ---

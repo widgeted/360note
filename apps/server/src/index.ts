@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import fs from 'node:fs';
 import { config, ensureDataDirs } from './config.js';
 import { migrate } from './migrate.js';
+import { validateCryptoConfig } from './lib/crypto.js';
 import { closePool, one } from './db.js';
 import { AppError, errorPayload } from './lib/errors.js';
 import { localizeMessage, requestLanguage } from './lib/i18n.js';
@@ -99,6 +100,11 @@ async function buildServer() {
     if (error.statusCode === 413) {
       return reply.status(413).send({ error: { code: 'PAYLOAD_TOO_LARGE', message: localize('上传内容过大') } });
     }
+    if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+      return reply.status(error.statusCode).send({
+        error: { code: error.code || 'BAD_REQUEST', message: localize('请求无效') },
+      });
+    }
     app.log.error({ error, stack: error.stack, url: request.url }, 'unhandled error');
     return reply.status(500).send({ error: { code: 'INTERNAL_ERROR', message: localize('服务器内部错误') } });
   });
@@ -115,7 +121,7 @@ async function buildServer() {
     mailEnabled: Boolean(config.mail.host && config.mail.user && config.mail.pass),
   }));
 
-  app.get('/health', async () => {
+  app.get('/health', async (request, reply) => {
     let database = false;
     try {
       await one('SELECT 1 AS ok');
@@ -123,6 +129,7 @@ async function buildServer() {
     } catch {
       database = false;
     }
+    if (!database) reply.status(503);
     return { ok: database, version: config.version, time: new Date().toISOString(), database };
   });
 
@@ -180,6 +187,7 @@ async function buildServer() {
 }
 
 async function start() {
+  validateCryptoConfig();
   ensureDataDirs();
   await migrate();
   const recovered = await recoverInterruptedJobs().catch((error) => {
@@ -190,7 +198,7 @@ async function start() {
   const app = await buildServer();
   await app.listen({ port: config.port, host: config.host });
   app.log.info(`360note API listening on http://${config.host}:${config.port}`);
-  void resumePendingOcr(app.log);
+  void resumePendingOcr(app.log).catch((error) => app.log.error({ error }, 'OCR resume failed'));
   void cleanupImportUploads();
 
   // Daily backup around 03:00 local server time, plus a check every six hours.

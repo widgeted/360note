@@ -1,5 +1,4 @@
 import archiver from 'archiver';
-import AdmZip from 'adm-zip';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -155,7 +154,6 @@ export async function exportSingleNote(note: Note, format: 'md' | 'html' | 'pdf'
         .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${safeTitle}.md`)}`)
         .send(body);
     }
-    const zip = new AdmZip();
     const used = new Set<string>();
     const attachmentPaths = new Map<string, string>();
     for (const attachment of attachments) {
@@ -167,7 +165,7 @@ export async function exportSingleNote(note: Note, format: 'md' | 'html' | 'pdf'
     let rewritten = note.contentMd;
     for (const attachment of attachments) {
       rewritten = rewritten.replace(
-        new RegExp(`(?:https?://[^\s)"']+)?/api/attachments/${attachment.id}/content`, 'g'),
+        new RegExp(`(?:https?://[^\\s)"']+)?/api/attachments/${attachment.id}/content`, 'g'),
         attachmentPaths.get(attachment.id)!,
       );
     }
@@ -179,16 +177,20 @@ export async function exportSingleNote(note: Note, format: 'md' | 'html' | 'pdf'
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
     }) + rewritten;
-    zip.addFile(`${safeTitle}.md`, Buffer.from(readme, 'utf8'));
+    const zip = archiver('zip', { zlib: { level: 6 } });
+    zip.on('warning', (error) => app.log.warn({ error }, 'single note export warning'));
+    zip.on('error', (error) => app.log.error({ error }, 'single note export error'));
+    zip.pipe(reply.raw);
+    reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${safeTitle}.zip`)}`);
+    zip.append(readme, { name: `${safeTitle}.md` });
     for (const attachment of attachments) {
       const data = await readAttachment(attachment.storage_key);
-      zip.addFile(attachmentPaths.get(attachment.id)!, data);
+      zip.append(data, { name: attachmentPaths.get(attachment.id)! });
     }
-    const buffer = zip.toBuffer();
-    return reply
-      .header('Content-Type', 'application/zip')
-      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${safeTitle}.zip`)}`)
-      .send(buffer);
+    await zip.finalize();
+    return;
   }
 
   const attachmentMap = new Map<string, { data: Buffer; mime: string; filename: string }>();
@@ -325,7 +327,10 @@ export async function exportWorkspace(input: {
   };
   archive.append(JSON.stringify(manifest, null, 2), { name: `${exportName}/manifest.json` });
 
-  const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const csvEscape = (value: string) => {
+    const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
   const csvRows = ['id,title,folder,tags,created,updated,words'];
   const htmlIndex = notes
     .map((note) => {

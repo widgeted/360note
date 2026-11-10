@@ -23,6 +23,7 @@ import { copyText, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { Avatar } from '../Avatar';
 import { Modal } from '../Modal';
 import { toast } from '../../stores/toast';
+import { LoadFailure } from '../LoadFailure';
 
 const ROLES = ['admin', 'editor', 'viewer'] as const;
 
@@ -61,6 +62,7 @@ export default function TeamSettings() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     setCreateOpen(searchParams.get('create') === '1');
@@ -83,8 +85,9 @@ export default function TeamSettings() {
     try {
       const response = await api.get<{ members: WorkspaceMember[] }>(`/api/workspaces/${workspaceId}/members`);
       setMembers(response.members);
-    } catch {
-      /* ignore */
+      setLoadError(null);
+    } catch (error) {
+      setLoadError((error as Error).message);
     }
   }
 
@@ -92,8 +95,8 @@ export default function TeamSettings() {
     try {
       const response = await api.get<{ invitations: Array<Invitation & { url?: string }> }>(`/api/workspaces/${workspaceId}/invitations`);
       setInvitations(response.invitations);
-    } catch {
-      /* ignore */
+    } catch (error) {
+      setLoadError((error as Error).message);
     }
   }
 
@@ -101,8 +104,8 @@ export default function TeamSettings() {
     try {
       const response = await api.get<{ entries: AuditEntry[] }>(`/api/workspaces/${workspaceId}/audit`);
       setAudit(response.entries);
-    } catch {
-      /* ignore */
+    } catch (error) {
+      setLoadError((error as Error).message);
     }
   }
 
@@ -259,6 +262,8 @@ export default function TeamSettings() {
     <>
       <h1 className="settings-title">{t('空间')}</h1>
       <p className="settings-subtitle">{t('个人空间是账户自带的私有空间；团队空间用于多人协作。每个账户始终有一个个人空间，团队空间可以创建多个。')}</p>
+
+      {loadError && <LoadFailure message={loadError} onRetry={() => { void loadMembers(); if (canManage) { void loadInvitations(); void loadAudit(); } }} />}
 
       <section className="settings-section">
         <div className="settings-section-head">

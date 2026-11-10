@@ -9,6 +9,7 @@ import { toast } from '../../stores/toast';
 import { Dropdown, MenuItem } from '../Dropdown';
 import { OffsiteSettings } from './OffsiteSettings';
 import { useAuthStore } from '../../stores/auth';
+import { LoadFailure } from '../LoadFailure';
 
 interface Stats {
   users: number;
@@ -86,6 +87,7 @@ export default function AdminSettings() {
   const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7, drillEnabled: true, drillFrequencyHours: 24, lastDrillAt: null as string | null, lastDrillOk: null as boolean | null, lastDrillError: null as string | null, lastDrillBackup: null as string | null });
   const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
   const [drillBusy, setDrillBusy] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime; attachmentStorage: AttachmentStorageStats }>('/api/admin/stats').then((res) => {
@@ -94,9 +96,10 @@ export default function AdminSettings() {
       setRuntime(res.runtime as typeof runtime);
       setAttachmentStorage(res.attachmentStorage);
       setRetention(res.instance?.backupRetentionDays ?? 30);
-    }).catch(() => {});
+      setPageError(null);
+    }).catch((error: Error) => setPageError(error.message));
     void refreshOffsiteUsage();
-    api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch(() => {});
+    api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch((error: Error) => setPageError(error.message));
     void loadAudit(0);
     void refreshIpBlocks();
     void refreshInstanceBackups();
@@ -145,15 +148,19 @@ export default function AdminSettings() {
     try {
       const response = await api.get<OffsiteUsage>('/api/admin/offsite/usage');
       setOffsiteUsage(response);
-    } catch {
-      /* Object storage may not be configured. */
+    } catch (error) {
+      setPageError((error as Error).message);
     }
   }
 
   async function refreshInstanceBackups() {
-    const response = await api.get<{ backups: Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>; settings: typeof instanceBackupSettings }>('/api/admin/instance-backups');
-    setInstanceBackups(response.backups);
-    setInstanceBackupSettings(response.settings);
+    try {
+      const response = await api.get<{ backups: Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>; settings: typeof instanceBackupSettings }>('/api/admin/instance-backups');
+      setInstanceBackups(response.backups);
+      setInstanceBackupSettings(response.settings);
+    } catch (error) {
+      setPageError((error as Error).message);
+    }
   }
 
   async function saveInstanceBackupSettings() {
@@ -306,6 +313,8 @@ export default function AdminSettings() {
     <>
       <h1 className="settings-title">{t('实例管理')}</h1>
       <p className="settings-subtitle">{t('实例级的统计、存储、用户、备份保留与审计。只有实例管理员可见。')}</p>
+
+      {pageError && <LoadFailure message={pageError} onRetry={() => window.location.reload()} />}
 
       <div className="admin-tabs">
         {([

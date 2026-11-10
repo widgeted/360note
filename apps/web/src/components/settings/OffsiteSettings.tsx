@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';
 import { toast } from '../../stores/toast';
 import { formatBytes, formatRelativeShort } from '../../lib/utils';
+import { LoadFailure } from '../LoadFailure';
 
 interface OffsiteConfig {
   enabled: boolean;
@@ -67,21 +68,25 @@ export function OffsiteSettings() {
   const [restoring, setRestoring] = useState<string | null>(null);
   const [secret, setSecret] = useState('');
   const [purgeRemote, setPurgeRemote] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [objectsError, setObjectsError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   const loadUsage = useCallback(async (force = false) => {
     try {
       const response = await api.get<StorageUsage>(`/api/admin/offsite/usage${force ? '?force=1' : ''}`);
       setUsage(response);
+      setPageError(null);
       return response;
-    } catch {
+    } catch (error) {
+      setPageError((error as Error).message);
       return null;
     }
   }, []);
 
   useEffect(() => {
     if (user?.role !== 'admin') return;
-    api.get<{ offsite: OffsiteConfig }>('/api/admin/offsite').then((res) => setConfig(res.offsite)).catch(() => {});
+    api.get<{ offsite: OffsiteConfig }>('/api/admin/offsite').then((res) => setConfig(res.offsite)).catch((error: Error) => setPageError(error.message));
     void loadUsage(true);
     void loadObjects();
   }, [user?.role, loadUsage]);
@@ -127,8 +132,9 @@ export function OffsiteSettings() {
     try {
       const response = await api.get<{ objects: Array<{ key: string; size: number; lastModified: string | null; kind: string }> }>('/api/admin/offsite/objects?limit=200');
       setObjects(response.objects);
-    } catch {
-      /* storage may not be configured */
+      setObjectsError(null);
+    } catch (error) {
+      setObjectsError((error as Error).message);
     } finally {
       setObjectsLoading(false);
     }
@@ -284,6 +290,7 @@ export function OffsiteSettings() {
         <span className="settings-section-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('异地备份与对象存储（S3 兼容）')}</span>
         <span className="settings-section-desc">{t('实例管理员')}</span>
       </div>
+      {pageError && <LoadFailure message={pageError} onRetry={() => void loadUsage(true)} />}
       <div className="banner banner-info" style={{ marginBottom: 12 }}>
         <ShieldCheck size={15} />
         <div>{t('S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）可同时用于备份副本和笔记附件。所有内容在离开本机前都已使用 360note 主密钥加密，S3 提供方无法读取。')}</div>
@@ -469,7 +476,9 @@ export function OffsiteSettings() {
           <table className="data-table admin-object-table">
             <thead><tr><th>{t('对象')}</th><th>{t('类型')}</th><th>{t('大小')}</th><th>{t('更新时间')}</th><th>{t('操作')}</th></tr></thead>
             <tbody>
-              {objects.length === 0 ? (
+              {objectsError ? (
+                <tr><td colSpan={5}><LoadFailure message={objectsError} onRetry={() => void loadObjects()} compact /></td></tr>
+              ) : objects.length === 0 ? (
                 <tr><td colSpan={5}><div className="context-empty">{objectsLoading ? t('加载中…') : t('没有对象或尚未配置连接')}</div></td></tr>
               ) : objects.map((object) => (
                 <tr key={object.key}>

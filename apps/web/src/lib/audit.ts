@@ -66,6 +66,21 @@ const LABELS: Record<string, string> = {
   'admin.instance_backup.upload': '上传整站备份',
   'admin.instance_backup.delete': '删除整站备份',
   'admin.comment.delete': '删除公开评论',
+  'admin.ip.block': '添加注册 IP 限制',
+  'admin.ip.unblock': '解除注册 IP 限制',
+  'admin.offsite.attachments.enable': '启用附件对象存储',
+  'admin.offsite.attachments.disable': '停用附件对象存储',
+  'admin.user.restrictions': '更新用户限制',
+  'admin.user.role': '修改用户角色',
+  'admin.user.sessions': '退出用户设备',
+  'auth.login.password': '密码登录',
+  'auth.session.revoke_others': '退出其他设备',
+  'backup.restore.upload': '恢复上传的备份',
+  'deny': '拒绝访问',
+  'note.conflict.save': '保存冲突副本',
+  'share.delete': '删除分享记录',
+  'share.public_comment': '公开访客评论',
+  'share.public_edit': '公开编辑笔记',
 };
 
 export function auditActionLabel(t: Translate, action: string): string {
