@@ -35,7 +35,7 @@ function PrivacyZh() {
           <li><strong>安全数据：</strong>登录会话、设备信息（浏览器 User-Agent）、IP 地址、登录尝试、审计日志。它们用于保护账户、排查滥用和满足安全审计需要。</li>
           <li><strong>偏好数据：</strong>主题、语言、编辑器设置等。</li>
         </ul>
-        <p>我们不收集广告标识符，不加载第三方行为分析脚本，不使用跨站跟踪像素。</p>
+        <p>我们不收集广告标识符，不使用跨站跟踪像素。站点经由 Cloudflare 提供服务，Cloudflare 可能注入无 Cookie 的汇总访问统计（页面浏览量、性能与错误），用于容量与可用性分析；它不读取笔记正文，也不建立跨站用户画像。</p>
 
         <h2>2. 我们不会做什么</h2>
         <ul>
@@ -109,7 +109,7 @@ function PrivacyEn() {
           <li>No marketing email. We only send account-essential email: sign-up and password-reset codes, password-change notices, workspace invitations, and security alerts you request. Routine notices such as comments and unusual sign-ins stay in-app.</li>
           <li>No selling or renting your content; no training AI on your notes.</li>
           <li>No sending notes to an AI service unless you explicitly trigger it. AI summaries are off by default.</li>
-          <li>No third-party ads or behavioral analytics on shared pages.</li>
+          <li>No third-party ads or cross-site tracking pixels. Cloudflare may inject cookieless aggregate page-view and performance metrics at the edge; it does not read note bodies or build cross-site profiles.</li>
         </ul>
         <h2>Security</h2>
         <p>TLS everywhere. Attachments are encrypted at rest with AES-256-GCM. Passwords are derived with scrypt; session tokens are stored hashed. TOTP two-factor authentication, device review and in-app sign-in alerts are available. Backups are encrypted at rest and can be downloaded at any time.</p>

@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -109,6 +110,24 @@ export async function putObject(storageKey: string, data: Buffer, contentType = 
     Bucket: config.bucket,
     Key: keyFor(config, storageKey),
     Body: data,
+    ContentType: contentType,
+    Metadata: { app: '360note', encryption: 'aes-256-gcm' },
+  }));
+}
+
+export async function putObjectStream(
+  storageKey: string,
+  body: Readable,
+  contentLength: number,
+  contentType = 'application/octet-stream',
+): Promise<void> {
+  const config = await getObjectStorageConfig();
+  if (!objectStorageConfigured(config)) throw new Error('对象存储配置不完整');
+  await client(config).send(new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: keyFor(config, storageKey),
+    Body: body,
+    ContentLength: contentLength,
     ContentType: contentType,
     Metadata: { app: '360note', encryption: 'aes-256-gcm' },
   }));

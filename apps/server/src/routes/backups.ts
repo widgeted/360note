@@ -94,7 +94,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     const decrypted = path.join(tempDir, 'backup.zip');
     try {
       await readBackupToFile(record.filename, decrypted);
-      return { preview: previewBackupFile(decrypted, workspaceId, BACKUP_LIMITS) };
+      return { preview: await previewBackupFile(decrypted, workspaceId, BACKUP_LIMITS) };
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
@@ -144,7 +144,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     }
     let preview;
     try {
-      preview = previewBackupFile(storedPath, id, UPLOAD_BACKUP_LIMITS);
+      preview = await previewBackupFile(storedPath, id, UPLOAD_BACKUP_LIMITS);
     } catch (error) {
       await fs.rm(storedPath, { force: true });
       await audit({ workspaceId: id, actorId: auth.user.id, action: 'backup.upload.failed', targetType: 'workspace', targetId: id, meta: { error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });

@@ -702,6 +702,16 @@ apps/web/src/styles/tokens.css        设计 token
 - 空间菜单展开右对齐（align=end, width=trigger），收起左对齐（align=start, auto）。
 - 设计文档已从“全宽触发器统一左对齐”改为上述规则。
 
+## 2026-11-10 · v0.1.40 yauzl 流式恢复与发布收尾
+
+- 备份预览/合并/替换恢复改用 yauzl：安全打开 ZIP、枚举条目时检查条目数/单文件/总大小/压缩比/路径/重复项；附件先流式复制到临时文件，再由 `saveAttachmentFromFile` 流式加密写入本地或 S3。
+- 对象存储校验与工作区恢复先解密到临时文件，再走 yauzl；实例备份仍用 AdmZip 做只读演练。
+- 迁移 013 先删除重复 filename/storage_key 的旧记录（保留最新），再建唯一索引。
+- CSP 允许 `static.cloudflareinsights.com` 与 `cloudflareinsights.com`；隐私页明确 Cloudflare 无 Cookie 汇总统计，不读取正文。
+- 新增 `SafeZip` 单测、带附件的合并/替换恢复集成测试、生产登录态 Playwright（demo 账号，测试后注销）。
+- 验证：server 13、web 4、build、postgres-api、jobs-recovery、backup-restore-drill、object-storage-e2e、backup-limits、public-smoke、authenticated-smoke 全部通过。
+- 生产已部署 0.1.40；健康检查 200；仅测试会话被撤销，真实 iPhone 会话未动。
+
 ## 2026-11-10 · v0.1.39 发布质量修复
 
 - 备份/恢复：跨工作区 ID 校验、循环文件夹检测、附件先落盘再原子替换、工作区 advisory lock；备份创建改为 archiver 写临时文件 + v2 流式 AES-256-GCM，下载解密到临时文件后流式发送；上传/导入先落盘；账号导出与实例备份同样走流式归档。

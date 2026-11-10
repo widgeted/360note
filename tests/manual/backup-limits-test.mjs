@@ -4,8 +4,11 @@
  * Run from /opt/360note after `npm run build -w @360note/server`.
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { previewBackup, BACKUP_LIMITS } from '../../apps/server/dist/services/backups.js';
+import { previewBackupFile, BACKUP_LIMITS } from '../../apps/server/dist/services/backups.js';
 
 const validDocument = {
   format: '360note-backup',
@@ -29,8 +32,19 @@ function validZip() {
   return zip;
 }
 
+async function previewBuffer(buffer) {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-limits-'));
+  const file = path.join(dir, 'backup.3nb');
+  try {
+    await fs.writeFile(file, buffer);
+    return await previewBackupFile(file, validDocument.workspace.id);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
 // A legitimate small backup still previews.
-const ok = previewBackup(validZip().toBuffer(), validDocument.workspace.id);
+const ok = await previewBuffer(validZip().toBuffer());
 assert.equal(ok.format, '360note-backup');
 console.log('PASS  valid backup previews');
 
@@ -39,8 +53,8 @@ const many = new AdmZip();
 for (let index = 0; index < BACKUP_LIMITS.maxEntries + 1; index += 1) {
   many.addFile(`f/${index}.txt`, Buffer.alloc(0));
 }
-assert.throws(
-  () => previewBackup(many.toBuffer(), validDocument.workspace.id),
+await assert.rejects(
+  () => previewBuffer(many.toBuffer()),
   /备份文件包含过多条目|too many entries/i,
 );
 console.log('PASS  excessive entry count rejected');
@@ -50,8 +64,8 @@ const bomb = new AdmZip();
 bomb.addFile('manifest.json', Buffer.from(JSON.stringify({ format: '360note-backup', version: 1 })));
 bomb.addFile('workspace.json', Buffer.from(JSON.stringify(validDocument)));
 bomb.addFile('bomb.bin', Buffer.alloc(2 * 1024 * 1024, 0));
-assert.throws(
-  () => previewBackup(bomb.toBuffer(), validDocument.workspace.id),
+await assert.rejects(
+  () => previewBuffer(bomb.toBuffer()),
   /压缩比异常|compression ratio/i,
 );
 console.log('PASS  abnormal compression ratio rejected');
@@ -61,8 +75,8 @@ const large = new AdmZip();
 large.addFile('manifest.json', Buffer.from(JSON.stringify({ format: '360note-backup', version: 1 })));
 large.addFile('workspace.json', Buffer.from(JSON.stringify(validDocument)));
 large.addFile('large.bin', Buffer.alloc(BACKUP_LIMITS.maxEntryBytes + 1, 1));
-assert.throws(
-  () => previewBackup(large.toBuffer(), validDocument.workspace.id),
+await assert.rejects(
+  () => previewBuffer(large.toBuffer()),
   /单个文件过大|file inside the backup is too large/i,
 );
 console.log('PASS  oversized entry rejected');
@@ -71,8 +85,8 @@ console.log('PASS  oversized entry rejected');
 const invalid = new AdmZip();
 invalid.addFile('manifest.json', Buffer.from(JSON.stringify({ format: '360note-backup', version: 1 })));
 invalid.addFile('workspace.json', Buffer.from(JSON.stringify({ format: '360note-backup', version: 1 })));
-assert.throws(
-  () => previewBackup(invalid.toBuffer(), validDocument.workspace.id),
+await assert.rejects(
+  () => previewBuffer(invalid.toBuffer()),
   /内容无法解析|could not be parsed/i,
 );
 console.log('PASS  invalid document shape rejected');

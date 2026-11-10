@@ -319,12 +319,12 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 manifest.json        # format, version, createdAt, workspace, counts
 workspace.json       # folders, tags, notes, noteTags, attachments meta, versions, comments
 attachments/<sha256>.bin  # 相同内容只存一份（备份内去重）
-attachments/<attachmentId>/<filename>
 ```
 
-- ZIP 明文内容在服务器用 AES-256-GCM 加密后存储，下载时解密并作为 ZIP 发送。
-- 分享链接、API 令牌、用户密码、2FA 密钥**不在备份中**；恢复不会恢复分享链接/评论作者账号（评论以访客名恢复）。
-- 不包含回收站中的笔记（当前版本只备份活跃笔记）。
+- ZIP 由 `archiver` 流式生成；明文 ZIP 用 AES-256-GCM（v2 流式格式，兼容 v1）加密后存储，下载时解密到临时文件并流式发送。
+- 预览、合并恢复、替换恢复使用 `yauzl` 流式读取 ZIP；单个附件先落临时文件，再加密写入本地或对象存储，不把整个归档载入内存。
+- 分享链接、API 令牌、用户密码、2FA 密钥**不在备份中**；替换恢复会保留同工作区分享链接，合并恢复不会回放分享；评论作者账号不在备份中，评论按访客名恢复。
+- 备份包含回收站中的笔记与文件夹（带 `trashedAt`），便于完整灾难恢复。
 
 ### 8.2 自动备份
 
@@ -335,10 +335,10 @@ attachments/<attachmentId>/<filename>
 
 ### 8.3 恢复
 
-- 上传备份（≤600MB）或从列表选择；
+- 上传备份（≤600MB）或从列表选择，也可从对象存储直接恢复工作区备份；
 - 解析 manifest/workspace.json，展示预览：笔记/文件夹/标签/附件/版本/评论；同工作区判断；
 - **合并为副本**：把备份转换为 ParsedImport，在“恢复副本 YYYY-MM-DD”文件夹下创建新笔记/附件；不覆盖当前内容；不回放版本/评论/分享；
-- **替换当前空间**：先创建 pre-restore 安全备份，事务内删除当前 notes/folders/tags 后按原 ID 恢复笔记/文件夹/标签/版本/评论/附件，清理旧附件文件；只允许同工作区。
+- **替换当前空间**：先创建 pre-restore 安全备份，附件先暂存到目标存储，再在事务内删除当前 notes/folders/tags 后按原 ID 恢复笔记/文件夹/标签/版本/评论/附件与分享链接，清理旧附件文件；只允许同工作区，并用工作区 advisory lock 串行执行。
 - 恢复任务异步，前端轮询进度；恢复完成后刷新工作区与当前笔记。
 - 恢复流程可验证：使用 `docs/OPERATIONS.md` 的手动 drill 步骤，并记录到 `MEMORY.md`。
 
@@ -347,13 +347,13 @@ attachments/<attachmentId>/<filename>
 - 实例管理员可在 实例管理 → 存储管理 配置 S3 兼容存储（AWS S3 / MinIO / R2 / Backblaze 等）。
 - 每次创建备份（自动/手动/恢复前）在加密落盘后，把同一个已加密 `.3nb` 上传到配置的 bucket/prefix；备份列表显示“异地已上传/失败”。
 - 删除/保留策略会同时删除远端对象；连接测试使用 ListObjectsV2。
-- 异地备份仅负责复制；恢复时从 S3 下载 `.3nb`，再用“上传备份文件”恢复。
+- 异地备份除复制外，实例管理员可在“对象存储文件”中校验并直接恢复工作区备份；整站备份仍按运维手册恢复数据库。
 - 凭证（secretAccessKey）AES-GCM 加密存 `instance_settings`；界面不回显。建议私有 bucket + 最小权限。
 
 ### 8.5 已知限制
 
-- 备份默认在同一台服务器；异地存储需管理员配置，且不提供应用内远端浏览/直接恢复。
-- 备份不含 E2EE 密钥（v1 无 E2EE）、分享链接/API 令牌。
+- 备份默认在同一台服务器；异地存储需管理员配置。对象存储文件浏览/校验/工作区恢复已内置，但整站数据库恢复仍是运维操作。
+- 备份不含 E2EE 密钥（v1 无 E2EE）、API 令牌；合并恢复不回放分享链接。
 - 恢复替换为工作区级，不是实例级；多用户各自工作区独立备份。
 
 ---

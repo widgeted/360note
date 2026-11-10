@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { config, paths } from '../config.js';
 import { encryptBuffer, decryptBuffer, encryptFile, decryptFile } from './crypto.js';
-import { attachmentObjectStorageKey, attachmentStorageKeyFromObject, deleteObject, getObject, getObjectStorageConfig, objectExists, objectStorageConfigured, putObject, attachmentStorageMigrationMode } from './object-storage.js';
+import { attachmentObjectStorageKey, attachmentStorageKeyFromObject, deleteObject, getObject, getObjectStorageConfig, objectExists, objectStorageConfigured, putObject, putObjectStream, attachmentStorageMigrationMode } from './object-storage.js';
 
 const ATTACHMENT_AAD = '360note:attachment';
 const BACKUP_AAD = '360note:backup';
@@ -54,6 +54,40 @@ export async function saveAttachment(
   assertInside(paths.attachments, localTarget);
   await fsp.mkdir(path.dirname(localTarget), { recursive: true, mode: 0o700 });
   await fsp.writeFile(localTarget, encrypted, { mode: 0o600 });
+  return effectiveKey;
+}
+
+/**
+ * Encrypt an on-disk upload into the attachment store. Used by backup restore
+ * so a single large attachment never has to be buffered in process memory.
+ */
+export async function saveAttachmentFromFile(
+  storageKey: string,
+  sourcePath: string,
+  target?: 'local' | 's3',
+): Promise<string> {
+  let config: Awaited<ReturnType<typeof getObjectStorageConfig>> | null = null;
+  try {
+    config = await getObjectStorageConfig();
+  } catch (error) {
+    console.warn('[storage] object storage config unavailable', (error as Error).message);
+  }
+  const wantS3 = target === 's3' || (target === undefined && config?.attachmentsEnabled === true && objectStorageConfigured(config) && !attachmentStorageMigrationMode());
+  const effectiveKey = storageKey.startsWith('s3:') || !wantS3 ? storageKey : attachmentObjectStorageKey(storageKey);
+  if (effectiveKey.startsWith('s3:')) {
+    const temp = path.join(paths.temp, `attach-${crypto.randomUUID()}.enc`);
+    try {
+      const size = await encryptFile(sourcePath, temp, ATTACHMENT_AAD);
+      await putObjectStream(effectiveKey, fs.createReadStream(temp), size);
+      return effectiveKey;
+    } finally {
+      await fsp.rm(temp, { force: true }).catch(() => {});
+    }
+  }
+  const localTarget = path.join(paths.attachments, effectiveKey);
+  assertInside(paths.attachments, localTarget);
+  await fsp.mkdir(path.dirname(localTarget), { recursive: true, mode: 0o700 });
+  await encryptFile(sourcePath, localTarget, ATTACHMENT_AAD);
   return effectiveKey;
 }
 

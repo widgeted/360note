@@ -3,7 +3,24 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.40] — 2026-11-10
+
+备份恢复流式化与发布收尾。
+
+### Changed
+
+- 工作区备份预览、合并恢复、替换恢复改用 yauzl 流式读取 ZIP，不再把整个归档载入内存；单个附件先流式落到临时文件，再加密写入本地或对象存储。
+- 异地对象恢复与校验同样先解密到临时文件，再用 yauzl 检查与恢复。
+- Nginx CSP 允许 Cloudflare 边缘注入的无 Cookie 汇总访问统计；隐私说明同步更新，仍不读取笔记正文或做跨站画像。
+- 迁移 `013_backup_unique.sql` 在建立唯一索引前保留每个文件名/存储键的最新记录，兼容已有重复项的实例。
+- 新增加密 ZIP、备份限流、附件恢复、替换恢复与登录态移动端/2FA 回归测试。
+
+### Upgrade note
+
+- 已安装 0.1.38 及更早 PWA 的客户端可能需要完全关闭再打开一次，才会看到 0.1.39+ 的“有新版本可用”提示。
+
 ## [0.1.39] — 2026-11-10
+
 
 发布质量修复：备份与恢复、权限边界、通知与前端状态一致性。
 

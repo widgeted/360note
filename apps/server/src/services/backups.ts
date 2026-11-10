@@ -1,4 +1,3 @@
-import AdmZip from 'adm-zip';
 import archiver from 'archiver';
 import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
@@ -17,7 +16,7 @@ import {
   readAttachment,
   readBackup,
   safeFilename,
-  saveAttachment,
+  saveAttachmentFromFile,
   saveBackup,
   saveBackupFromFile,
   readBackupToFile,
@@ -30,6 +29,7 @@ import { audit } from '../lib/audit.js';
 import { deleteOffsiteBackup, getOffsiteConfig, uploadOffsiteBackup } from './offsite.js';
 import { withWorkspaceLock } from '../lib/workspace-lock.js';
 import { getSetting } from './settings.js';
+import { SafeZip } from '../lib/zip-reader.js';
 
 interface BackupNote {
   id: string;
@@ -318,32 +318,6 @@ function backupManifest(document: BackupDocument): Buffer {
   }, null, 2));
 }
 
-/** In-memory variant used by account export and tests. */
-export async function createBackupDocument(workspaceId: string): Promise<{ buffer: Buffer; document: BackupDocument; name: string }> {
-  const { workspace, document, attachmentRows } = await collectBackupDocument(workspaceId);
-  const zip = new AdmZip();
-  zip.addFile('manifest.json', backupManifest(document));
-  zip.addFile('workspace.json', Buffer.from(JSON.stringify(document, null, 2)));
-  const addedPaths = new Set<string>();
-  for (const attachment of attachmentRows) {
-    const zipPath = `attachments/${attachment.sha256}.bin`;
-    if (addedPaths.has(zipPath)) continue;
-    try {
-      const data = await readAttachment(attachment.storage_key);
-      zip.addFile(zipPath, data);
-      addedPaths.add(zipPath);
-    } catch (error) {
-      throw new Error(`附件读取失败，备份未生成：${attachment.filename} (${(error as Error).message.slice(0, 120)})`);
-    }
-  }
-  for (const attachment of document.attachments) {
-    if (!addedPaths.has(attachment.zipPath)) {
-      throw new Error(`备份缺少附件内容：${attachment.filename}`);
-    }
-  }
-  return { buffer: zip.toBuffer(), document, name: backupFilename(workspace.id, workspace.name, 'backup') };
-}
-
 /** Stream the archive to disk so large workspaces do not build the ZIP in RAM. */
 export async function createBackupArchive(workspaceId: string, outputPath: string): Promise<{ document: BackupDocument; name: string }> {
   const { workspace, document, attachmentRows } = await collectBackupDocument(workspaceId);
@@ -422,7 +396,7 @@ export async function createBackup(input: {
     if (input.jobId) await updateJob(input.jobId, { progress: 70, message: '正在校验备份…' });
     // Verify decryption and ZIP structure before publishing the backup row.
     await readBackupToFile(name, verifyPath);
-    const preview = previewBackupFile(verifyPath, input.workspaceId, BACKUP_LIMITS);
+    const preview = await previewBackupFile(verifyPath, input.workspaceId, BACKUP_LIMITS);
     if (
       preview.counts.notes !== archive.document.counts.notes ||
       preview.counts.attachments !== archive.document.counts.attachments ||
@@ -527,44 +501,6 @@ export async function listBackups(workspaceId: string, userId: string) {
   }));
 }
 
-function inspectBackupZip(zip: AdmZip, limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS): void {
-  let entries: AdmZip.IZipEntry[];
-  try {
-    entries = zip.getEntries();
-  } catch {
-    throw errors.badRequest('备份文件已损坏');
-  }
-  if (entries.length > limits.maxEntries) {
-    throw errors.badRequest('备份文件包含过多条目');
-  }
-  let total = 0;
-  for (const entry of entries) {
-    const size = entry.header.size;
-    const compressed = entry.header.compressedSize;
-    if (!Number.isFinite(size) || size < 0 || !Number.isFinite(compressed) || compressed < 0) {
-      throw errors.badRequest('备份文件已损坏');
-    }
-    if (size > limits.maxEntryBytes) {
-      throw errors.badRequest('备份文件中的单个文件过大');
-    }
-    total += size;
-    if (total > limits.maxTotalBytes) {
-      throw errors.badRequest('备份文件解压后过大');
-    }
-    if (size > 1024 * 1024 && (compressed === 0 || size / compressed > limits.maxCompressionRatio)) {
-      throw errors.badRequest('备份文件压缩比异常');
-    }
-  }
-}
-
-function readEntryData(entry: AdmZip.IZipEntry): Buffer {
-  const data = entry.getData();
-  if (data.length > BACKUP_LIMITS.maxEntryBytes) {
-    throw errors.badRequest('备份文件中的单个文件过大');
-  }
-  return data;
-}
-
 function validateBackupDocument(document: BackupDocument): void {
   if (
     !document ||
@@ -597,40 +533,49 @@ function validateBackupDocument(document: BackupDocument): void {
   }
 }
 
-function readBackupZip(buffer: Buffer, limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS): { zip: AdmZip; manifest: Record<string, unknown>; document: BackupDocument } {
-  let zip: AdmZip;
+async function readBackupFromFile(
+  filePath: string,
+  limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS,
+): Promise<{ zip: SafeZip; document: BackupDocument }> {
+  let zip: SafeZip;
   try {
-    zip = new AdmZip(buffer);
-  } catch {
-    throw errors.badRequest('备份文件已损坏');
-  }
-  inspectBackupZip(zip, limits);
-  const manifestEntry = zip.getEntry('manifest.json');
-  const documentEntry = zip.getEntry('workspace.json');
-  if (!manifestEntry || !documentEntry) throw errors.badRequest('不是有效的 360note 备份文件');
-  let manifest: Record<string, unknown>;
-  let document: BackupDocument;
-  try {
-    manifest = JSON.parse(readEntryData(manifestEntry).toString('utf8'));
-    document = JSON.parse(readEntryData(documentEntry).toString('utf8'));
+    zip = await SafeZip.open(filePath, limits);
   } catch (error) {
     if (error instanceof Error && error.name === 'AppError') throw error;
-    throw errors.badRequest('备份文件内容无法解析');
+    throw errors.badRequest('备份文件已损坏');
   }
-  if (manifest.format !== '360note-backup' || document.format !== '360note-backup') {
-    throw errors.badRequest('备份格式不受支持');
+  try {
+    if (!zip.has('manifest.json') || !zip.has('workspace.json')) {
+      throw errors.badRequest('不是有效的 360note 备份文件');
+    }
+    let manifest: Record<string, unknown>;
+    let document: BackupDocument;
+    try {
+      manifest = JSON.parse((await zip.read('manifest.json')).toString('utf8'));
+      document = JSON.parse((await zip.read('workspace.json')).toString('utf8'));
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AppError') throw error;
+      throw errors.badRequest('备份文件内容无法解析');
+    }
+    if (manifest.format !== '360note-backup' || document.format !== '360note-backup') {
+      throw errors.badRequest('备份格式不受支持');
+    }
+    validateBackupDocument(document);
+    return { zip, document };
+  } catch (error) {
+    zip.close();
+    throw error;
   }
-  validateBackupDocument(document);
-  return { zip, manifest, document };
 }
 
-export function inspectBackupBuffer(buffer: Buffer): {
+export async function inspectBackupFile(filePath: string): Promise<{
   workspaceId: string;
   workspaceName: string;
   counts: BackupDocument['counts'];
   createdAt: string;
-} {
-  const { document } = readBackupZip(buffer);
+}> {
+  const { zip, document } = await readBackupFromFile(filePath);
+  zip.close();
   return {
     workspaceId: document.workspace.id,
     workspaceName: document.workspace.name,
@@ -663,39 +608,14 @@ function previewFromDocument(document: BackupDocument, targetWorkspaceId: string
   };
 }
 
-export function previewBackup(buffer: Buffer, targetWorkspaceId: string, limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS): BackupPreview {
-  return previewFromDocument(readBackupZip(buffer, limits).document, targetWorkspaceId);
-}
-
-function readBackupZipFromFile(filePath: string, limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS): { zip: AdmZip; document: BackupDocument } {
-  let zip: AdmZip;
-  try {
-    zip = new AdmZip(filePath);
-  } catch {
-    throw errors.badRequest('备份文件已损坏');
-  }
-  inspectBackupZip(zip, limits);
-  const manifestEntry = zip.getEntry('manifest.json');
-  const documentEntry = zip.getEntry('workspace.json');
-  if (!manifestEntry || !documentEntry) throw errors.badRequest('不是有效的 360note 备份文件');
-  let manifest: Record<string, unknown>;
-  let document: BackupDocument;
-  try {
-    manifest = JSON.parse(readEntryData(manifestEntry).toString('utf8'));
-    document = JSON.parse(readEntryData(documentEntry).toString('utf8'));
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AppError') throw error;
-    throw errors.badRequest('备份文件内容无法解析');
-  }
-  if (manifest.format !== '360note-backup' || document.format !== '360note-backup') {
-    throw errors.badRequest('备份格式不受支持');
-  }
-  validateBackupDocument(document);
-  return { zip, document };
-}
-
-export function previewBackupFile(filePath: string, targetWorkspaceId: string, limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS): BackupPreview {
-  return previewFromDocument(readBackupZipFromFile(filePath, limits).document, targetWorkspaceId);
+export async function previewBackupFile(
+  filePath: string,
+  targetWorkspaceId: string,
+  limits: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS = UPLOAD_BACKUP_LIMITS,
+): Promise<BackupPreview> {
+  const { zip, document } = await readBackupFromFile(filePath, limits);
+  zip.close();
+  return previewFromDocument(document, targetWorkspaceId);
 }
 
 function validateBackupRestore(document: BackupDocument): void {
@@ -760,15 +680,12 @@ async function assertNoForeignIds(document: BackupDocument, workspaceId: string)
 async function restoreReplace(input: {
   workspaceId: string;
   userId: string;
-  buffer?: Buffer;
-  filePath?: string;
+  filePath: string;
   jobId: string;
   limits?: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS;
 }): Promise<Record<string, unknown>> {
-  if (!input.buffer && !input.filePath) throw errors.badRequest('缺少备份文件');
-  const { zip, document } = input.filePath
-    ? readBackupZipFromFile(input.filePath, input.limits)
-    : readBackupZip(input.buffer!, input.limits);
+  const { zip, document } = await readBackupFromFile(input.filePath, input.limits);
+  try {
   await requireWorkspace(input.userId, input.workspaceId, 'manage');
   if (document.workspace.id !== input.workspaceId) throw errors.badRequest('只能替换恢复到备份来源的工作区');
   validateBackupRestore(document);
@@ -792,23 +709,27 @@ async function restoreReplace(input: {
     size: number;
   }> = [];
 
+  const attachmentDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-restore-attachments-'));
   try {
     for (const attachment of document.attachments) {
-      const entry = zip.getEntry(attachment.zipPath);
-      if (!entry) throw errors.badRequest(`备份缺少附件：${attachment.filename}`);
-      const data = readEntryData(entry);
+      if (!zip.has(attachment.zipPath)) throw errors.badRequest(`备份缺少附件：${attachment.filename}`);
+      const staged = path.join(attachmentDir, `${attachment.id}.bin`);
+      const copied = await zip.copyToFile(attachment.zipPath, staged);
       const localKey = attachmentStorageKey(input.workspaceId, attachment.id);
-      const storageKey = await saveAttachment(localKey, data);
+      const storageKey = await saveAttachmentFromFile(localKey, staged);
       preparedAttachments.push({
         attachment,
         storageKey,
-        sha256: crypto.createHash('sha256').update(data).digest('hex'),
-        size: data.length,
+        sha256: copied.sha256,
+        size: copied.size,
       });
+      await fs.rm(staged, { force: true }).catch(() => {});
     }
   } catch (error) {
     await Promise.all(preparedAttachments.map((item) => deleteAttachment(item.storageKey).catch(() => {})));
     throw error;
+  } finally {
+    await fs.rm(attachmentDir, { recursive: true, force: true }).catch(() => {});
   }
 
   const newStorageKeys = new Set(preparedAttachments.map((item) => item.storageKey));
@@ -937,19 +858,19 @@ async function restoreReplace(input: {
     versions: document.versions.length,
     comments: document.comments.length,
   };
+  } finally {
+    zip.close();
+  }
 }
 
 async function backupToParsedImport(input: {
-  buffer?: Buffer;
-  filePath?: string;
+  filePath: string;
   jobDir: string;
   targetFolderId: string | null;
   limits?: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS;
 }): Promise<ParsedImport> {
-  if (!input.buffer && !input.filePath) throw errors.badRequest('缺少备份文件');
-  const { zip, document } = input.filePath
-    ? readBackupZipFromFile(input.filePath, input.limits)
-    : readBackupZip(input.buffer!, input.limits);
+  const { zip, document } = await readBackupFromFile(input.filePath, input.limits);
+  try {
   const folderMap = new Map(document.folders.map((folder) => [folder.id, folder]));
   function folderPath(folderId: string | null): string[] {
     const parts: string[] = [];
@@ -969,14 +890,13 @@ async function backupToParsedImport(input: {
     const attachments: ParsedAttachment[] = [];
     let content = note.contentMd;
     for (const attachment of document.attachments.filter((item) => item.noteId === note.id)) {
-      const entry = zip.getEntry(attachment.zipPath);
-      if (!entry) continue;
+      if (!zip.has(attachment.zipPath)) continue;
       const key = crypto.randomUUID();
       const dir = path.join(input.jobDir, 'files');
       await fs.mkdir(dir, { recursive: true });
       const filename = safeFilename(attachment.filename);
       const storedPath = path.join(dir, `${key}-${filename}`);
-      await fs.writeFile(storedPath, readEntryData(entry), { mode: 0o600 });
+      await zip.copyToFile(attachment.zipPath, storedPath);
       attachments.push({
         key,
         filename,
@@ -998,22 +918,21 @@ async function backupToParsedImport(input: {
   }
   parsed.warnings.push('合并恢复不会带回回收站内容、历史版本、评论和旧的分享链接。');
   return parsed;
+  } finally {
+    zip.close();
+  }
 }
 
 export async function restoreBackup(input: {
   workspaceId: string;
   userId: string;
-  buffer?: Buffer;
-  filePath?: string;
+  filePath: string;
   mode: 'replace' | 'merge';
   jobId: string;
   limits?: typeof BACKUP_LIMITS | typeof UPLOAD_BACKUP_LIMITS;
 }): Promise<Record<string, unknown>> {
-  if (!input.buffer && !input.filePath) throw errors.badRequest('缺少备份文件');
   return withWorkspaceLock(input.workspaceId, async () => {
-    const document = input.filePath
-      ? previewBackupFile(input.filePath, input.workspaceId, input.limits)
-      : previewBackup(input.buffer!, input.workspaceId, input.limits);
+    const document = await previewBackupFile(input.filePath, input.workspaceId, input.limits);
     if (input.mode === 'replace') {
       if (!document.sameWorkspace) throw errors.badRequest('只能替换恢复到备份来源的工作区');
       await requireWorkspace(input.userId, input.workspaceId, 'manage');
@@ -1030,7 +949,7 @@ export async function restoreBackup(input: {
       await requireWorkspace(input.userId, input.workspaceId, 'write');
       const jobDir = paths.imports + '/' + input.jobId;
       await fs.mkdir(jobDir, { recursive: true, mode: 0o700 });
-      const parsed = await backupToParsedImport({ buffer: input.buffer, filePath: input.filePath, jobDir, targetFolderId: null, limits: input.limits });
+      const parsed = await backupToParsedImport({ filePath: input.filePath, jobDir, targetFolderId: null, limits: input.limits });
       return executeImport({
         jobId: input.jobId,
         jobDir,

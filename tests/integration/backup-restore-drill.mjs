@@ -25,6 +25,7 @@ dbUrl.pathname = `/${database}`;
 const base = `http://127.0.0.1:${port}`;
 const email = `drill-${stamp}@invalid.local`;
 const password = 'K9m!tR4#vQ2@2026';
+const masterKey = crypto.randomBytes(32).toString('base64');
 let child = null;
 let pool = null;
 
@@ -32,6 +33,7 @@ process.env.DATABASE_URL = dbUrl.toString();
 process.env.NODE_ENV = 'test';
 process.env.NOTE360_DATA_DIR = dataDir;
 process.env.NOTE360_ENV_FILE = '/tmp/opencode/nonexistent.env';
+process.env.NOTE360_MASTER_KEY = masterKey;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -93,7 +95,7 @@ async function main() {
       NOTE360_ENV_FILE: '/tmp/opencode/nonexistent.env',
       SMTP_HOST: '',
       REGISTRATION_MODE: 'open',
-      NOTE360_MASTER_KEY: crypto.randomBytes(32).toString('base64'),
+      NOTE360_MASTER_KEY: masterKey,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -121,6 +123,17 @@ async function main() {
   });
   assert.equal(created.status, 200, created.text);
   const noteId = created.json.note.id;
+
+  const attachmentForm = new FormData();
+  attachmentForm.append('file', new Blob(['attachment-restore-marker'], { type: 'text/plain' }), 'marker.txt');
+  const attachmentResponse = await fetch(`${base}/api/notes/${noteId}/attachments`, {
+    method: 'POST',
+    headers: { cookie, 'x-360note-csrf': '1' },
+    body: attachmentForm,
+  });
+  const attachmentJson = await attachmentResponse.json();
+  assert.equal(attachmentResponse.status, 201, JSON.stringify(attachmentJson));
+  assert.ok(attachmentJson.attachment?.id, 'attachment upload failed');
 
   const backupJobId = (await req(`/api/workspaces/${workspace.id}/backups`, { method: 'POST', cookie })).json.jobId;
   const backupJob = await waitForJob(cookie, backupJobId);
@@ -173,7 +186,41 @@ async function main() {
   assert.ok(restored.json.notes.length >= 1, 'restored note missing');
   const restoredNote = await req(`/api/notes/${restored.json.notes[0].id}`, { cookie });
   assert.match(restoredNote.json.note.contentMd, /restore me/);
-  console.log('PASS  uploaded backup restored and content verified');
+  const restoredAttachment = restoredNote.json.note.attachments?.find((entry) => entry.filename === 'marker.txt');
+  assert.ok(restoredAttachment?.id, 'attachment missing after restore');
+  const attachmentContent = await fetch(`${base}/api/attachments/${restoredAttachment.id}/content`, { headers: { cookie } });
+  assert.equal(attachmentContent.status, 200);
+  assert.equal(await attachmentContent.text(), 'attachment-restore-marker');
+  console.log('PASS  uploaded backup restored, including attachment content');
+
+  // Replace restore uses the same streaming ZIP reader but stages attachments
+  // straight into the attachment store instead of the import pipeline.
+  const replaceForm = new FormData();
+  replaceForm.append('file', new Blob([archive], { type: 'application/zip' }), 'drill-replace.3nb');
+  const replaceUploadResponse = await fetch(`${base}/api/workspaces/${workspace.id}/backups/upload`, {
+    method: 'POST',
+    headers: { cookie, 'x-360note-csrf': '1' },
+    body: replaceForm,
+  });
+  const replaceUpload = await replaceUploadResponse.json();
+  assert.equal(replaceUploadResponse.status, 200, JSON.stringify(replaceUpload));
+  const replaceRestore = await req(`/api/backups/uploads/${replaceUpload.uploadId}/restore`, {
+    method: 'POST',
+    cookie,
+    body: { mode: 'replace' },
+  });
+  assert.equal(replaceRestore.status, 200, replaceRestore.text);
+  const replaceJob = await waitForJob(cookie, replaceRestore.json.jobId);
+  assert.equal(replaceJob.status, 'done', JSON.stringify(replaceJob));
+  const replaced = await req(`/api/search?workspaceId=${workspace.id}&q=zqxmd`, { cookie });
+  assert.ok(replaced.json.notes.length >= 1, 'replace restore lost the note');
+  const replacedNote = await req(`/api/notes/${replaced.json.notes[0].id}`, { cookie });
+  const replacedAttachment = replacedNote.json.note.attachments?.find((entry) => entry.filename === 'marker.txt');
+  assert.ok(replacedAttachment?.id, 'replace restore lost the attachment');
+  const replacedContent = await fetch(`${base}/api/attachments/${replacedAttachment.id}/content`, { headers: { cookie } });
+  assert.equal(replacedContent.status, 200);
+  assert.equal(await replacedContent.text(), 'attachment-restore-marker');
+  console.log('PASS  replace restore streams attachments back into storage');
 
   // Direct idempotency/verification check using the same data directory.
   const { createBackup } = await import('../../apps/server/dist/services/backups.js');

@@ -1,9 +1,12 @@
 import AdmZip from 'adm-zip';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { one } from '../db.js';
 import { decryptBuffer } from '../lib/crypto.js';
 import { getObject } from '../lib/object-storage.js';
 import { errors } from '../lib/errors.js';
-import { inspectBackupBuffer, restoreBackup } from './backups.js';
+import { inspectBackupFile, restoreBackup } from './backups.js';
 
 function assertKey(key: string): string {
   const clean = key.replace(/^s3:/, '').replace(/^\/+/, '');
@@ -19,11 +22,16 @@ export async function verifyOffsiteObject(key: string) {
     return { kind: 'attachment' as const, bytes: data.length, encryptedBytes: raw.length };
   }
   const decrypted = decryptBuffer(raw, '360note:backup');
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-offsite-verify-'));
+  const archivePath = path.join(tempDir, 'backup.zip');
   try {
-    const info = inspectBackupBuffer(decrypted);
+    await fs.writeFile(archivePath, decrypted, { mode: 0o600 });
+    const info = await inspectBackupFile(archivePath);
     return { kind: 'workspace-backup' as const, bytes: decrypted.length, ...info };
   } catch {
     /* maybe an instance backup */
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
   let zip: AdmZip;
   try {
@@ -61,23 +69,30 @@ export async function restoreOffsiteWorkspaceBackup(input: {
   }
   const raw = await getObject(`s3:${clean}`);
   const decrypted = decryptBuffer(raw, '360note:backup');
-  const info = inspectBackupBuffer(decrypted);
-  const workspace = await one<{ id: string; deleted_at: Date | null }>(
-    'SELECT id, deleted_at FROM workspaces WHERE id = $1',
-    [info.workspaceId],
-  );
-  if (!workspace || workspace.deleted_at) throw errors.badRequest('备份所属工作区已不存在');
-  const owner = await one<{ user_id: string }>(
-    `SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND role = 'owner' LIMIT 1`,
-    [info.workspaceId],
-  );
-  if (!owner) throw errors.badRequest('工作区没有可用的所有者，无法恢复');
-  const result = await restoreBackup({
-    workspaceId: info.workspaceId,
-    userId: owner.user_id,
-    buffer: decrypted,
-    mode: input.mode,
-    jobId: input.jobId,
-  });
-  return { workspaceId: info.workspaceId, workspaceName: info.workspaceName, result };
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-offsite-restore-'));
+  const archivePath = path.join(tempDir, 'backup.zip');
+  try {
+    await fs.writeFile(archivePath, decrypted, { mode: 0o600 });
+    const info = await inspectBackupFile(archivePath);
+    const workspace = await one<{ id: string; deleted_at: Date | null }>(
+      'SELECT id, deleted_at FROM workspaces WHERE id = $1',
+      [info.workspaceId],
+    );
+    if (!workspace || workspace.deleted_at) throw errors.badRequest('备份所属工作区已不存在');
+    const owner = await one<{ user_id: string }>(
+      `SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND role = 'owner' LIMIT 1`,
+      [info.workspaceId],
+    );
+    if (!owner) throw errors.badRequest('工作区没有可用的所有者，无法恢复');
+    const result = await restoreBackup({
+      workspaceId: info.workspaceId,
+      userId: owner.user_id,
+      filePath: archivePath,
+      mode: input.mode,
+      jobId: input.jobId,
+    });
+    return { workspaceId: info.workspaceId, workspaceName: info.workspaceName, result };
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
