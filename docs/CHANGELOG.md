@@ -3,6 +3,15 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.33] — 2026-11-10
+
+分享列表信息压缩。
+
+### Changed
+
+- “已有分享”的权限、创建时间、过期时间和浏览次数合并到一行，窄屏自动换行，减少纵向占用。
+- “只读”改用书本图标，浏览次数继续使用眼睛图标，避免两个含义不同的信息使用同一图标。
+
 ## [0.1.32] — 2026-11-10
 
 公开评论管理、通知中心、图片说明、自定义模板与备份运维增强。

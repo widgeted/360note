@@ -671,3 +671,8 @@ apps/web/src/styles/tokens.css        设计 token
 - 模板变量渲染在客户端；自定义模板标题不能被 fresh note 清空，`isAutoNoteTitle` 只清空“未命名笔记”类标题。
 - 工作区备份 zipPath 改为 `attachments/<sha256>.bin`，同内容附件只存一份；旧备份仍兼容。
 - 对象存储浏览/校验/下载/工作区备份恢复副本；整站备份演练手动/自动；链式增量暂未上线。
+
+## 2026-11-10 · v0.1.33 分享列表压缩
+
+- “已有分享”meta 合并为单行 flex-wrap：权限 badge、密码/撤销、创建时间、过期时间、浏览次数。
+- 只读权限改用 BookOpen 图标；浏览次数保留 Eye，避免图标语义冲突。

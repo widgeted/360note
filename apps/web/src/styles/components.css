@@ -1560,21 +1560,10 @@ a.btn {
 }
 
 .share-item-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
+  margin-top: 7px;
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--text-tertiary);
-}
-
-.share-item-meta-tags {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 1px;
 }
 
 .share-item-note {
@@ -1585,24 +1574,28 @@ a.btn {
   color: var(--text-tertiary);
 }
 
-.share-item-meta > span,
 .share-item-meta-line > span {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
 .share-item-meta-line {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 4px 14px;
+  gap: 4px 12px;
+}
+
+.share-item-meta-line .badge {
+  min-height: 18px;
+  padding: 0 6px;
+  gap: 3px;
 }
 
 .share-item-meta svg {
   flex: none;
-  margin-top: 1px;
 }
 
 @media (max-width: 640px) {

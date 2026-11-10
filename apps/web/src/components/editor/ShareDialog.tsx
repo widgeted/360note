@@ -4,6 +4,7 @@ import {
   Check,
   Clock3,
   Copy,
+  BookOpen,
   Edit3,
   Eye,
   Info,
@@ -253,16 +254,14 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
                       </div>
                     </div>
                     <div className="share-item-meta">
-                      <div className="share-item-meta-tags">
+                      <div className="share-item-meta-line">
                         <span className="badge badge-blue">
-                          {share.permission === 'view' ? <Eye size={11} /> : share.permission === 'edit' ? <Edit3 size={11} /> : <MessageCircle size={11} />}
+                          {share.permission === 'view' ? <BookOpen size={11} /> : share.permission === 'edit' ? <Edit3 size={11} /> : <MessageCircle size={11} />}
                           {share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}
                         </span>
                         {share.hasPassword && <span className="share-item-note"><LockKeyhole size={12} />{t('需要密码')}</span>}
                         {share.revokedAt && <span className="badge">{t('已撤销')}</span>}
-                      </div>
-                      <span><CalendarDays size={13} />{t('创建于 {date}', { date: formatFullDate(share.createdAt) })}</span>
-                      <div className="share-item-meta-line">
+                        <span><CalendarDays size={13} />{t('创建于 {date}', { date: formatFullDate(share.createdAt) })}</span>
                         <span><Clock3 size={13} />{share.expiresAt ? t('到期于 {date}', { date: formatFullDate(share.expiresAt) }) : t('永不过期')}</span>
                         <span><Eye size={13} />{t('浏览 {n}', { n: share.viewCount })}</span>
                       </div>
