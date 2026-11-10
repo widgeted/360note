@@ -304,6 +304,7 @@ export default function SharePage() {
                 }}
                 dangerouslySetInnerHTML={{ __html: rendered.html }}
               />
+              <div className="public-article-divider" aria-hidden="true" />
               {share.note.attachments.length > 0 && (
                 <section className="public-attachments">
                   <div className="public-toc-title">{t('附件')}</div>

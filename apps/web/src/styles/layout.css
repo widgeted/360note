@@ -675,14 +675,18 @@ kbd {
   cursor: pointer;
   transition: background var(--dur);
   border: 1px solid transparent;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .note-item + .note-item {
   margin-top: 1px;
 }
 
-.note-item:hover {
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .note-item:hover {
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+  }
 }
 
 .note-item.active {
@@ -796,9 +800,31 @@ kbd {
   padding-left: 18px;
 }
 
-.note-item:hover .note-item-quick-actions,
-.note-item:focus-within .note-item-quick-actions {
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .note-item:hover .note-item-quick-actions,
+  .note-item:focus-within .note-item-quick-actions {
+    opacity: 1;
+  }
+}
+
+/* Touch devices have no reliable hover: keep actions visible so the first
+   tap never gets consumed by revealing them. */
+@media (hover: none), (pointer: coarse) {
+  .note-item-quick-actions {
+    opacity: 0.55;
+  }
+
+  .note-item:active .note-item-quick-actions {
+    opacity: 1;
+  }
+
+  .note-item:hover {
+    background: transparent;
+  }
+
+  .note-item.active:hover {
+    background: var(--surface);
+  }
 }
 
 .quick-icon-btn {
@@ -2057,4 +2083,37 @@ kbd {
 
 .table-toolbar .table-delete {
   color: var(--red);
+}
+
+
+/* Mobile note list: one clear row per note, no hover-only affordances. */
+@media (max-width: 760px) {
+  .list-body {
+    padding: 0 10px 24px;
+  }
+
+  .note-item {
+    border: 0;
+    border-radius: 0;
+    padding: 13px 10px;
+  }
+
+  .note-item + .note-item {
+    margin-top: 0;
+  }
+
+  .note-item + .note-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10px;
+    right: 10px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .note-item.active {
+    border: 0;
+    box-shadow: none;
+    background: var(--surface);
+  }
 }
