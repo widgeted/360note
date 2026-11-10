@@ -269,7 +269,7 @@ curl -fsS https://360note.com/health
 - 保留：14 份自动 + 30 天（`BACKUP_RETENTION_DAYS`）。
 - 备份文件：`/var/lib/360note/backups/*.3nb`，AES-256-GCM 加密。
 - 备份包含：notes/folders/tags/versions/comments/attachments。不含分享链接/API token/密码。
-- **默认在同一服务器**：管理员可在 设置→数据与备份→异地备份与对象存储 配置 S3 兼容存储；仍建议定期下载。
+- **默认在同一服务器**：管理员可在 实例管理→存储管理 配置 S3 兼容存储；仍建议定期下载。
 - 异地备份上传的是同一个已加密 `.3nb`；S3 侧无法读取内容。
 - 可同时启用附件对象存储：先迁移本机附件，再切换新上传；停用前会把所有附件取回并校验。附件 URL 不变。
 - 对象存储用量按 bucket 内 `prefix/attachments/` 与备份对象统计；本机用量按 `/var/lib/360note/attachments` 实际文件统计。

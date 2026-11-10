@@ -7,6 +7,7 @@ import { auditActionLabel } from '../../lib/audit';
 import { cn, formatBytes, formatFullDate, formatRelativeShort } from '../../lib/utils';
 import { toast } from '../../stores/toast';
 import { Dropdown, MenuItem } from '../Dropdown';
+import { OffsiteSettings } from './OffsiteSettings';
 import { useAuthStore } from '../../stores/auth';
 
 interface Stats {
@@ -73,7 +74,7 @@ export default function AdminSettings() {
   const [runtime, setRuntime] = useState<{ uptimeSeconds: number; memoryBytes: number; nodeVersion: string } | null>(null);
   const [retention, setRetention] = useState(30);
   const [saving, setSaving] = useState(false);
-  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'shares' | 'logs'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'storage' | 'users' | 'shares' | 'logs'>('overview');
   const [instanceBackups, setInstanceBackups] = useState<Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>>([]);
   const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7 });
   const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
@@ -242,11 +243,12 @@ export default function AdminSettings() {
   return (
     <>
       <h1 className="settings-title">{t('实例管理')}</h1>
-      <p className="settings-subtitle">{t('实例级的统计、用户、备份保留与审计。只有实例管理员可见。')}</p>
+      <p className="settings-subtitle">{t('实例级的统计、存储、用户、备份保留与审计。只有实例管理员可见。')}</p>
 
       <div className="admin-tabs">
         {([
           ['overview', t('概览')],
+          ['storage', t('存储管理')],
           ['users', t('用户管理')],
           ['shares', t('公开链接')],
           ['logs', t('操作日志')],
@@ -256,6 +258,12 @@ export default function AdminSettings() {
           </button>
         ))}
       </div>
+
+      {adminTab === 'storage' && (
+        <div className="admin-storage-panel">
+          <OffsiteSettings />
+        </div>
+      )}
 
       <section className="settings-section" hidden={adminTab !== 'overview'}>
         <div className="settings-section-head">
@@ -318,7 +326,7 @@ export default function AdminSettings() {
           </div>
         </div>
         <p className="setting-note" style={{ marginTop: 6 }}>
-          {t('本机附件与对象存储附件分开统计；切换存储不会改变附件链接。可在“数据与备份”中启用、停用并迁移。')}
+          {t('本机附件与对象存储附件分开统计；切换存储不会改变附件链接。可在“存储管理”中启用、停用并迁移。')}
         </p>
       </section>
 

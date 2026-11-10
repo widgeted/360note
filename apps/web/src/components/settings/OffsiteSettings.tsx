@@ -367,6 +367,9 @@ export function OffsiteSettings() {
         <p className="setting-note" style={{ marginTop: 10 }}>
           {t('启用时会先检查对象存储中是否已有同目录、同名称、同大小的文件，已有则跳过上传；停用前会逐个取回并校验，全部成功后才切换回本机。附件链接始终是 /api/attachments/:id/content，不会因切换而失效。')}
         </p>
+        <p className="setting-note">
+          {t('附件通过站点域名加密代理访问，因此图片 URL 显示为 360biji.com 或 360note.com，而不是对象存储域名；实际文件保存在对象存储。')}
+        </p>
       </div>
     </section>
   );

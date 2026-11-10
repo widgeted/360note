@@ -2190,14 +2190,17 @@ a.btn {
 
 .editor-tag-section {
   margin-top: auto;
-  padding-top: 18px;
-  border-top: 1px solid var(--line-soft);
+  padding-top: 0;
+  border-top: 0;
 }
 
 .editor-tag-bar {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 2px;
@@ -2237,7 +2240,8 @@ a.btn {
 }
 
 @media (max-width: 640px) {
-  .editor-tag-section {
+  .editor-tag-bar {
+    margin-top: 22px;
     padding-top: 16px;
   }
 }

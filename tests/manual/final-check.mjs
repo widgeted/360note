@@ -8,7 +8,7 @@ await p.click('.note-item'); await p.waitForTimeout(1200); console.log('title',a
 await p.screenshot({path:'/tmp/final-clean-editor.png',fullPage:true});
 // share dialog visual only
 await p.click('.topbar-actions .btn-soft'); await p.waitForTimeout(600); await p.screenshot({path:'/tmp/final-share-dialog.png',fullPage:true}); console.log('share modal', await p.locator('.modal').count()); await p.keyboard.press('Escape');
-// settings data
-await p.goto('https://360note.com/app/settings/data',{waitUntil:'networkidle'}); await p.waitForTimeout(800); console.log('offsite visible',(await p.locator('.settings-inner').innerText()).includes('异地备份（S3 兼容）'));
+// settings admin storage
+await p.goto('https://360note.com/app/settings/admin',{waitUntil:'networkidle'}); await p.waitForTimeout(800); await p.getByRole('button',{name:'存储管理'}).click(); await p.waitForTimeout(700); console.log('offsite visible',(await p.locator('.settings-inner').innerText()).includes('异地备份与对象存储（S3 兼容）'));
 console.log('errors',errs);
 await b.close();

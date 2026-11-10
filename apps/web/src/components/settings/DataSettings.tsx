@@ -9,7 +9,6 @@ import { downloadBlob } from '../../lib/api';
 import { toast } from '../../stores/toast';
 import { ImportWizard } from './ImportWizard';
 import { BackupPanel } from './BackupPanel';
-import { OffsiteSettings } from './OffsiteSettings';
 
 export default function DataSettings() {
   const t = useT();
@@ -119,7 +118,6 @@ export default function DataSettings() {
         <BackupPanel workspaceId={workspaceId} canManage={canManage} />
       </section>
 
-      <OffsiteSettings />
 
       <section className="settings-section">
         <div className="settings-section-head">

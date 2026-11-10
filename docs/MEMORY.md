@@ -627,3 +627,10 @@ apps/web/src/styles/tokens.css        设计 token
 - 有远端附件时禁止改 endpoint/bucket/prefix/access key/secret；必须停用取回。
 - 整站备份会把远端附件原始加密对象写入归档，避免备份缺附件。
 - 验证脚本 `tests/manual/object-storage-e2e.mjs`，使用 s3rver 与临时数据库。
+
+## 2026-11-10 · v0.1.28 存储管理归位
+
+- 实例级对象存储/备份副本只在 **实例管理 → 存储管理**，普通用户不可见；用户数据导出仍是自助。
+- 图片上传接口同步生成缩略图再返回；`thumbnails.ts` 增加 64MB 内存缓存，解决上传后首屏不显示。
+- 附件 URL 始终是站点域名的 `/api/attachments/:id/content`，S3 只是后端存储；不要用 URL 域名判断文件位置。
+- 编辑器标签栏底部线改为标签栏自身 border-top + margin-top 26px；分享页附件区去掉全宽分割线。

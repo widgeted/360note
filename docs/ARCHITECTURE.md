@@ -342,7 +342,7 @@ attachments/<attachmentId>/<filename>
 
 ### 8.4 异地存储（S3 兼容）
 
-- 实例管理员可在 设置 → 数据与备份 → 异地备份 配置 S3 兼容存储（AWS S3 / MinIO / R2 / Backblaze 等）。
+- 实例管理员可在 实例管理 → 存储管理 配置 S3 兼容存储（AWS S3 / MinIO / R2 / Backblaze 等）。
 - 每次创建备份（自动/手动/恢复前）在加密落盘后，把同一个已加密 `.3nb` 上传到配置的 bucket/prefix；备份列表显示“异地已上传/失败”。
 - 删除/保留策略会同时删除远端对象；连接测试使用 ListObjectsV2。
 - 异地备份仅负责复制；恢复时从 S3 下载 `.3nb`，再用“上传备份文件”恢复。

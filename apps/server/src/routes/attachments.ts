@@ -49,9 +49,10 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     const digest = checksum(buffer);
     const storageKey = await saveAttachment(localKey, buffer);
     if (isDisplayableImage(mime)) {
-      void ensureAttachmentThumbnail(storageKey, mime, buffer).then((thumbnail) => {
-        if (!thumbnail) app.log.warn({ attachmentId }, 'failed to generate attachment thumbnail');
-      });
+      // Generate before responding so the first render of the inserted image
+      // does not race an asynchronous thumbnail upload to object storage.
+      const thumbnail = await ensureAttachmentThumbnail(storageKey, mime, buffer);
+      if (!thumbnail) app.log.warn({ attachmentId }, 'failed to generate attachment thumbnail');
     }
     const row = await one<{
       id: string;

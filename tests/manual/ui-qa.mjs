@@ -46,9 +46,9 @@ await page.screenshot({path:'/tmp/qa-context1440.png',fullPage:true});
 await page.goto('https://360note.com/app/settings/admin',{waitUntil:'networkidle'}); await page.waitForTimeout(1000);
 console.log('admin settings', (await page.locator('.settings-inner').innerText()).slice(0,300));
 await page.screenshot({path:'/tmp/qa-admin.png',fullPage:true});
-// settings data offsite visible
-await page.goto('https://360note.com/app/settings/data',{waitUntil:'networkidle'}); await page.waitForTimeout(900);
-console.log('offsite text', (await page.locator('.settings-inner').innerText()).includes('异地备份（S3 兼容）'));
+// settings admin storage visible
+await page.goto('https://360note.com/app/settings/admin',{waitUntil:'networkidle'}); await page.waitForTimeout(900); await page.getByRole('button',{name:'存储管理'}).click(); await page.waitForTimeout(700);
+console.log('offsite text', (await page.locator('.settings-inner').innerText()).includes('异地备份与对象存储（S3 兼容）'));
 // cleanup temp notes
 await page.evaluate(async(ids)=>{
   for(const id of ids){ await fetch(`/api/notes/${id}`,{method:'DELETE',headers:{'X-360note-CSRF':'1'},credentials:'same-origin'}); await fetch(`/api/notes/${id}/permanent`,{method:'DELETE',headers:{'X-360note-CSRF':'1'},credentials:'same-origin'}); }

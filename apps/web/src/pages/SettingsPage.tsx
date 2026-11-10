@@ -5,6 +5,7 @@ import {
   Code2,
   Keyboard,
   Palette,
+  ServerCog,
   ShieldCheck,
   UserRound,
   Users,
@@ -37,7 +38,7 @@ const SECTIONS = [
   { id: 'api', icon: Code2, label: 'API 与集成', group: '数据' },
   { id: 'ai', icon: Bot, label: 'AI 与隐私', group: '高级' },
   { id: 'about', icon: null, label: '关于', group: '高级' },
-  { id: 'admin', icon: ShieldCheck, label: '实例管理', group: '高级', adminOnly: true },
+  { id: 'admin', icon: ServerCog, label: '实例管理', group: '高级', adminOnly: true },
 ] as const;
 
 export default function SettingsPage({ section }: { section: string }) {
