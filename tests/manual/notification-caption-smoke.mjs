@@ -22,7 +22,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
 const marker = `regression-${Date.now()}`;
 const notificationBody = `${'通知正文摘要 '.repeat(20)}${marker}-end`;
 const noteTitle = `__caption_${marker}__`;
-const attachmentId = '544dd0c3-727e-4665-8b08-3e074f3ed5eb';
+const imageData = 'https://360note.com/og-image.png';
 const results = {};
 let notificationId = null;
 let noteId = null;
@@ -92,24 +92,29 @@ try {
     const data = await response.json();
     return data.workspaces.find((workspace) => workspace.kind === 'personal')?.id ?? data.workspaces[0]?.id;
   });
-  const created = await page.evaluate(async ({ workspaceId, noteTitle, attachmentId }) => {
+  const created = await page.evaluate(async ({ workspaceId, noteTitle, imageData }) => {
     const response = await fetch('/api/notes', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-360note-csrf': '1' },
       body: JSON.stringify({
         workspaceId,
         title: noteTitle,
-        contentMd: `# Caption\n\n![alt](/api/attachments/${attachmentId}/content "Captioned image")`,
+        contentMd: `# Caption\n\n![alt](${imageData} "Captioned image")`,
       }),
     });
     return { status: response.status, data: await response.json() };
-  }, { workspaceId, noteTitle, attachmentId });
+  }, { workspaceId, noteTitle, imageData });
   if (created.status !== 200) throw new Error(`create note failed: ${JSON.stringify(created.data)}`);
   noteId = created.data.note.id;
 
   await page.goto(`${base}/app/note/${noteId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.editor-figure figcaption', { timeout: 10_000 });
+  await page.waitForSelector('.editor-figure img', { state: 'visible', timeout: 10_000 });
   results.editorCaption = (await page.locator('.editor-figure figcaption').first().innerText()).trim();
+  const editorImageBox = await page.locator('.editor-figure img').first().boundingBox();
+  const editorCaptionBox = await page.locator('.editor-figure figcaption').first().boundingBox();
+  results.editorCaptionCenteredWithImage = Boolean(editorImageBox && editorCaptionBox) &&
+    Math.abs((editorImageBox.x + editorImageBox.width / 2) - (editorCaptionBox.x + editorCaptionBox.width / 2)) < 2;
 
   const share = await page.evaluate(async (id) => {
     const response = await fetch(`/api/notes/${id}/shares`, {
@@ -122,7 +127,12 @@ try {
   if (share.status !== 200) throw new Error(`share failed: ${JSON.stringify(share.data)}`);
   await page.goto(`${base}/s/${share.data.share.token}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.public-body .prose-figure figcaption', { timeout: 10_000 });
+  await page.waitForSelector('.public-body .prose-figure img', { state: 'visible', timeout: 10_000 });
   results.shareCaptionAlign = await page.locator('.public-body .prose-figure figcaption').first().evaluate((element) => getComputedStyle(element).textAlign);
+  const shareImageBox = await page.locator('.public-body .prose-figure img').first().boundingBox();
+  const shareCaptionBox = await page.locator('.public-body .prose-figure figcaption').first().boundingBox();
+  results.shareCaptionCenteredWithImage = Boolean(shareImageBox && shareCaptionBox) &&
+    Math.abs((shareImageBox.x + shareImageBox.width / 2) - (shareCaptionBox.x + shareCaptionBox.width / 2)) < 2;
   await page.emulateMedia({ media: 'print' });
   results.printCaptionAlign = await page.locator('.prose-figure figcaption').first().evaluate((element) => getComputedStyle(element).textAlign);
 

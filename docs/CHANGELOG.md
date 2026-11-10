@@ -3,7 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.42] — 2026-11-10
+
+图片说明对齐一致。
+
+### Fixed
+
+- 编辑器、公开分享页与打印稿统一使用 shrink-wrap 的 `figure`：图片和说明作为一个整体居中，说明文字的中心与图片中心对齐，不再出现“编辑器靠左、分享页按整栏居中”的偏差。
+- 补充 Playwright 断言：编辑器与分享页的图片中心/说明中心误差 < 2px。
+
 ## [0.1.41] — 2026-11-10
+
 
 通知、计数、图片说明与公开落地页体验修复。
 

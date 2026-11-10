@@ -972,28 +972,30 @@
   }
 }
 
+/* The figure shrink-wraps the image and is centered as one unit, so the
+   caption is centered under the image itself — not under the full prose column.
+   This applies identically in the editor, public share page and print output. */
 .prose-figure {
-  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 20px auto;
 }
 
 .prose-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
   margin: 0;
 }
 
 .prose-figure figcaption {
+  width: 100%;
   margin-top: 7px;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--text-tertiary);
-}
-
-/* Share/public articles and printed copies center image captions. */
-.public-body .prose-figure figcaption {
   text-align: center;
-}
-
-@media print {
-  .prose-figure figcaption {
-    text-align: center;
-  }
+  color: var(--text-tertiary);
 }
