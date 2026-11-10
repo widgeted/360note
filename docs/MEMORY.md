@@ -708,7 +708,7 @@ apps/web/src/styles/tokens.css        设计 token
 - 对象存储校验与工作区恢复先解密到临时文件，再走 yauzl；实例备份仍用 AdmZip 做只读演练。
 - 迁移 013 先删除重复 filename/storage_key 的旧记录（保留最新），再建唯一索引。
 - CSP 允许 `static.cloudflareinsights.com` 与 `cloudflareinsights.com`；隐私页明确 Cloudflare 无 Cookie 汇总统计，不读取正文。
-- 新增 `SafeZip` 单测、带附件的合并/替换恢复集成测试、生产登录态 Playwright（demo 账号，测试后注销）。
+- 新增 `SafeZip` 单测、带附件的合并/替换恢复集成测试、生产登录态 Playwright（demo 与管理员账号，测试后注销）。管理员覆盖实例管理 6 个页签、2FA 重认证、移动设置 3 列与 PWA SW。
 - 验证：server 13、web 4、build、postgres-api、jobs-recovery、backup-restore-drill、object-storage-e2e、backup-limits、public-smoke、authenticated-smoke 全部通过。
 - 生产已部署 0.1.40；健康检查 200；仅测试会话被撤销，真实 iPhone 会话未动。
 

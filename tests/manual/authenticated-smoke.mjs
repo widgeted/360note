@@ -53,7 +53,8 @@ try {
   results.noteCount = await page.locator('.note-item').count();
   if (results.noteCount > 0) {
     await page.locator('.note-item').first().click();
-    await page.waitForTimeout(1200);
+    await page.waitForURL(/\/app\/note\//, { timeout: 10_000 }).catch(() => {});
+    await page.waitForSelector('.editor-page', { timeout: 10_000 }).catch(() => {});
     results.editorVisible = await page.locator('.editor-page').isVisible().catch(() => false);
   }
 
@@ -70,8 +71,23 @@ try {
 
   if ((await page.locator('.admin-tab').count()) > 0 || (await page.locator('button', { hasText: /实例管理|Instance/i }).count()) > 0) {
     await page.goto('https://360note.com/app/settings/admin', { waitUntil: 'networkidle' });
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1000);
     results.adminVisible = (await page.locator('.admin-tabs').count()) > 0;
+    const tabs = page.locator('.admin-tab');
+    const tabCount = await tabs.count();
+    results.adminTabs = await tabs.allInnerTexts();
+    results.adminTabChecks = [];
+    for (let index = 0; index < tabCount; index += 1) {
+      await tabs.nth(index).click();
+      await page.waitForTimeout(index === 1 ? 1800 : 700);
+      results.adminTabChecks.push({
+        tab: (await tabs.nth(index).innerText()).trim(),
+        active: await tabs.nth(index).evaluate((element) => element.classList.contains('active')),
+        visiblePanel: await page.locator('.admin-tabs ~ *, .admin-panel, .settings-section').count(),
+        inlineErrors: await page.locator('.form-error, .banner-warning').count(),
+      });
+    }
+    results.adminNoInlineErrors = results.adminTabChecks.every((entry) => entry.inlineErrors === 0);
   }
   await page.screenshot({ path: '/tmp/opencode/auth-desktop.png', fullPage: false });
 
