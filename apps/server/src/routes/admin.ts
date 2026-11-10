@@ -12,7 +12,7 @@ import { getNoteForUser } from '../services/notes.js';
 import { readBackup } from '../lib/storage.js';
 import { decryptString, sha256 } from '../lib/crypto.js';
 import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, saveInstanceBackupSettings, uploadInstanceBackupToOffsite } from '../services/instance-backups.js';
-import { attachmentMigrationRunning, getAttachmentStorageUsage, getLocalAttachmentUsage, startDisableAttachments, startEnableAttachments } from '../services/attachment-storage.js';
+import { attachmentMigrationRunning, cleanupLocalAttachmentCopies, getAttachmentStorageUsage, getLocalAttachmentUsage, startDisableAttachments, startEnableAttachments } from '../services/attachment-storage.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
   async function requireAdmin(userId: string): Promise<void> {
@@ -499,6 +499,15 @@ export default async function adminRoutes(app: FastifyInstance) {
     const state = await startEnableAttachments();
     await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.enable', ip: clientIp(request) });
     return { migration: state };
+  });
+
+  app.post('/api/admin/offsite/attachments/cleanup-local', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    if (attachmentMigrationRunning()) throw errors.conflict('附件迁移正在进行，请稍候');
+    const result = await cleanupLocalAttachmentCopies();
+    await audit({ actorId: auth.user.id, action: 'admin.offsite.attachments.cleanup_local', meta: result, ip: clientIp(request) });
+    return result;
   });
 
   app.post('/api/admin/offsite/attachments/disable', async (request) => {

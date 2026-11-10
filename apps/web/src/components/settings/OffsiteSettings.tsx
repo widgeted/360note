@@ -60,6 +60,7 @@ export function OffsiteSettings() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
   const [secret, setSecret] = useState('');
   const [purgeRemote, setPurgeRemote] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -165,6 +166,25 @@ export function OffsiteSettings() {
     } catch (error) {
       setMigrating(false);
       toast('error', t('无法启用对象存储附件'), (error as Error).message);
+    }
+  }
+
+  async function cleanupLocalCopies() {
+    setCleaning(true);
+    try {
+      const result = await api.post<{ deleted: number; retained: number }>('/api/admin/offsite/attachments/cleanup-local');
+      await loadUsage(true);
+      toast(
+        'success',
+        t('本机副本已清理'),
+        result.retained > 0
+          ? t('已清理 {n} 个；{m} 个因远端校验未通过而保留。', { n: result.deleted, m: result.retained })
+          : t('已清理 {n} 个本机附件副本。', { n: result.deleted }),
+      );
+    } catch (error) {
+      toast('error', t('清理失败'), (error as Error).message);
+    } finally {
+      setCleaning(false);
     }
   }
 
@@ -339,6 +359,11 @@ export function OffsiteSettings() {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => void disableAttachments()}>
                   <CloudDownload size={13} /> {t('停用并取回全部附件')}
                 </button>
+                {(usage?.local.files ?? 0) > 0 && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => void cleanupLocalCopies()} disabled={cleaning}>
+                    {cleaning ? <span className="spinner" /> : <HardDrive size={13} />} {t('清理本机副本')}
+                  </button>
+                )}
               </>
             ) : (
               <>

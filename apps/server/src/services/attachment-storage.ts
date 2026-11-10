@@ -190,6 +190,33 @@ async function sweepLocalAttachments(failedIds: string[]): Promise<number> {
   return failed;
 }
 
+export async function cleanupLocalAttachmentCopies(): Promise<{ deleted: number; retained: number }> {
+  const rows = await many<{ storage_key: string }>(
+    `SELECT storage_key FROM attachments WHERE deleted_at IS NULL AND storage_key LIKE 's3:%'`,
+  );
+  let deleted = 0;
+  let retained = 0;
+  for (const row of rows) {
+    const localKey = attachmentStorageKeyFromObject(row.storage_key);
+    const localBytes = await localSize(localKey);
+    if (localBytes === null) continue;
+    try {
+      const remote = await headObject(row.storage_key);
+      if (!remote.exists || remote.size !== localBytes) {
+        retained += 1;
+        continue;
+      }
+      await fs.rm(localPathForKey(localKey), { force: true });
+      await fs.rm(localPathForKey(attachmentThumbnailStorageKey(localKey)), { force: true });
+      deleted += 1;
+    } catch {
+      retained += 1;
+    }
+  }
+  if (deleted > 0) invalidateAttachmentUsage();
+  return { deleted, retained };
+}
+
 async function runEnable(): Promise<void> {
   const failedIds: string[] = [];
   setAttachmentStorageMigrationMode(true);
@@ -210,7 +237,13 @@ async function runEnable(): Promise<void> {
         '新上传的附件将直接保存到对象存储。',
       );
     } else {
-      finishState(null, '附件已迁移到对象存储，新上传的附件将直接保存到对象存储。');
+      const cleanup = await cleanupLocalAttachmentCopies();
+      finishState(
+        null,
+        cleanup.retained > 0
+          ? `附件已迁移到对象存储，本机副本已清理 ${cleanup.deleted} 个；${cleanup.retained} 个暂未清理。`
+          : `附件已迁移到对象存储，本机副本已清理，新上传的附件将直接保存到对象存储。`,
+      );
     }
   } catch (error) {
     finishState((error as Error).message.slice(0, 500), '迁移未完成，附件仍按各自记录的位置读取。');
