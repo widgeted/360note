@@ -396,7 +396,8 @@ export function Sidebar() {
         </div>
 
         <Dropdown
-          align="start"
+          align={collapsed ? 'start' : 'end'}
+          width={collapsed ? 'auto' : 'trigger'}
           className="workspace-menu"
           trigger={
             <button type="button" className="workspace-switcher">

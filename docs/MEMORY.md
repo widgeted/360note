@@ -695,3 +695,9 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PWA iOS 提示改回单行，仅 SquarePlus 图标；不要四步列表。
 - 移动侧栏去掉 box-shadow，保留右边框；导航图标 18px、操作图标 16px。
+
+## 2026-11-10 · v0.1.37 安装提示与空间菜单
+
+- iOS PWA 提示保留 More/Share/Add 三个内联图标，单段文字，不拆行。
+- 空间菜单展开右对齐（align=end, width=trigger），收起左对齐（align=start, auto）。
+- 设计文档已从“全宽触发器统一左对齐”改为上述规则。

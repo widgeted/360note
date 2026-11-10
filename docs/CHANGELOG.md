@@ -3,6 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.37] — 2026-11-10
+
+安装提示图标与空间菜单对齐修正。
+
+### Changed
+
+- iOS Safari 安装提示改为单段文字，内联“更多”“共享”“添加到主屏幕”三个图标，不再拆分步骤行。
+- 展开侧栏的空间切换菜单改为右对齐，跟随右侧向下箭头；宽度与触发器一致，长名称换行。
+- 收起侧栏仍保持左对齐、自适应宽度，避免窄触发器把长名称挤出去。
+- 更新设计系统文档中的空间菜单对齐规则，避免继续按旧的“全宽触发器统一左对齐”执行。
+
 ## [0.1.36] — 2026-11-10
 
 安装提示与移动侧栏微调。

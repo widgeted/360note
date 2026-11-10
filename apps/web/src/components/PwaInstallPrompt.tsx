@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { SquarePlus, X } from 'lucide-react';
+import { MoreHorizontal, Share, SquarePlus, X } from 'lucide-react';
 import { useT } from '../lib/i18n';
 
 const STORAGE_KEY = 'nh-pwa-install-v1';
@@ -121,7 +121,9 @@ export function PwaInstallPrompt() {
         <div className="pwa-install-text">
           {mode === 'ios' ? (
             <>
-              <SquarePlus size={13} /> {t('在 Safari 菜单中点击“共享”，再选择“添加到主屏幕”。')}
+              <MoreHorizontal size={13} /> {t('点击“更多”')}{t('，再点击菜单中的')}
+              <Share size={13} /> {t('“共享”')}{t('，然后选择')}
+              <SquarePlus size={13} /> {t('“添加到主屏幕”')}
             </>
           ) : (
             t('安装后可以像 App 一样打开，离线草稿仍会保留。')
