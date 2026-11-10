@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { Backlink, Comment, NoteVersion, NoteVersionDetail } from '@360note/shared';
 import { useAppStore } from '../stores/app';
+import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
 import { api } from '../lib/api';
 import { cn, formatBytes, formatFullDate, formatRelativeShort } from '../lib/utils';
@@ -35,6 +36,7 @@ const REASON_LABELS: Record<string, string> = {
 export function ContextPanel() {
   const t = useT();
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const [searchParams] = useSearchParams();
   const requestedComment = searchParams.get('comment');
   const requestedVersion = searchParams.get('version');
@@ -200,6 +202,17 @@ export function ContextPanel() {
       toast('error', t('发送评论失败'), (error as Error).message);
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function deleteComment(comment: Comment) {
+    if (!window.confirm(t('删除这条评论？'))) return;
+    try {
+      await api.delete(`/api/comments/${comment.id}`);
+      setComments((current) => current.filter((entry) => entry.id !== comment.id));
+      toast('success', t('评论已删除'));
+    } catch (error) {
+      toast('error', t('删除评论失败'), (error as Error).message);
     }
   }
 
@@ -432,9 +445,22 @@ export function ContextPanel() {
                         <span>{formatRelativeShort(comment.createdAt)}</span>
                         {comment.isGuest && <span className="badge">{t('访客')}</span>}
                         {comment.resolved && <span className="badge badge-green"><Check size={9} /> {t('已解决')}</span>}
-                        <button type="button" className="footbar-button" style={{ marginLeft: 'auto' }} onClick={() => void resolveComment(comment)}>
-                          {comment.resolved ? t('重新打开') : t('解决')}
-                        </button>
+                        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <button type="button" className="footbar-button" onClick={() => void resolveComment(comment)}>
+                            {comment.resolved ? t('重新打开') : t('解决')}
+                          </button>
+                          {(comment.authorId === user?.id || (comment.isGuest && note?.createdBy === user?.id)) && (
+                            <button
+                              type="button"
+                              className="footbar-button"
+                              onClick={() => void deleteComment(comment)}
+                              title={t('删除评论')}
+                              aria-label={t('删除评论')}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="comment-text">{comment.body}</div>
                     </div>

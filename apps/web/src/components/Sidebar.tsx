@@ -617,20 +617,6 @@ export function Sidebar() {
         </div>
 
         <div className="sidebar-footer" style={{ marginTop: 'auto' }}>
-          <button
-            type="button"
-            className={cn('nav-item', settingsActive && 'active')}
-            onClick={() => {
-              const state = location.pathname.startsWith('/app/settings')
-                ? location.state
-                : { from: location.pathname + location.search };
-              navigate('/app/settings/account', { state });
-              closeMobile();
-            }}
-          >
-            <Settings size={15} />
-            <span className="nav-label">{t('设置')}</span>
-          </button>
           <div className="sidebar-user">
             <Avatar name={user?.displayName ?? 'N'} color={user?.avatarColor} size="sm" />
             <span className="sidebar-user-meta">
@@ -646,6 +632,20 @@ export function Sidebar() {
             >
               {(close) => (
                 <>
+                <MenuItem
+                  icon={<Settings size={14} />}
+                  onClick={() => {
+                    const state = location.pathname.startsWith('/app/settings')
+                      ? location.state
+                      : { from: location.pathname + location.search };
+                    close();
+                    navigate('/app/settings/account', { state });
+                    closeMobile();
+                  }}
+                >
+                  {t('设置')}
+                </MenuItem>
+                <div className="menu-separator" />
                 <MenuItem
                   danger
                   icon={<LogOut size={14} />}

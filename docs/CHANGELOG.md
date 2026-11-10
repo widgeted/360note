@@ -3,6 +3,21 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.31] — 2026-11-10
+
+公开链接表格、访客评论管理与设置入口调整。
+
+### Changed
+
+- 实例管理“公开链接”改为表格：链接、用户、权限、类型、过期时间、次数；每页 50 条，可翻页。
+- 去除单独的“打开”列，直接点击链接即可打开；密码链接仍要求密码。
+- 笔记作者可以删除匿名访客评论；评论作者仍可删除自己的评论。
+- 笔记页侧栏的“设置”入口移入用户名右侧“…”菜单，放在“退出登录”“退出并清除本机数据”上方。
+
+### Fixed
+
+- 评论删除权限提示区分“自己的评论”和“笔记作者删除匿名访客评论”。
+
 ## [0.1.30] — 2026-11-10
 
 按钮体系统一与最近改动的深度回归。

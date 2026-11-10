@@ -257,6 +257,22 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/api/admin/shares', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
+    const params = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      request.query,
+    );
+    const where = `s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > now())
+         AND n.deleted_at IS NULL AND n.trashed_at IS NULL AND w.deleted_at IS NULL`;
+    const totalRow = await one<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM share_links s
+       JOIN notes n ON n.id = s.note_id
+       JOIN workspaces w ON w.id = n.workspace_id
+       WHERE ${where}`,
+    );
     const rows = await many<{
       id: string;
       token_cipher: string;
@@ -274,11 +290,12 @@ export default async function adminRoutes(app: FastifyInstance) {
        JOIN notes n ON n.id = s.note_id
        JOIN workspaces w ON w.id = n.workspace_id
        LEFT JOIN users u ON u.id = s.created_by
-       WHERE s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > now())
-         AND n.deleted_at IS NULL AND n.trashed_at IS NULL AND w.deleted_at IS NULL
-       ORDER BY s.created_at DESC LIMIT 200`,
+       WHERE ${where}
+       ORDER BY s.created_at DESC LIMIT $1 OFFSET $2`,
+      [params.limit, params.offset],
     );
     return {
+      total: Number(totalRow?.count ?? 0),
       shares: rows.map((row) => ({
         id: row.id,
         workspaceName: row.workspace_name,

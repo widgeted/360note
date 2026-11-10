@@ -101,8 +101,10 @@ export default async function commentRoutes(app: FastifyInstance) {
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const comment = await one<{ user_id: string | null; note_id: string }>('SELECT user_id, note_id FROM comments WHERE id = $1', [id]);
     if (!comment) throw errors.notFound('评论不存在');
-    await getNoteForUser(comment.note_id, auth.user.id);
-    if (comment.user_id !== auth.user.id) throw errors.forbidden('只能删除自己的评论');
+    const { note } = await getNoteForUser(comment.note_id, auth.user.id);
+    const isOwner = comment.user_id === auth.user.id;
+    const isNoteAuthorDeletingGuest = comment.user_id === null && note.createdBy === auth.user.id;
+    if (!isOwner && !isNoteAuthorDeletingGuest) throw errors.forbidden('只能删除自己的评论；笔记作者可以删除匿名访客评论');
     await one('DELETE FROM comments WHERE id = $1 RETURNING id', [id]);
     await audit({ actorId: auth.user.id, action: 'comment.delete', targetType: 'comment', targetId: id });
     return { ok: true };

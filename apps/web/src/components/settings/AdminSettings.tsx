@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Cloud, CloudUpload, Database, Download, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { Activity, Ban, Cloud, CloudUpload, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -68,6 +68,9 @@ export default function AdminSettings() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [ipBlocks, setIpBlocks] = useState<Array<{ id: string; ip: string; reason: string | null; createdAt: string }>>([]);
   const [shares, setShares] = useState<Array<{ id: string; workspaceName: string; ownerName: string | null; permission: string; hasPassword: boolean; expiresAt: string | null; viewCount: number; url: string }>>([]);
+  const [sharesTotal, setSharesTotal] = useState(0);
+  const [sharesOffset, setSharesOffset] = useState(0);
+  const [sharesLoading, setSharesLoading] = useState(false);
   const [blockIp, setBlockIp] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [instance, setInstance] = useState<{ version: string; registrationMode: string; aiEnabled: boolean; ocrEnabled: boolean; backupRetentionDays: number } | null>(null);
@@ -92,7 +95,7 @@ export default function AdminSettings() {
     void loadAudit(0);
     void refreshIpBlocks();
     void refreshInstanceBackups();
-    api.get<{ shares: typeof shares }>('/api/admin/shares').then((res) => setShares(res.shares)).catch(() => {});
+    void loadShares(0);
   }, []);
 
   async function refreshIpBlocks() {
@@ -186,6 +189,20 @@ export default function AdminSettings() {
       await Promise.all([refreshInstanceBackups(), refreshOffsiteUsage()]);
     } catch (error) {
       toast('error', t('删除失败'), (error as Error).message);
+    }
+  }
+
+  async function loadShares(offset: number) {
+    setSharesLoading(true);
+    try {
+      const response = await api.get<{ shares: typeof shares; total: number }>(`/api/admin/shares?limit=50&offset=${offset}`);
+      setShares(response.shares);
+      setSharesTotal(response.total);
+      setSharesOffset(offset);
+    } catch (error) {
+      toast('error', t('加载失败'), (error as Error).message);
+    } finally {
+      setSharesLoading(false);
     }
   }
 
@@ -456,29 +473,47 @@ export default function AdminSettings() {
       <section className="settings-section" hidden={adminTab !== 'shares'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('分享链接')}</span>
-          <span className="settings-section-desc">{shares.length}</span>
+          <span className="settings-section-desc">{t('共 {n} 条', { n: sharesTotal })}</span>
         </div>
-        <p className="setting-note">{t('只展示已生成的有效分享链接，用于排查公开内容。公开链接可直接打开；需要密码的链接仍需密码，管理员不能绕过。管理员不会看到笔记正文。')}</p>
-        <div className="admin-share-list">
-          {shares.length === 0 ? <div className="context-empty">{t('暂无有效分享')}</div> : shares.map((share) => (
-            <div className="admin-share-row" key={share.id}>
-              {share.hasPassword ? (
-                <span className="admin-share-link" title={share.url}>{share.url}</span>
-              ) : (
-                <a className="admin-share-link" href={share.url} target="_blank" rel="noopener noreferrer" title={share.url}>{share.url}</a>
-              )}
-              <span className="admin-share-owner" title={share.ownerName ?? ''}>{share.ownerName ?? '—'}</span>
-              <span>{share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}</span>
-              <span>{share.hasPassword ? t('需要密码') : t('公开')}</span>
-              <span>{share.expiresAt ? formatFullDate(share.expiresAt) : t('永不过期')}</span>
-              <span>{share.viewCount}</span>
-              {!share.hasPassword ? (
-                <a href={share.url} target="_blank" rel="noopener noreferrer">{t('打开')} <ExternalLink size={11} /></a>
-              ) : (
-                <span className="setting-note">{t('受密码保护')}</span>
-              )}
-            </div>
-          ))}
+        <p className="setting-note">{t('只展示已生成的有效分享链接，用于排查公开内容。点击链接即可打开；需要密码的链接仍需密码，管理员不能绕过。管理员不会看到笔记正文。')}</p>
+        <div className="setting-card" style={{ padding: 0, overflowX: 'auto' }}>
+          <table className="data-table admin-share-table">
+            <thead>
+              <tr>
+                <th>{t('链接')}</th>
+                <th>{t('用户')}</th>
+                <th>{t('权限')}</th>
+                <th>{t('类型')}</th>
+                <th>{t('过期时间')}</th>
+                <th>{t('次数')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sharesLoading ? (
+                <tr><td colSpan={6}><div className="loading-row"><span className="spinner" /> {t('加载中…')}</div></td></tr>
+              ) : shares.length === 0 ? (
+                <tr><td colSpan={6}><div className="context-empty">{t('暂无有效分享')}</div></td></tr>
+              ) : shares.map((share) => (
+                <tr key={share.id}>
+                  <td><a className="admin-share-link" href={share.url} target="_blank" rel="noopener noreferrer" title={share.url}>{share.url}</a></td>
+                  <td>{share.ownerName ?? '—'}</td>
+                  <td>{share.permission === 'view' ? t('只读') : share.permission === 'edit' ? t('可编辑') : t('可评论')}</td>
+                  <td>{share.hasPassword ? t('密码保护') : t('公开')}</td>
+                  <td>{share.expiresAt ? formatFullDate(share.expiresAt) : t('永不过期')}</td>
+                  <td>{share.viewCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="admin-log-pager">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadShares(Math.max(0, sharesOffset - 50))} disabled={sharesLoading || sharesOffset === 0}>
+            {t('上一页')}
+          </button>
+          <span className="setting-note">{t('第 {page} 页', { page: Math.floor(sharesOffset / 50) + 1 })}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadShares(sharesOffset + 50)} disabled={sharesLoading || sharesOffset + 50 >= sharesTotal}>
+            {t('下一页')}
+          </button>
         </div>
       </section>
 

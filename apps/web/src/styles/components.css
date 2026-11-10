@@ -2458,31 +2458,23 @@ a.btn {
   text-overflow: ellipsis;
 }
 
-.admin-share-list {
-  margin-top: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  overflow: hidden;
+.admin-share-table td {
+  vertical-align: top;
 }
 
-.admin-share-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 12px;
-  align-items: center;
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--line-soft);
-  font-size: 12.5px;
-  color: var(--text-secondary);
+.admin-share-table th,
+.admin-share-table td {
+  white-space: nowrap;
 }
 
-.admin-share-row:last-child {
-  border-bottom: 0;
+.admin-share-table td:first-child {
+  min-width: 260px;
+  max-width: 520px;
+  white-space: normal;
 }
 
 .admin-share-link {
-  flex: 1 1 100%;
+  display: inline;
   min-width: 0;
   color: var(--blue);
   text-decoration: none;
@@ -2492,22 +2484,6 @@ a.btn {
   overflow-wrap: anywhere;
   word-break: break-word;
   line-height: 1.45;
-}
-
-.admin-share-owner {
-  min-width: 0;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-share-row a {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--blue);
-  text-decoration: none;
 }
 
 .admin-tabs {
