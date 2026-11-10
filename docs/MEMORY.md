@@ -683,3 +683,10 @@ apps/web/src/styles/tokens.css        设计 token
 - iOS Safari 用分享说明；Android Chromium 用 beforeinstallprompt；未捕获事件的其他浏览器不打扰。
 - 图标审计：模式切换 M↓/Aa、启用账号 UserCheck、重命名 Pencil、撤销 Link2Off。
 - 移动端收藏/置顶为独立 26px 按钮，无渐变遮罩；meta 预留 62px。
+
+## 2026-11-10 · v0.1.35 移动端细节
+
+- PWA iOS 指引四步带图标；移动端主题三列、图标 11px。
+- `applyUserExperience` 在登录/恢复后应用账户主题；`initializeTheme` 优先读取账户缓存；`storeTheme` 同步更新缓存。
+- 设置移动端导航点击后居中 active 标签。
+- 移动侧栏宽 min(86vw,316px)，加边框/阴影；桌面折叠空间菜单自适应宽度并换行。

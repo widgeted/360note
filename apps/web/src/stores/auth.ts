@@ -3,6 +3,7 @@ import type { User, Workspace } from '@360note/shared';
 import { api, ApiError } from '../lib/api';
 import { getLocale } from '../lib/i18n';
 import { clearSensitiveLocalData, setLocalWritesEnabled } from '../lib/offline';
+import { applyTheme, type ThemePreference } from '../lib/theme';
 import { useAppStore } from './app';
 
 export interface InstanceInfo {
@@ -73,6 +74,14 @@ function clearCachedAuth(): void {
   }
 }
 
+function applyUserExperience(user: User): void {
+  const theme = user.prefs?.theme;
+  if (theme === 'light' || theme === 'dark' || theme === 'system') {
+    localStorage.setItem('nh-theme', theme);
+    applyTheme(theme as ThemePreference, user.prefs?.reduceMotion === true);
+  }
+}
+
 async function applyAuth(response: AuthResponse): Promise<void> {
   let previousUserId: string | null = null;
   try {
@@ -87,6 +96,7 @@ async function applyAuth(response: AuthResponse): Promise<void> {
     useAppStore.getState().reset();
   }
   setLocalWritesEnabled(true);
+  applyUserExperience(response.user);
   try {
     localStorage.setItem(LAST_USER_KEY, response.user.id);
   } catch {

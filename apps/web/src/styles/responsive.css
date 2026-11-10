@@ -22,10 +22,12 @@
     top: 0;
     bottom: 0;
     left: 0;
-    width: 258px;
+    width: min(86vw, 316px);
     transform: translateX(-102%);
     transition: transform 260ms var(--ease);
     z-index: 60;
+    border-right: 1px solid var(--sidebar-line);
+    box-shadow: 18px 0 42px rgba(5, 8, 21, 0.16);
   }
 
   .app-root.sidebar-open .sidebar {
@@ -536,7 +538,27 @@
   }
 
   .theme-grid {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .theme-option {
+    padding: 6px;
+  }
+
+  .theme-preview {
+    height: 54px;
+    margin-bottom: 6px;
+  }
+
+  .theme-option-label {
+    gap: 3px;
+    font-size: 12px;
+  }
+
+  .theme-option-label > svg {
+    width: 11px;
+    height: 11px;
   }
 
   .restore-counts,

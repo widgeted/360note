@@ -2634,6 +2634,27 @@ a.btn {
   color: var(--text-tertiary);
 }
 
+.pwa-install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.pwa-install-steps > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pwa-install-steps svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
 .pwa-install-text svg {
   display: inline;
   vertical-align: -1px;
@@ -2658,4 +2679,15 @@ a.btn {
     height: 28px;
     padding: 0 9px;
   }
+}
+
+/* Workspace switcher can contain long names even when the sidebar is collapsed. */
+.workspace-menu .menu-item {
+  align-items: flex-start;
+}
+
+.workspace-menu .menu-item > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }

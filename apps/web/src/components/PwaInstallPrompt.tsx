@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Share, X } from 'lucide-react';
+import { Ellipsis, MoreHorizontal, Share, SquarePlus, X } from 'lucide-react';
 import { useT } from '../lib/i18n';
 
 const STORAGE_KEY = 'nh-pwa-install-v1';
@@ -118,15 +118,16 @@ export function PwaInstallPrompt() {
       <img className="pwa-install-icon" src="/icons/icon-192.png" alt="" />
       <div className="pwa-install-body">
         <div className="pwa-install-title">{t('把 360笔记添加到主屏幕')}</div>
-        <div className="pwa-install-text">
-          {mode === 'ios' ? (
-            <>
-              {t('点击 Safari 的分享按钮')} <Share size={12} /> {t('，再选择“添加到主屏幕”。')}
-            </>
-          ) : (
-            t('安装后可以像 App 一样打开，离线草稿仍会保留。')
-          )}
-        </div>
+        {mode === 'ios' ? (
+          <div className="pwa-install-steps">
+            <div><MoreHorizontal size={14} /> <span>{t('点击右下角的“…”')}</span></div>
+            <div><Share size={14} /> <span>{t('点击“共享”')}</span></div>
+            <div><Ellipsis size={14} /> <span>{t('点击“查看更多”')}</span></div>
+            <div><SquarePlus size={14} /> <span>{t('选择“添加到主屏幕”')}</span></div>
+          </div>
+        ) : (
+          <div className="pwa-install-text">{t('安装后可以像 App 一样打开，离线草稿仍会保留。')}</div>
+        )}
       </div>
       <div className="pwa-install-actions">
         {mode === 'chromium' && (

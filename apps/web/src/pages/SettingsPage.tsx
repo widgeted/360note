@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Bot,
@@ -59,6 +60,17 @@ export default function SettingsPage({ section }: { section: string }) {
   const current = visibleSections.some((entry) => entry.id === section) ? section : 'account';
   const sectionLabel = SECTIONS.find((entry) => entry.id === current)?.label ?? '设置';
   useDocumentTitle(t(sectionLabel));
+
+  useEffect(() => {
+    const nav = navFade.ref.current;
+    if (!nav || nav.scrollWidth <= nav.clientWidth) return;
+    const active = nav.querySelector<HTMLElement>('.settings-nav-item.active');
+    if (!active) return;
+    const navRect = nav.getBoundingClientRect();
+    const itemRect = active.getBoundingClientRect();
+    const target = nav.scrollLeft + itemRect.left - navRect.left - (nav.clientWidth - active.offsetWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, Math.min(target, nav.scrollWidth - nav.clientWidth)), behavior: 'smooth' });
+  }, [current, navFade.ref]);
 
   const groups = ['个人', '数据', '高级'];
   const from = (location.state as { from?: unknown } | null)?.from;

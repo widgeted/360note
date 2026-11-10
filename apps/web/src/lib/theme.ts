@@ -23,16 +23,46 @@ export function applyTheme(preference: ThemePreference, reduceMotion?: boolean):
   }
 }
 
+function cachedAccountTheme(): ThemePreference | null {
+  try {
+    const raw = localStorage.getItem('nh-auth-cache');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { user?: { prefs?: { theme?: string } } };
+    const theme = parsed?.user?.prefs?.theme;
+    return theme === 'light' || theme === 'dark' || theme === 'system' ? theme : null;
+  } catch {
+    return null;
+  }
+}
+
 export function initializeTheme(): void {
-  const saved = (localStorage.getItem(THEME_KEY) as ThemePreference | null) ?? 'system';
+  const saved = cachedAccountTheme() ?? (localStorage.getItem(THEME_KEY) as ThemePreference | null) ?? 'system';
   applyTheme(saved, localStorage.getItem(MOTION_KEY) === 'true');
   window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
     if ((localStorage.getItem(THEME_KEY) as ThemePreference | null) === 'system') applyTheme('system');
   });
 }
 
+function syncCachedAccountPrefs(preference: ThemePreference, reduceMotion?: boolean): void {
+  try {
+    const raw = localStorage.getItem('nh-auth-cache');
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { user?: { prefs?: Record<string, unknown> } };
+    if (!parsed?.user) return;
+    parsed.user.prefs = {
+      ...(parsed.user.prefs ?? {}),
+      theme: preference,
+      ...(reduceMotion === undefined ? {} : { reduceMotion }),
+    };
+    localStorage.setItem('nh-auth-cache', JSON.stringify(parsed));
+  } catch {
+    /* ignore quota/private mode */
+  }
+}
+
 export function storeTheme(preference: ThemePreference, reduceMotion?: boolean): void {
   localStorage.setItem(THEME_KEY, preference);
+  syncCachedAccountPrefs(preference, reduceMotion);
   applyTheme(preference, reduceMotion);
 }
 

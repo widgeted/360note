@@ -397,7 +397,7 @@ export function Sidebar() {
 
         <Dropdown
           align="start"
-          width="trigger"
+          className="workspace-menu"
           trigger={
             <button type="button" className="workspace-switcher">
               <span
