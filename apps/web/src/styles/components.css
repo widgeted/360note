@@ -2634,25 +2634,11 @@ a.btn {
   color: var(--text-tertiary);
 }
 
-.pwa-install-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 5px;
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--text-tertiary);
-}
-
-.pwa-install-steps > div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pwa-install-steps svg {
+.pwa-install-text svg {
   flex: none;
   color: var(--text-secondary);
+  display: inline;
+  vertical-align: -2px;
 }
 
 .pwa-install-text svg {

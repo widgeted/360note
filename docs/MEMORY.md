@@ -690,3 +690,8 @@ apps/web/src/styles/tokens.css        设计 token
 - `applyUserExperience` 在登录/恢复后应用账户主题；`initializeTheme` 优先读取账户缓存；`storeTheme` 同步更新缓存。
 - 设置移动端导航点击后居中 active 标签。
 - 移动侧栏宽 min(86vw,316px)，加边框/阴影；桌面折叠空间菜单自适应宽度并换行。
+
+## 2026-11-10 · v0.1.36 提示与侧栏
+
+- PWA iOS 提示改回单行，仅 SquarePlus 图标；不要四步列表。
+- 移动侧栏去掉 box-shadow，保留右边框；导航图标 18px、操作图标 16px。

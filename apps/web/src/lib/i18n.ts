@@ -213,6 +213,7 @@ const en: Record<string, string> = {
   '退出其他设备': 'Sign out other devices',
   '当前设备': 'Current device',
   '修改密码': 'Change password',
+  '在 Safari 菜单中点击“共享”，再选择“添加到主屏幕”。': 'In Safari, tap “Share”, then choose “Add to Home Screen”.',
   '选择“添加到主屏幕”': 'Choose “Add to Home Screen”',
   '点击“查看更多”': 'Tap “More”',
   '点击“共享”': 'Tap “Share”',

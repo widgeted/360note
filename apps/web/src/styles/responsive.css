@@ -27,7 +27,7 @@
     transition: transform 260ms var(--ease);
     z-index: 60;
     border-right: 1px solid var(--sidebar-line);
-    box-shadow: 18px 0 42px rgba(5, 8, 21, 0.16);
+    box-shadow: none;
   }
 
   .app-root.sidebar-open .sidebar {
@@ -569,5 +569,48 @@
   .restore-counts .setting-card,
   .import-counts .setting-card {
     padding: 9px !important;
+  }
+}
+
+
+/* The mobile drawer has more room, so give its controls clearer visual weight. */
+@media (max-width: 900px) {
+  .sidebar .workspace-mark {
+    width: 30px;
+    height: 30px;
+    font-size: 15px;
+  }
+
+  .sidebar .nav-item > svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sidebar .sidebar-icon-btn svg,
+  .sidebar .sidebar-collapse svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .sidebar .sidebar-section-action svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .sidebar .tree-folder-row svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .sidebar .workspace-kind-icon svg,
+  .sidebar .workspace-chevron {
+    width: 15px;
+    height: 15px;
+  }
+
+  .sidebar .tag-chip-more svg,
+  .sidebar .sidebar-user-more svg {
+    width: 15px;
+    height: 15px;
   }
 }

@@ -3,6 +3,16 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.36] — 2026-11-10
+
+安装提示与移动侧栏微调。
+
+### Changed
+
+- iPhone 安装引导恢复为单行说明，只保留“添加到主屏幕”图标，不再拆成四步多行。
+- 移除移动端侧栏的项目阴影，避免暗色蒙层下出现类似屏幕损坏的阴影带。
+- 保留侧栏右边框；移动端展开侧栏的导航、文件夹、标签、通知和账户图标整体放大。
+
 ## [0.1.35] — 2026-11-10
 
 移动端安装步骤、外观主题与设置导航优化。
