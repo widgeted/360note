@@ -93,7 +93,7 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
     try {
       await downloadBlob(
         `/api/backups/${backup.id}/download?workspaceId=${workspaceId}`,
-        backup.filename.replace(/\.nhbackup$/, '.zip'),
+        backup.filename.replace(/\.(nhbackup|3nb)$/, '.3nb'),
       );
     } catch (error) {
       toast('error', t('下载失败'), (error as Error).message);
@@ -188,7 +188,7 @@ export function BackupPanel({ workspaceId, canManage }: { workspaceId: string; c
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => uploadRef.current?.click()} disabled={uploading || !canManage}>
           {uploading ? <span className="spinner" /> : <UploadCloud size={13} />} {t('上传备份文件')}
         </button>
-        <input ref={uploadRef} type="file" hidden accept=".nhbackup,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBackup(file); event.target.value = ''; }} />
+        <input ref={uploadRef} type="file" hidden accept=".3nb,.nhbackup,.zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBackup(file); event.target.value = ''; }} />
         <div style={{ flex: 1 }} />
         <span className="setting-note">
           {getLocale() === 'en'

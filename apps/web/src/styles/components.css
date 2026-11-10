@@ -2203,6 +2203,8 @@ a.btn {
   padding-bottom: 2px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pinch-zoom;
+  overscroll-behavior: contain;
 }
 
 .editor-tag-bar::-webkit-scrollbar {
@@ -2488,4 +2490,41 @@ a.btn {
   .admin-share-row > span:nth-child(6) {
     display: none;
   }
+}
+
+.admin-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: -12px 0 24px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-tab {
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.admin-tab:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.admin-tab.active {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-weight: 570;
 }

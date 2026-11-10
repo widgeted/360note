@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Database, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Ban, Database, Download, ExternalLink, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -56,6 +56,10 @@ export default function AdminSettings() {
   const [runtime, setRuntime] = useState<{ uptimeSeconds: number; memoryBytes: number; nodeVersion: string } | null>(null);
   const [retention, setRetention] = useState(30);
   const [saving, setSaving] = useState(false);
+  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'shares' | 'logs'>('overview');
+  const [instanceBackups, setInstanceBackups] = useState<Array<{ id: string; filename: string; size: number; createdAt: string }>>([]);
+  const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7 });
+  const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
 
   useEffect(() => {
     api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime }>('/api/admin/stats').then((res) => {
@@ -67,6 +71,7 @@ export default function AdminSettings() {
     api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch(() => {});
     void loadAudit(0);
     void refreshIpBlocks();
+    void refreshInstanceBackups();
     api.get<{ shares: typeof shares }>('/api/admin/shares').then((res) => setShares(res.shares)).catch(() => {});
   }, []);
 
@@ -104,6 +109,44 @@ export default function AdminSettings() {
       toast('success', t('用户限制已更新'));
     } catch (error) {
       toast('error', t('操作失败'), (error as Error).message);
+    }
+  }
+
+  async function refreshInstanceBackups() {
+    const response = await api.get<{ backups: Array<{ id: string; filename: string; size: number; createdAt: string }>; settings: typeof instanceBackupSettings }>('/api/admin/instance-backups');
+    setInstanceBackups(response.backups);
+    setInstanceBackupSettings(response.settings);
+  }
+
+  async function saveInstanceBackupSettings() {
+    try {
+      await api.put('/api/admin/settings', { instanceBackup: instanceBackupSettings });
+      await refreshInstanceBackups();
+      toast('success', t('设置已保存'));
+    } catch (error) {
+      toast('error', t('保存失败'), (error as Error).message);
+    }
+  }
+
+  async function createInstanceBackup() {
+    setInstanceBackupBusy(true);
+    try {
+      await api.post('/api/admin/instance-backups');
+      await refreshInstanceBackups();
+      toast('success', t('整站备份已创建'));
+    } catch (error) {
+      toast('error', t('备份失败'), (error as Error).message);
+    } finally {
+      setInstanceBackupBusy(false);
+    }
+  }
+
+  async function removeInstanceBackup(id: string) {
+    try {
+      await api.delete(`/api/admin/instance-backups/${id}`);
+      await refreshInstanceBackups();
+    } catch (error) {
+      toast('error', t('删除失败'), (error as Error).message);
     }
   }
 
@@ -163,7 +206,20 @@ export default function AdminSettings() {
       <h1 className="settings-title">{t('实例管理')}</h1>
       <p className="settings-subtitle">{t('实例级的统计、用户、备份保留与审计。只有实例管理员可见。')}</p>
 
-      <section className="settings-section">
+      <div className="admin-tabs">
+        {([
+          ['overview', t('概览')],
+          ['users', t('用户管理')],
+          ['shares', t('公开链接')],
+          ['logs', t('操作日志')],
+        ] as const).map(([id, label]) => (
+          <button key={id} type="button" className={cn('admin-tab', adminTab === id && 'active')} onClick={() => setAdminTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <section className="settings-section" hidden={adminTab !== 'overview'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('运行概况')}</span>
           <span className="settings-section-desc">v{instance?.version ?? '—'}</span>
@@ -201,7 +257,7 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" hidden={adminTab !== 'overview'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('备份保留')}</span>
         </div>
@@ -217,7 +273,37 @@ export default function AdminSettings() {
         <p className="setting-note" style={{ marginTop: 6 }}>{t('自动备份保留 14 份；超过保留天数的备份会被清理。')}</p>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" hidden={adminTab !== 'overview'}>
+        <div className="settings-section-head">
+          <span className="settings-section-title">{t('整站备份')}</span>
+          <span className="settings-section-desc">{instanceBackups.length}</span>
+        </div>
+        <p className="setting-note">{t('整站备份包含数据库导出和加密附件，用于灾难恢复。下载文件为 .3nb，需要主密钥才能恢复。')}</p>
+        <div className="setting-inline-form" style={{ marginTop: 10 }}>
+          <label className="checkbox-row" style={{ margin: 0 }}>
+            <input type="checkbox" checked={instanceBackupSettings.enabled} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, enabled: event.target.checked }))} />
+            <span>{t('自动整站备份')}</span>
+          </label>
+          <div className="field field-role"><label>{t('频率（小时）')}</label><input className="input" type="number" min={1} max={720} value={instanceBackupSettings.frequencyHours} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, frequencyHours: Number(event.target.value) }))} /></div>
+          <div className="field field-role"><label>{t('保留份数')}</label><input className="input" type="number" min={1} max={365} value={instanceBackupSettings.retentionCount} onChange={(event) => setInstanceBackupSettings((value) => ({ ...value, retentionCount: Number(event.target.value) }))} /></div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void saveInstanceBackupSettings()}>{t('保存')}</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void createInstanceBackup()} disabled={instanceBackupBusy}>{instanceBackupBusy ? <span className="spinner" /> : <Database size={13} />} {t('立即备份整站')}</button>
+        </div>
+        <div className="admin-ip-list" style={{ marginTop: 10 }}>
+          {instanceBackups.length === 0 ? <div className="context-empty">{t('暂无整站备份')}</div> : instanceBackups.map((backup) => (
+            <div className="admin-ip-row" key={backup.id}>
+              <span className="mono" title={backup.filename}>{backup.filename}</span>
+              <span>{formatBytes(backup.size)} · {formatRelativeShort(backup.createdAt)}</span>
+              <span style={{ display: 'flex', gap: 4 }}>
+                <a className="icon-btn icon-btn-sm" href={`/api/admin/instance-backups/${backup.id}/download`} aria-label={t('下载')}><Download size={13} /></a>
+                <button type="button" className="icon-btn icon-btn-sm" onClick={() => void removeInstanceBackup(backup.id)} aria-label={t('删除')}><Trash2 size={13} /></button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="settings-section" hidden={adminTab !== 'users'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('用户')}</span>
           <span className="settings-section-desc">{users.length}</span>
@@ -287,7 +373,7 @@ export default function AdminSettings() {
         <p className="setting-note" style={{ marginTop: 8 }}>{t('管理员可以查看账户元数据、空间/笔记/附件数量、会话与审计日志，并可调整角色或强制退出设备。不会提供读取用户笔记正文的后门；正文只在其授权的空间内可访问。')}</p>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" hidden={adminTab !== 'shares'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('分享链接')}</span>
           <span className="settings-section-desc">{shares.length}</span>
@@ -316,7 +402,7 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" hidden={adminTab !== 'users'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('注册 IP 限制')}</span>
           <span className="settings-section-desc">{ipBlocks.length}</span>
@@ -338,7 +424,7 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" hidden={adminTab !== 'logs'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('日志')}</span>
           <span className="settings-section-desc">{t('共 {n} 条', { n: auditTotal })}</span>

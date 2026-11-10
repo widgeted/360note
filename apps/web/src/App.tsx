@@ -73,6 +73,7 @@ function HomeRoute() {
 export default function App() {
   const status = useAuthStore((state) => state.status);
   const bootstrap = useAuthStore((state) => state.bootstrap);
+  const location = useLocation();
 
   useEffect(() => {
     void bootstrap();
@@ -100,6 +101,37 @@ export default function App() {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('nh:unauthorized', onUnauthorized);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/app/note/')) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (location.pathname.startsWith('/app/settings')) {
+        document.querySelector<HTMLElement>('.settings-content')?.scrollTo({ top: 0 });
+      }
+      window.scrollTo({ top: 0 });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'hidden') return;
+      const state = useAppStore.getState();
+      if (!state.workspaceId) return;
+      void state.refreshList({ silent: true });
+      void state.refreshFolders();
+      void state.refreshTags();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 

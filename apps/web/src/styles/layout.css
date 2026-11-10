@@ -1019,8 +1019,10 @@ kbd {
   margin: 0 0 7px;
   field-sizing: content;
   min-height: 1.15em;
+  height: auto;
   resize: none;
   overflow: hidden;
+  white-space: pre-wrap;
 }
 
 .note-title-input::placeholder {

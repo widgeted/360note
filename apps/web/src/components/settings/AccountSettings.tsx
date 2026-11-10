@@ -299,7 +299,7 @@ export default function AccountSettings() {
         <div className="setting-row">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('导出我的数据')}</div>
-            <div className="setting-row-desc">{t('生成包含你自有空间的 .nhbackup 包，并把 7 天有效的下载链接发送到你的邮箱。每 24 小时最多一次。')}</div>
+            <div className="setting-row-desc">{t('生成包含你自有空间的 .3nb 包，并把 7 天有效的下载链接发送到你的邮箱。每 24 小时最多一次。')}</div>
           </div>
           <div className="setting-row-control">
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => void exportData()} disabled={exporting}>

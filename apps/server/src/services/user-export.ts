@@ -45,7 +45,7 @@ export async function createUserExport(input: {
 
   const archive = new AdmZip();
   archive.addFile('README.txt', Buffer.from(
-    '360note data export\n\nThis archive contains one .nhbackup per workspace owned by the account. Keep it private.\n',
+    '360note data export\n\nThis archive contains one .3nb per workspace owned by the account. Keep it private.\n',
     'utf8',
   ));
   const used = new Set<string>();
@@ -54,14 +54,14 @@ export async function createUserExport(input: {
     let entry = safeFilename(name);
     let index = 2;
     while (used.has(entry)) {
-      entry = safeFilename(name.replace(/\.nhbackup$/, `-${index}.nhbackup`));
+      entry = safeFilename(name.replace(/\.3nb$/, `-${index}.3nb`));
       index += 1;
     }
     used.add(entry);
     archive.addFile(entry, buffer);
   }
 
-  const filename = `user-export-${input.userId}-${Date.now()}.nhbackup`;
+  const filename = `user-export-${input.userId}-${Date.now()}.3nb`;
   await saveBackup(filename, archive.toBuffer());
   const token = randomToken(24);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

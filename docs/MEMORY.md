@@ -32,7 +32,7 @@
 - **冲突**：`version` 乐观并发 + 客户端 `node-diff3` 行级三向合并 + 冲突副本；不做 CRDT。
 - **E2EE 不提供**：不假装；附件/备份 AES-256-GCM 只是静态加密。恢复密钥只保存哈希。
 - **账户邮件**：注册/找回验证码、密码与邮箱变更通知、团队邀请；SMTP 仅用于账户与安全邮件。
-- **备份**：独立 `.nhbackup`（ZIP 加密存储）；自动/手动/pre-restore；合并/替换恢复；预览。
+- **备份**：独立 `.3nb`（ZIP 加密存储）；自动/手动/pre-restore；合并/替换恢复；预览。
 - **团队**：workspace + 角色（owner/admin/editor/viewer）+ 邀请 + 审计。
 - **AI**：默认关闭；实例管理员配置 OpenAI 兼容接口；用户主动点击；不训练；加密笔记不发送。
 - **设计**：午夜侧栏 + 暖纸内容 + Signal Blue；Inter/系统无衬线；深色模式；三栏→单屏。~~Newsreader 衬线标题~~ 已于 2026-11-08 废止，全站禁止衬线（见下方纠偏记录）。
@@ -609,3 +609,12 @@ apps/web/src/styles/tokens.css        设计 token
 - 事故：security-audit 使用 `@invalid.local` 注册临时用户，注册后的欢迎邮件/邮箱变更邮件进入生产 SMTP，向不存在的地址发送了测试邮件。
 - 修复：`mailer.ts` 新增 `isReservedMailAddress()`，在 SMTP 前拦截 `.invalid`/`.test`/`.example`/`.invalid.local`/`localhost` 等保留域名；新增 `mailer.test.ts`。
 - 红线写入 `tests/manual/README.md`、`docs/QUALITY.md`、`docs/OPERATIONS.md`：测试只使用保留域名，真实投递只允许 access@126.com 或操作者明确提供的地址。
+
+## 2026-11-10 · v0.1.26 响应式、刷新与整站备份
+
+- `note-title-input` 增加 ResizeObserver 重算高度，解决收窄窗口第二行被截断。
+- App 增加路由切换滚动复位（settings-content/window）与 focus/visibility 自动刷新列表/文件夹/标签。
+- 移动端 `.editor-toolbar` 加 `overflow-y:hidden; touch-action:pan-x` 禁止上下滑动。
+- 备份/导出扩展名改为 `.3nb`；旧 `.nhbackup` 仍兼容。
+- 新增 `instance_backups` 迁移 009、`instance-backups.ts`（pg_dump + 加密附件），admin 9 个 API；概览卡片可设置自动频率/保留数。实例管理分四栏 tabs。
+- 语音输入依赖 Web Speech API（Chrome/Edge/Safari），OCR 依赖 tesseract(chi_sim+eng)+pdftotext，本机均可用。

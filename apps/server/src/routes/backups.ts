@@ -51,7 +51,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     await audit({ workspaceId, actorId: auth.user.id, action: 'backup.download', targetType: 'backup', targetId: id, ip: clientIp(request) });
     return reply
       .header('Content-Type', 'application/zip')
-      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(record.filename.replace(/\.nhbackup$/, '.zip'))}`)
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(record.filename.replace(/\.(nhbackup|3nb)$/, '.3nb'))}`)
       .send(buffer);
   });
 
@@ -103,7 +103,7 @@ export default async function backupRoutes(app: FastifyInstance) {
       throw errors.payloadTooLarge('备份文件不能超过 600 MB');
     }
     const uploadId = crypto.randomUUID();
-    const storedPath = path.join(paths.imports, `upload-${uploadId}.nhbackup`);
+    const storedPath = path.join(paths.imports, `upload-${uploadId}.3nb`);
     await fs.mkdir(paths.imports, { recursive: true, mode: 0o700 });
     await fs.writeFile(storedPath, buffer, { mode: 0o600 });
     let preview;

@@ -10,7 +10,7 @@ Backups stored on the same server do not protect against server loss or ransomwa
 ## Decision
 
 - Admin configures endpoint, region, bucket, prefix, access key id and encrypted secret in Settings → Data & backups → Offsite.
-- Every backup (auto/manual/pre-restore) is already encrypted at rest with the 360note master key; the same encrypted `.nhbackup` bytes are uploaded via `PutObject` to `bucket/prefix/filename`.
+- Every backup (auto/manual/pre-restore) is already encrypted at rest with the 360note master key; the same encrypted `.3nb` bytes are uploaded via `PutObject` to `bucket/prefix/filename`.
 - Backup list shows `offsite: uploaded|failed`; retention/deletion also deletes the remote object.
 - Connection test uses `ListObjectsV2`.
 - No in-app remote listing/direct restore in v0.1: download the object from the provider and use “Upload backup file”.

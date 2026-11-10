@@ -30,7 +30,7 @@ Fastify API (Node.js, TypeScript)
         ├── PostgreSQL 15 (metadata, content, search, audit)
         └── Filesystem /var/lib/360note
               ├─ attachments/ (encrypted)
-              ├─ backups/ (encrypted .nhbackup)
+              ├─ backups/ (encrypted .3nb)
               ├─ imports/ (transient staging)
               └─ tmp/
 ```
@@ -46,7 +46,7 @@ Fastify API (Node.js, TypeScript)
 | 冲突 | version + 行级 diff3 + 历史冲突快照 | 不静默覆盖；冲突不进入笔记列表；无需全量 CRDT |
 | 附件 | 服务器 AES-256-GCM | 静止加密；分享/导出可控制 |
 | E2EE | v1 不提供 | 搜索/分享/AI/恢复需要服务端读正文；不假装提供 |
-| 备份 | 独立 `.nhbackup` + 恢复前备份 | 与同步解耦；可下载/上传/预览/恢复 |
+| 备份 | 独立 `.3nb` + 恢复前备份 | 与同步解耦；可下载/上传/预览/恢复 |
 | 邮件 | 无 | 产品约束；邀请链接 + 应用内通知 + 恢复密钥 |
 
 ### 1.2 目录结构
@@ -311,7 +311,7 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 
 ### 8.1 格式
 
-`.nhbackup` = ZIP：
+`.3nb` = ZIP：
 
 ```
 manifest.json        # format, version, createdAt, workspace, counts
@@ -342,9 +342,9 @@ attachments/<attachmentId>/<filename>
 ### 8.4 异地存储（S3 兼容）
 
 - 实例管理员可在 设置 → 数据与备份 → 异地备份 配置 S3 兼容存储（AWS S3 / MinIO / R2 / Backblaze 等）。
-- 每次创建备份（自动/手动/恢复前）在加密落盘后，把同一个已加密 `.nhbackup` 上传到配置的 bucket/prefix；备份列表显示“异地已上传/失败”。
+- 每次创建备份（自动/手动/恢复前）在加密落盘后，把同一个已加密 `.3nb` 上传到配置的 bucket/prefix；备份列表显示“异地已上传/失败”。
 - 删除/保留策略会同时删除远端对象；连接测试使用 ListObjectsV2。
-- 异地备份仅负责复制；恢复时从 S3 下载 `.nhbackup`，再用“上传备份文件”恢复。
+- 异地备份仅负责复制；恢复时从 S3 下载 `.3nb`，再用“上传备份文件”恢复。
 - 凭证（secretAccessKey）AES-GCM 加密存 `instance_settings`；界面不回显。建议私有 bucket + 最小权限。
 
 ### 8.5 已知限制

@@ -153,6 +153,23 @@ export function EditorPane({
   titleValueRef.current = title;
 
   useEffect(() => {
+    const element = titleRef.current;
+    if (!element) return;
+    const resize = () => {
+      element.style.height = 'auto';
+      element.style.height = `${element.scrollHeight}px`;
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    window.addEventListener('resize', resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', resize);
+    };
+  }, [title]);
+
+  useEffect(() => {
     if (!note) return;
     const fresh = useAppStore.getState().freshNoteId === note.id;
     setTitle(fresh ? '' : note.title);

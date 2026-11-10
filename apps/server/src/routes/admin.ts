@@ -11,6 +11,7 @@ import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite }
 import { getNoteForUser } from '../services/notes.js';
 import { readBackup } from '../lib/storage.js';
 import { decryptString, sha256 } from '../lib/crypto.js';
+import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, saveInstanceBackupSettings } from '../services/instance-backups.js';
 
 export default async function adminRoutes(app: FastifyInstance) {
   async function requireAdmin(userId: string): Promise<void> {
@@ -229,7 +230,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const data = await readBackup(row.filename);
     return reply
       .header('Content-Type', 'application/zip')
-      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.filename.replace(/\.nhbackup$/, '.zip'))}`)
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.filename.replace(/\.(nhbackup|3nb)$/, '.3nb'))}`)
       .header('Cache-Control', 'no-store')
       .send(data);
   });
@@ -273,6 +274,53 @@ export default async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.get('/api/admin/instance-backups', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const rows = await listInstanceBackups();
+    return {
+      backups: rows.map((row) => ({
+        id: row.id,
+        filename: row.filename,
+        size: Number(row.size_bytes),
+        status: row.status,
+        createdAt: row.created_at.toISOString(),
+      })),
+      settings: await getInstanceBackupSettings(),
+    };
+  });
+
+  app.post('/api/admin/instance-backups', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const backup = await createInstanceBackup(auth.user.id);
+    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create', targetType: 'instance_backup', targetId: backup.id, meta: { size: backup.size }, ip: clientIp(request) });
+    return { backup };
+  });
+
+  app.get('/api/admin/instance-backups/:id/download', async (request, reply) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const row = await one<{ filename: string }>('SELECT filename FROM instance_backups WHERE id = $1', [id]);
+    if (!row) throw errors.notFound('实例备份不存在');
+    const data = await downloadInstanceBackup(row.filename);
+    return reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`)
+      .header('Cache-Control', 'no-store')
+      .send(data);
+  });
+
+  app.delete('/api/admin/instance-backups/:id', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await deleteInstanceBackup(id);
+    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.delete', targetType: 'instance_backup', targetId: id, ip: clientIp(request) });
+    return { ok: true };
+  });
+
   app.get('/api/admin/settings', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
@@ -291,6 +339,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         offsite: backup?.offsite ?? { enabled: false },
       },
       registration: { mode: config.registrationMode },
+      instanceBackup: await getInstanceBackupSettings(),
       environment: {
         publicOrigin: config.publicOrigin,
         version: config.version,
@@ -319,6 +368,13 @@ export default async function adminRoutes(app: FastifyInstance) {
             offsite: z.record(z.string(), z.unknown()).optional(),
           })
           .optional(),
+        instanceBackup: z
+          .object({
+            enabled: z.boolean().optional(),
+            frequencyHours: z.number().int().min(1).max(720).optional(),
+            retentionCount: z.number().int().min(1).max(365).optional(),
+          })
+          .optional(),
       }),
       request.body,
     );
@@ -336,6 +392,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         ...(body.backup.offsite ? { offsite: body.backup.offsite } : {}),
       });
     }
+    if (body.instanceBackup) await saveInstanceBackupSettings(body.instanceBackup);
     await audit({ actorId: auth.user.id, action: 'admin.settings.update', meta: { ai: Boolean(body.ai), backup: Boolean(body.backup) }, ip: clientIp(request) });
     return { ok: true };
   });

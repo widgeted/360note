@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Resource-limit regression tests for attacker-controlled .nhbackup archives.
+ * Resource-limit regression tests for attacker-controlled .3nb archives.
  * Run from /opt/360note after `npm run build -w @360note/server`.
  */
 import assert from 'node:assert/strict';

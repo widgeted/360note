@@ -149,7 +149,7 @@ async function main() {
   console.log('PASS  backup created, previewed, downloaded and note removed');
 
   const form = new FormData();
-  form.append('file', new Blob([archive], { type: 'application/zip' }), 'drill.nhbackup');
+  form.append('file', new Blob([archive], { type: 'application/zip' }), 'drill.3nb');
   const uploadResponse = await fetch(`${base}/api/workspaces/${workspace.id}/backups/upload`, {
     method: 'POST',
     headers: { cookie, 'x-360note-csrf': '1' },

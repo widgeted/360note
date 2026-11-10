@@ -9,7 +9,7 @@ Sync propagates deletions and ransomware; backups must not. Reference projects o
 
 ## Decision
 
-- `.nhbackup` ZIP: manifest + workspace.json + attachments, encrypted at rest with AES-256-GCM.
+- `.3nb` ZIP: manifest + workspace.json + attachments, encrypted at rest with AES-256-GCM.
 - Automatic daily per-workspace backups, retention 14 auto copies / 30 days (configurable); manual and pre-restore backups.
 - Download, upload, list, delete; restore preview; merge (new copy folder) and replace (with automatic pre-restore backup).
 - Separate full exports in open formats (Markdown + attachments/HTML/JSON).

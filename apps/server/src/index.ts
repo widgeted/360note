@@ -28,6 +28,7 @@ import accountRoutes from './routes/account.js';
 import { resumePendingOcr } from './lib/ocr.js';
 import { recoverInterruptedJobs } from './lib/jobs.js';
 import { cleanupImportUploads, runAutoBackups } from './services/backups.js';
+import { runInstanceAutoBackup } from './services/instance-backups.js';
 
 async function buildServer() {
   const app = Fastify({
@@ -200,6 +201,7 @@ async function start() {
     setTimeout(async () => {
       try {
         await runAutoBackups();
+        await runInstanceAutoBackup();
       } catch (error) {
         app.log.error({ error }, 'auto backup run failed');
       } finally {

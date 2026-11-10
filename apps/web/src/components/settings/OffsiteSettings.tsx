@@ -76,7 +76,7 @@ export function OffsiteSettings() {
       </div>
       <div className="banner banner-info" style={{ marginBottom: 12 }}>
         <ShieldCheck size={15} />
-        <div>{t('开启后，每次备份都会把已加密的 .nhbackup 复制到你的 S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）。备份使用 360note 主密钥加密，S3 提供方无法读取内容。')}</div>
+        <div>{t('开启后，每次备份都会把已加密的 .3nb 复制到你的 S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）。备份使用 360note 主密钥加密，S3 提供方无法读取内容。')}</div>
       </div>
       <div className="setting-card">
         <div className="setting-row" style={{ paddingTop: 0 }}>
@@ -133,7 +133,7 @@ export function OffsiteSettings() {
         </div>
         {config.lastError && <div className="form-error" style={{ marginTop: 10 }}>{config.lastError}</div>}
         <p className="setting-note" style={{ marginTop: 10 }}>
-          {t('异地备份只负责复制，不在应用内从远端恢复。需要恢复时，从 S3 下载 .nhbackup，再使用上方的“上传备份文件”。')}
+          {t('异地备份只负责复制，不在应用内从远端恢复。需要恢复时，从 S3 下载 .3nb，再使用上方的“上传备份文件”。')}
         </p>
       </div>
     </section>

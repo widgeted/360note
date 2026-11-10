@@ -121,7 +121,7 @@ interface BackupPreview {
 
 function backupFilename(workspaceName: string, kind: string): string {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
-  return `${kind}-${safeFilename(workspaceName).slice(0, 40)}-${stamp}.nhbackup`;
+  return `${kind}-${safeFilename(workspaceName).slice(0, 40)}-${stamp}.3nb`;
 }
 
 export async function createBackupDocument(workspaceId: string): Promise<{ buffer: Buffer; document: BackupDocument; name: string }> {

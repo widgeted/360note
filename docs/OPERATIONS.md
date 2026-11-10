@@ -267,10 +267,10 @@ curl -fsS https://360note.com/health
 
 - 应用内调度：每天约 03:15，最多每 6 小时检查一次；每工作区。
 - 保留：14 份自动 + 30 天（`BACKUP_RETENTION_DAYS`）。
-- 备份文件：`/var/lib/360note/backups/*.nhbackup`，AES-256-GCM 加密。
+- 备份文件：`/var/lib/360note/backups/*.3nb`，AES-256-GCM 加密。
 - 备份包含：notes/folders/tags/versions/comments/attachments。不含分享链接/API token/密码。
 - **默认在同一服务器**：管理员可在 设置→数据与备份→异地备份 配置 S3 兼容存储；仍建议定期下载。
-- 异地备份上传的是同一个已加密 `.nhbackup`；S3 侧无法读取内容。
+- 异地备份上传的是同一个已加密 `.3nb`；S3 侧无法读取内容。
 
 ### 5.2 手动备份 + 下载
 
@@ -315,7 +315,7 @@ curl -fsS -b admin.jar -F "file=@360note-backup.zip" \
 
 ### 5.4 数据库级备份（运维，非用户备份）
 
-用户级 `.nhbackup` 不包含用户/设置。若需要实例级灾难恢复：
+用户级 `.3nb` 不包含用户/设置。若需要实例级灾难恢复：
 
 ```bash
 sudo -u postgres pg_dump -Fc 360note > /secure/offsite/360note-$(date +%F).dump

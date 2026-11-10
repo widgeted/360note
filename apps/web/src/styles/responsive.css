@@ -168,6 +168,9 @@
     min-height: var(--toolbar-height);
     flex-wrap: nowrap;
     overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x pinch-zoom;
+    overscroll-behavior: contain;
     padding: 5px 8px;
   }
 
@@ -458,6 +461,8 @@
     border-bottom: 1px solid var(--line-soft);
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pinch-zoom;
+    overscroll-behavior: contain;
   }
 
   .settings-nav::-webkit-scrollbar {
