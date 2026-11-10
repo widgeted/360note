@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Cloud, CloudUpload, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { Activity, Ban, Cloud, CloudUpload, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, UserCheck, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -504,7 +504,7 @@ export default function AdminSettings() {
                             {member.sharingDisabled ? t('允许分享') : t('禁止分享')}
                           </MenuItem>
                           <MenuItem
-                            icon={<Ban size={14} />}
+                            icon={member.disabledAt ? <UserCheck size={14} /> : <Ban size={14} />}
                             danger={!member.disabledAt}
                             disabled={member.id === currentUser?.id}
                             onClick={() => { close(); void setRestriction(member, { disabled: !member.disabledAt }); }}

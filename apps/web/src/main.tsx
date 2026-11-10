@@ -14,6 +14,15 @@ import App from './App';
 import { initializeTheme } from './lib/theme';
 import { getLocale } from './lib/i18n';
 
+// Capture Chromium's install event before React mounts so a late event is not
+// lost. The prompt component only uses it after the user has spent some time
+// in the app and only once.
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  (window as unknown as { __nhInstallPrompt?: Event }).__nhInstallPrompt = event;
+  window.dispatchEvent(new Event('nh:install-available'));
+});
+
 initializeTheme();
 
 const chinese = getLocale() === 'zh-CN';

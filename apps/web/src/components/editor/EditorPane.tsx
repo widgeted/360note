@@ -777,7 +777,7 @@ export function EditorPane({
                 <div className="menu-separator" />
                 <MenuItem icon={<Share2 size={14} />} onClick={() => { close(); setShowShare(true); }}>{t('分享笔记')}</MenuItem>
                 <MenuItem icon={<Link2 size={14} />} onClick={() => { close(); setShowWiki(true); }}>{t('双向链接')}</MenuItem>
-                <MenuItem icon={<span className="mono" style={{ fontSize: 13 }}>M↓</span>} onClick={() => { close(); void toggleMode(); }}>{mode === 'rich' ? t('Markdown 模式') : t('富文本模式')}</MenuItem>
+                <MenuItem icon={<span className="mono" style={{ fontSize: 13 }}>{mode === 'rich' ? 'M↓' : 'Aa'}</span>} onClick={() => { close(); void toggleMode(); }}>{mode === 'rich' ? t('Markdown 模式') : t('富文本模式')}</MenuItem>
                 <div className="menu-separator" />
                 <MenuItem danger icon={<Trash2 size={14} />} onClick={() => { close(); setDeleteOpen(true); }}>{t('删除')}</MenuItem>
               </>

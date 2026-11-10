@@ -793,11 +793,9 @@ kbd {
   right: 8px;
   bottom: 7px;
   display: flex;
-  gap: 1px;
+  gap: 4px;
   opacity: 0;
   transition: opacity var(--dur);
-  background: linear-gradient(90deg, transparent, var(--surface) 18%);
-  padding-left: 18px;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -832,13 +830,16 @@ kbd {
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: 5px;
+  border-radius: 6px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-raised);
   color: var(--text-tertiary);
-  transition: background var(--dur), color var(--dur);
+  transition: background var(--dur), border-color var(--dur), color var(--dur);
 }
 
 .quick-icon-btn:hover {
   background: var(--surface-hover);
+  border-color: var(--line-strong);
   color: var(--text);
 }
 
@@ -2115,5 +2116,25 @@ kbd {
     border: 0;
     box-shadow: none;
     background: var(--surface);
+  }
+}
+
+
+@media (hover: none), (pointer: coarse) {
+  .note-item-quick-actions {
+    right: 10px;
+    bottom: 9px;
+    gap: 5px;
+    opacity: 0.9;
+  }
+
+  .note-item-quick-actions .quick-icon-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+
+  .note-item-meta {
+    padding-right: 62px;
   }
 }

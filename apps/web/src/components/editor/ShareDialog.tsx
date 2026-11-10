@@ -9,6 +9,7 @@ import {
   Eye,
   Info,
   Link2,
+  Link2Off,
   LockKeyhole,
   MessageCircle,
   Plus,
@@ -243,7 +244,7 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
                               title={t('撤销')}
                               aria-label={revokeId === share.id ? t('再次点击确认') : t('撤销')}
                             >
-                              <Trash2 size={13} /> {revokeId === share.id ? t('再次点击确认') : ''}
+                              {revokeId === share.id ? <Trash2 size={13} /> : <Link2Off size={13} />} {revokeId === share.id ? t('再次点击确认') : ''}
                             </button>
                           </>
                         ) : (

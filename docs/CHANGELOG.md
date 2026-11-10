@@ -3,6 +3,24 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.34] — 2026-11-10
+
+移动端安装引导、图标语义修正与快捷操作样式。
+
+### Added
+
+- iPhone Safari 与 Android Chromium 等主流移动浏览器增加一次性“添加到主屏幕”引导。
+- 已是桌面 App/standalone 模式、桌面设备或微信等内嵌浏览器时不提示。
+- 每个浏览器只提示一次；关闭或拒绝后不再出现。
+- 补充 iOS 152/167/180 专用主屏幕图标、Web App 元信息与更完整的 PWA manifest。
+
+### Changed
+
+- 编辑器“Markdown 模式/富文本模式”菜单图标随目标模式切换为 `M↓` / `Aa`。
+- 管理员“启用账号”改用用户勾选图标，不再使用禁止图标。
+- 文件夹和标签“重命名”统一使用铅笔图标；分享“撤销”改用断链图标。
+- 移动端笔记列表的收藏/置顶改为两个独立按钮，各自有边框和背景，不再使用渐变遮罩，并给元信息预留右侧空间。
+
 ## [0.1.33] — 2026-11-10
 
 分享列表信息压缩。

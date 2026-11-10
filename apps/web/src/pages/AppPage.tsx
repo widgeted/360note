@@ -8,6 +8,7 @@ import { Sidebar } from '../components/Sidebar';
 import { NoteListPane } from '../components/NoteListPane';
 import { ContextPanel } from '../components/ContextPanel';
 import { CommandPalette } from '../components/CommandPalette';
+import { PwaInstallPrompt } from '../components/PwaInstallPrompt';
 import { EditorPane, EmptyEditorState } from '../components/editor/EditorPane';
 import SettingsPage from './SettingsPage';
 import { Modal } from '../components/Modal';
@@ -287,6 +288,7 @@ export default function AppPage() {
       )}
 
       <CommandPalette />
+      <PwaInstallPrompt />
       <Modal
         open={showTemplates}
         onClose={() => setShowTemplates(false)}

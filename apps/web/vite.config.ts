@@ -8,15 +8,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon.png', 'favicon.ico', 'icons/apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'favicon.png', 'favicon.ico', 'icons/apple-touch-icon.png', 'icons/apple-touch-icon-152.png', 'icons/apple-touch-icon-167.png'],
       manifest: {
         name: '360note · 360笔记',
         short_name: '360note',
         description: '360note / 360笔记 — a calm, local-first notebook for ideas and knowledge.',
         theme_color: '#17865b',
         background_color: '#f6f4ef',
+        id: '/',
+        lang: 'zh-CN',
+        dir: 'ltr',
         display: 'standalone',
-        start_url: '/',
+        display_override: ['standalone', 'minimal-ui'],
+        prefer_related_applications: false,
+        start_url: '/app',
         scope: '/',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

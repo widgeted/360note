@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Plus,
   Settings,
   Star,
@@ -318,7 +319,7 @@ export function Sidebar() {
                       {t('新建子文件夹')}
                     </MenuItem>
                     <MenuItem
-                      icon={<FolderClosed size={14} />}
+                      icon={<Pencil size={14} />}
                       onClick={() => {
                         close();
                         setEditingTag(null);
@@ -584,7 +585,7 @@ export function Sidebar() {
                         {(close) => (
                           <>
                             <MenuItem
-                              icon={<Hash size={14} />}
+                              icon={<Pencil size={14} />}
                               onClick={() => {
                                 close();
                                 setEditingFolder(null);

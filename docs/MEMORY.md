@@ -676,3 +676,10 @@ apps/web/src/styles/tokens.css        设计 token
 
 - “已有分享”meta 合并为单行 flex-wrap：权限 badge、密码/撤销、创建时间、过期时间、浏览次数。
 - 只读权限改用 BookOpen 图标；浏览次数保留 Eye，避免图标语义冲突。
+
+## 2026-11-10 · v0.1.34 安装引导与图标
+
+- PWA 引导只在移动端 `/app`、非 standalone、非内嵌浏览器出现；localStorage `nh-pwa-install-v1` 一次后永久不再提示。
+- iOS Safari 用分享说明；Android Chromium 用 beforeinstallprompt；未捕获事件的其他浏览器不打扰。
+- 图标审计：模式切换 M↓/Aa、启用账号 UserCheck、重命名 Pencil、撤销 Link2Off。
+- 移动端收藏/置顶为独立 26px 按钮，无渐变遮罩；meta 预留 62px。
