@@ -213,6 +213,7 @@ const en: Record<string, string> = {
   '退出其他设备': 'Sign out other devices',
   '当前设备': 'Current device',
   '修改密码': 'Change password',
+  '附件数据量': 'Attachment data',
   '清理失败': 'Cleanup failed',
   '已清理 {n} 个本机附件副本。': 'Cleaned {n} local attachment copies.',
   '已清理 {n} 个；{m} 个因远端校验未通过而保留。': 'Cleaned {n}; kept {m} because remote verification did not match.',

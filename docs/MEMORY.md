@@ -646,3 +646,10 @@ apps/web/src/styles/tokens.css        设计 token
 - 移动端 `.note-item + .note-item::before` 提供 1px 分割线。
 - 分享页正文后新增 `.public-article-divider`（26px），附件在分割线后且无独立 border，footer 不再重复画线。
 - 管理员公开链接改 flex 整行显示，避免固定 grid 窄列把 URL 压成 4px。
+
+## 2026-11-10 · v0.1.30 按钮统一
+
+- 所有非 ghost 的 `.btn` 变体都有 1px 边框；危险按钮增加阴影，深色主题使用深色文字。
+- `.btn-danger-ghost` 也有淡红边框，不再是完全无边框的红色文字。
+- 对象存储身份校验包含 region；改 region 需先停用并取回附件。
+- 整站备份在本地附件清理后仍能包含远端附件（生产 36 个附件条目验证）。

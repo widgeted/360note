@@ -274,7 +274,7 @@ export default function AdminSettings() {
           {[
             { icon: <Users size={15} />, value: stats?.users ?? 0, label: t('用户') },
             { icon: <Database size={15} />, value: stats?.notes ?? 0, label: t('笔记') },
-            { icon: <HardDrive size={15} />, value: stats ? formatBytes(stats.storageBytes) : '—', label: t('附件存储') },
+            { icon: <HardDrive size={15} />, value: stats ? formatBytes(stats.storageBytes) : '—', label: t('附件数据量') },
             { icon: <Activity size={15} />, value: stats?.activeShares ?? 0, label: t('有效分享') },
             { icon: <Server size={15} />, value: stats?.workspaces ?? 0, label: t('空间') },
             { icon: <ShieldCheck size={15} />, value: stats?.attachments ?? 0, label: t('附件') },

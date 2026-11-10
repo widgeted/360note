@@ -461,6 +461,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const hasRemoteAttachments = Number(stored?.count ?? 0) > 0 || current.attachmentsEnabled;
     const identityChanged =
       body.endpoint !== current.endpoint ||
+      body.region !== current.region ||
       body.bucket !== current.bucket ||
       body.prefix !== current.prefix ||
       body.accessKeyId !== current.accessKeyId ||

@@ -118,6 +118,7 @@ a.btn {
 
 .btn-primary {
   background: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 82%, #000);
   color: #fff;
   box-shadow: 0 1px 2px rgba(9, 14, 28, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
@@ -133,6 +134,12 @@ a.btn {
 
 [data-theme='dark'] .btn-primary {
   color: #04130c;
+}
+
+[data-theme='dark'] .btn-danger {
+  border-color: color-mix(in srgb, var(--red) 72%, #000);
+  color: #2b0b10;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .btn-secondary {
@@ -160,6 +167,7 @@ a.btn {
 
 .btn-soft {
   background: var(--blue-soft);
+  border-color: color-mix(in srgb, var(--blue) 18%, transparent);
   color: var(--blue);
 }
 
@@ -170,7 +178,9 @@ a.btn {
 
 .btn-danger {
   background: var(--red);
+  border-color: color-mix(in srgb, var(--red) 78%, #000);
   color: #fff;
+  box-shadow: 0 1px 2px rgba(9, 14, 28, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -178,13 +188,20 @@ a.btn {
   color: #fff;
 }
 
+[data-theme='dark'] .btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red) 88%, #000);
+  color: #2b0b10;
+}
+
 .btn-danger-ghost {
   background: transparent;
+  border-color: color-mix(in srgb, var(--red) 28%, transparent);
   color: var(--red);
 }
 
 .btn-danger-ghost:hover:not(:disabled) {
   background: var(--red-soft);
+  border-color: color-mix(in srgb, var(--red) 42%, transparent);
 }
 
 .btn-sm {
