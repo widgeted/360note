@@ -704,6 +704,12 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-11 · v0.1.52 分隔线与表格密度
+
+- `.setting-row-heading` 统一标题行：`padding-top: 0` 时必须有 14px 下间距，避免 border-bottom 贴住字段标签。
+- 子区块标题使用 `.setting-row-heading-spaced`；管理表格 td 统一 6px 垂直内边距（约 43px 行高）。
+- 媒体加速标题显示“已启用/待启用存储/未配置域名”，并说明未配置媒体域名时哪些能力不生效。
+
 ## 2026-11-11 · v0.1.51 HEIC/PDF/视频封面
 
 - 上传允许 HEIC/HEIF/TIFF/BMP/RAW/PDF/SVG/视频；CoreIX 生成 WebP 缩略图，原文件仍加密。

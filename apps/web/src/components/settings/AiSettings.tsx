@@ -107,7 +107,7 @@ export default function AiSettings() {
             <span className="settings-section-desc">{t('仅实例管理员可见')}</span>
           </div>
           <div className="setting-card">
-            <div className="setting-row" style={{ paddingTop: 0 }}>
+            <div className="setting-row setting-row-heading">
               <div className="setting-row-main">
                 <div className="setting-row-title">{t('启用 AI 摘要')}</div>
                 <div className="setting-row-desc">{t('开启后，用户仍然需要在单篇笔记中主动点击。')}</div>

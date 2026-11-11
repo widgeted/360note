@@ -377,6 +377,8 @@ export function OffsiteSettings() {
   const migration = usage?.migration;
   const busy = migrating || Boolean(migration?.running);
   const hasRemoteRows = (usage?.remote?.attachmentsCount ?? 0) > 0;
+  const mediaConfigured = Boolean(attachmentConfig?.mediaBaseUrl.trim());
+  const mediaReady = Boolean(attachmentConfig?.enabled && mediaConfigured);
   const mixed = !usage?.attachmentsEnabled && hasRemoteRows;
   const phaseLabel =
     migration?.phase === 'enabling'
@@ -399,7 +401,7 @@ export function OffsiteSettings() {
         <div>{t('S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）用于异地备份副本。工作区/整站备份在离开本机前已使用 360note 主密钥加密，S3 提供方无法读取。附件存储请使用下方独立设置。')}</div>
       </div>
       <div className="setting-card">
-        <div className="setting-row" style={{ paddingTop: 0 }}>
+        <div className="setting-row setting-row-heading">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('启用备份副本')}</div>
             <div className="setting-row-desc">{t('每次工作区/整站备份都会复制到对象存储。建议使用私有 bucket，并给最小权限的访问密钥。')}</div>
@@ -465,7 +467,7 @@ export function OffsiteSettings() {
       </div>
 
       <div className="setting-card" style={{ marginTop: 12 }}>
-        <div className="setting-row" style={{ paddingTop: 0 }}>
+        <div className="setting-row setting-row-heading">
           <div className="setting-row-main">
             <div className="setting-row-title">
               <HardDrive size={13} style={{ display: 'inline', marginRight: 5 }} />
@@ -547,10 +549,27 @@ export function OffsiteSettings() {
         {attachmentConfig.lastError && <div className="form-error" style={{ marginTop: 10 }}>{attachmentConfig.lastError}</div>}
         {attachmentConfig.legacy && <p className="setting-note" style={{ marginTop: 8 }}>{t('当前沿用备份对象存储的旧配置。建议保存一份独立的附件存储配置。')}</p>}
 
-        <div className="setting-row" style={{ marginTop: 18, paddingTop: 0 }}>
+        <div className="setting-row setting-row-heading setting-row-heading-spaced">
           <div className="setting-row-main">
             <div className="setting-row-title"><Sparkles size={13} style={{ display: 'inline', marginRight: 5 }} />{t('图片加速与自动标签')}</div>
-            <div className="setting-row-desc">{t('仅对可分享的笔记图片生效（含公开和密码保护分享）。媒体副本不包含加密，请为媒体域名配置 CDN 鉴权或私有访问；未分享的笔记图片不会上传。')}</div>
+            <div className="setting-row-desc">
+              {t('仅对可分享的笔记图片生效（含公开和密码保护分享）。媒体副本不包含加密，请为媒体域名配置 CDN 鉴权或私有访问；未分享的笔记图片不会上传。')}
+              {!mediaReady && (
+                <>
+                  <br />
+                  <strong style={{ color: 'var(--amber)' }}>
+                    {mediaConfigured
+                      ? t('媒体域名已填写，但附件对象存储尚未启用；启用后图片加速、图片标签、功能性图片识别和 HEIC/PDF/视频封面才会生效。')
+                      : t('尚未配置媒体访问域名：分享图片优化、图片标签、功能性图片识别和 HEIC/PDF/视频封面不会生效；附件上传下载与本地 OCR 不受影响。')}
+                  </strong>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="setting-row-control">
+            <span className={`badge ${mediaReady ? 'badge-green' : 'badge-amber'}`}>
+              {mediaReady ? t('已启用') : mediaConfigured ? t('待启用存储') : t('未配置域名')}
+            </span>
           </div>
         </div>
         <div className="offsite-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -694,7 +713,7 @@ export function OffsiteSettings() {
       </div>
 
       <div className="setting-card" style={{ marginTop: 12 }}>
-        <div className="setting-row" style={{ paddingTop: 0 }}>
+        <div className="setting-row setting-row-heading">
           <div className="setting-row-main">
             <div className="setting-row-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('对象存储文件')}</div>
             <div className="setting-row-desc">{t('浏览、校验和恢复备份对象存储中的文件。恢复工作区备份会以副本形式合并，不覆盖现有内容。')}</div>
@@ -709,7 +728,7 @@ export function OffsiteSettings() {
             </button>
           </div>
         </div>
-        <div className="setting-card" style={{ padding: 0, overflowX: 'auto', marginTop: 8 }}>
+        <div className="setting-card" style={{ padding: 0, overflowX: 'auto' }}>
           <table className="data-table admin-object-table">
             <thead><tr><th>{t('对象')}</th><th>{t('类型')}</th><th>{t('大小')}</th><th>{t('更新时间')}</th><th>{t('操作')}</th></tr></thead>
             <tbody>

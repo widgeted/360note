@@ -1728,6 +1728,10 @@ const en: Record<string, string> = {
   "备份副本会复制到对象存储；工作区备份可在“对象存储文件”中校验并恢复为副本。整站备份请按运维手册恢复。": "Backup copies are replicated to object storage; workspace backups can be verified and restored as a copy from “Object storage files”. Restore instance backups with the operations runbook.",
   "更新附件对象存储": "Update attachment object storage",
   "测试附件对象存储": "Test attachment object storage",
+  "待启用存储": "Storage not enabled",
+  "未配置域名": "Domain not set",
+  "媒体域名已填写，但附件对象存储尚未启用；启用后图片加速、图片标签、功能性图片识别和 HEIC/PDF/视频封面才会生效。": "A media domain is set, but attachment object storage is not enabled yet. Image acceleration, image tags, functional-image detection and HEIC/PDF/video covers start working after storage is enabled.",
+  "尚未配置媒体访问域名：分享图片优化、图片标签、功能性图片识别和 HEIC/PDF/视频封面不会生效；附件上传下载与本地 OCR 不受影响。": "No media domain is configured: share image optimization, image tags, functional-image detection and HEIC/PDF/video covers will not run. Attachment upload/download and local OCR still work.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

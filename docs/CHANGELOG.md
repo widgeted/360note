@@ -3,7 +3,23 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.52] — 2026-11-11
+
+设置页分隔线与管理表格密度修复。
+
+### Fixed
+
+- 修复“图片加速与自动标签”分隔线紧贴“媒体访问域名”字段的问题：标题行改用统一的 `.setting-row-heading`，与下方表单保持 14px 间距。
+- AI 实例设置、备份连接、附件连接、对象存储文件等同类标题行统一使用同一规则，避免分隔线贴住字段标签或输入框。
+- 管理表格统一为 6px 垂直内边距，用户、分享、评论等表格行高与对象表一致，减少不必要的空白高度。
+- 图片加速标题增加状态 badge 和未配置说明：明确哪些能力需要媒体访问域名，未配置时不会误以为已启用。
+
+### Docs
+
+- `docs/DESIGN_SYSTEM.md` §6.1 增加“分隔线不得贴住下一行文字或控件”的规则和标题行类用法。
+
 ## [0.1.51] — 2026-11-11
+
 
 CoreIX 输入兼容与封面。
 

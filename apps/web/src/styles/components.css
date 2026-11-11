@@ -1119,6 +1119,19 @@ a.btn {
   border-bottom: 0;
 }
 
+.setting-row-heading {
+  padding-top: 0;
+  margin-bottom: 14px;
+}
+
+.setting-row-heading:last-child {
+  margin-bottom: 0;
+}
+
+.setting-row-heading-spaced {
+  margin-top: 20px;
+}
+
 .setting-row-main {
   flex: 1;
   min-width: 0;
@@ -1431,7 +1444,7 @@ a.btn {
 }
 
 .data-table td {
-  padding: 10px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--line-soft);
   color: var(--text-secondary);
   vertical-align: middle;
