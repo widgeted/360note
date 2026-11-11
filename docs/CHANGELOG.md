@@ -3,7 +3,18 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.56] — 2026-11-11
+
+图片组紧凑度修复。
+
+### Fixed
+
+- 图片组不再强制 4:3 画布和 `object-fit: contain`；竖构图按原始比例填满列宽，不再左右留白。
+- 移除图片组背景填充，列间距收紧到 6px（打印 2mm）。
+- 单张图片仍保留 60vh / 150mm 上限，避免独占整屏或整页。
+
 ## [0.1.55] — 2026-11-11
+
 
 多图排版与打印修复。
 

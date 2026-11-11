@@ -95,11 +95,11 @@ export function exportHtmlDocument(input: {
   .prose-figure { margin: 1.5em 0; }
   .prose-figure img { margin: 0; }
   .prose-figure figcaption { margin-top: 7px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-  .image-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:1.4em 0; align-items:start; }
+  .image-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin:1.4em 0; align-items:start; }
   .image-grid[data-columns="3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .image-grid[data-columns="4"] { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .image-grid > img, .image-grid > figure, .image-grid > p { margin:0; min-width:0; }
-  .image-grid img { width:100%; height:auto; aspect-ratio:4/3; object-fit:contain; background:#f1f1ee; border-radius:7px; margin:0; }
+  .image-grid img { width:100%; height:auto; max-height:none; border-radius:7px; margin:0; }
   .image-grid .prose-figure { width:100%; margin:0; }
   .image-grid figcaption { margin-top:5px; font-size:12px; text-align:center; }
   hr { border:0; border-top:1px solid var(--line); margin: 3em 0; }
@@ -128,9 +128,9 @@ export function exportHtmlDocument(input: {
     .attachments h2, .attachments ul { font-size: 9.5pt; }
     .prose-figure figcaption { font-size: 9pt; color: #666; }
     img { max-height: 150mm; }
-    .image-grid { gap:4mm; margin:4mm 0; break-inside:auto; }
+    .image-grid { gap:2mm; margin:3mm 0; break-inside:auto; }
     .image-grid > img, .image-grid > figure, .image-grid > p { break-inside:avoid; page-break-inside:avoid; }
-    .image-grid img { width:100%; max-height:none; background:#f4f4f2; }
+    .image-grid img { width:100%; max-height:none; }
     footer { margin-top: 28pt; padding-top: 10pt; font-size: 9pt; }
     a { color: inherit; }
     .nh-wikilink { border:0; }

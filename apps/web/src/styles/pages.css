@@ -1000,12 +1000,13 @@
   color: var(--text-tertiary);
 }
 
-/* Image grids: a group of images shares the row height, so a portrait image
-   can never occupy a whole screen or a whole printed page on its own. */
+/* Image grids: each image fills its column at its natural aspect ratio.
+   No forced canvas and no letterboxing, so portrait images stay large and
+   compact instead of leaving empty space on both sides. */
 .image-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   margin: 1.4em 0;
   align-items: start;
 }
@@ -1029,10 +1030,7 @@
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 3;
   max-height: none;
-  object-fit: contain;
-  background: var(--surface-sunken);
   border-radius: 7px;
   box-shadow: none;
 }
@@ -1060,8 +1058,8 @@
 
 @media print {
   .image-grid {
-    gap: 4mm;
-    margin: 4mm 0;
+    gap: 2mm;
+    margin: 3mm 0;
     break-inside: auto;
     page-break-inside: auto;
   }
@@ -1084,6 +1082,5 @@
     width: 100% !important;
     max-height: none !important;
     height: auto !important;
-    background: #f4f4f2 !important;
   }
 }
