@@ -49,6 +49,7 @@ import { saveDraft, readDraft, clearDraft, type Draft } from '../../lib/offline'
 import { subscribeNoteSaved } from '../../lib/sync';
 import { escapeHtml } from '../../lib/utils';
 import { markdownToEditorHtml, renderMarkdown, stripDuplicateTitle } from '../../lib/markdown';
+import { trimTrailingBlankLines } from '../../lib/markdown-text';
 import { Dropdown, MenuItem } from '../Dropdown';
 import { ConfirmDialog, Modal } from '../Modal';
 import { toast } from '../../stores/toast';
@@ -194,7 +195,7 @@ export function EditorPane({
     const fresh = useAppStore.getState().freshNoteId === note.id;
     const showEmptyTitle = isAutoNoteTitle(note.title);
     setTitle(showEmptyTitle ? '' : note.title);
-    const normalized = stripDuplicateTitle(note.contentMd, note.title);
+    const normalized = trimTrailingBlankLines(stripDuplicateTitle(note.contentMd, note.title));
     setContent(normalized);
     contentRef.current = normalized;
     titleValueRef.current = showEmptyTitle ? '' : note.title;
@@ -230,7 +231,7 @@ export function EditorPane({
     if (!latest || latest.id !== note.id) return;
     clearTimeout(saveTimer.current ?? undefined);
     setTitle(latest.title);
-    const normalized = stripDuplicateTitle(latest.contentMd, latest.title);
+    const normalized = trimTrailingBlankLines(stripDuplicateTitle(latest.contentMd, latest.title));
     setContent(normalized);
     contentRef.current = normalized;
     titleValueRef.current = latest.title;

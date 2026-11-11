@@ -20,6 +20,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - 修复两个窗口编辑同一篇笔记时另一个窗口无反应、也没有冲突提示的问题。
 - 通知展开后保留卡片背景，行动链接不再落在背景外。
 - 修复英文相对时间出现“1 undefinedday ago”：正则可选捕获组未匹配时不再插入 `undefined`。
+- 跨窗口自动同步时裁掉正文末尾空行，避免接收端多出一行换行。
 
 ## [0.1.43] — 2026-11-11
 
