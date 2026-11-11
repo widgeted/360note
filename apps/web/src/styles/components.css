@@ -2849,3 +2849,23 @@ a.btn {
 .notification-action:hover {
   background: color-mix(in srgb, var(--blue) 10%, transparent);
 }
+
+/* Image-analysis labels attached to a shared/processed image. */
+.attachment-image-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.attachment-image-tags span {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 13px;
+  line-height: 1;
+}

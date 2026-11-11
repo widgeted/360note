@@ -704,6 +704,20 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-11 · v0.1.49 附件媒体收尾
+
+- `app-build` 改为每次构建唯一（版本号+随机 hex），PWA 更新提示不会再因同版本重新构建而误判。
+- 媒体对象路径包含附件 Prefix，避免 `prefix/media` 与 CDN URL 不一致；媒体副本不写加密元数据。
+- 生产已部署 0.1.49；SEO 不主动提交，仅保持 sitemap/robots/canonical/hreflang 可抓取。
+
+## 2026-11-11 · v0.1.48 缤纷云附件存储与 CoreIX 图片增强
+
+- 附件存储拆分为独立 `attachmentStorage` 设置，旧 `offsite` 配置自动回退；备份与附件可分别配置。
+- 新增 CoreIX 分享图片代理：仅公开分享图片生成 `media/` 下未加密媒体副本，按 fmt/q/w 处理，服务端代理避免泄露分享密码与撤销逻辑。
+- 新增 `image_tags` 与异步 `fmt=tags` 分析；建议/自动添加笔记标签。
+- 迁移 014；新 UI 提供缤纷云推荐配置、媒体域名、CDN 鉴权、格式/质量/宽度/标签分析设置。
+- 注意：媒体域名需由管理员绑定；未配置 mediaBaseUrl 时自动回退原图，不影响现有附件。
+
 ## 2026-11-11 · v0.1.47 修复 sitemap 被 PWA 拦截
 
 - 现象：已登录且有 Service Worker 的浏览器访问 `/sitemap.xml` 显示 SPA 404；未登录/无 SW 正常显示 XML。

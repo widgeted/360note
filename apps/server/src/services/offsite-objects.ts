@@ -16,7 +16,8 @@ function assertKey(key: string): string {
 
 export async function verifyOffsiteObject(key: string) {
   const clean = assertKey(key);
-  const raw = await getObject(`s3:${clean}`);
+  const target = clean.startsWith('attachments/') || clean.startsWith('media/') ? 'attachment' : 'backup';
+  const raw = await getObject(`s3:${clean}`, target);
   if (clean.startsWith('attachments/')) {
     const data = decryptBuffer(raw, '360note:attachment');
     return { kind: 'attachment' as const, bytes: data.length, encryptedBytes: raw.length };
@@ -67,7 +68,7 @@ export async function restoreOffsiteWorkspaceBackup(input: {
   if (!/^backup-.*\.(3nb|nhbackup)$/i.test(clean)) {
     throw errors.badRequest('只能在这里恢复工作区备份对象；整站备份请按运维手册恢复数据库');
   }
-  const raw = await getObject(`s3:${clean}`);
+  const raw = await getObject(`s3:${clean}`, 'backup');
   const decrypted = decryptBuffer(raw, '360note:backup');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-offsite-restore-'));
   const archivePath = path.join(tempDir, 'backup.zip');

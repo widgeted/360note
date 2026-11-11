@@ -3,7 +3,36 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.49] — 2026-11-11
+
+附件媒体增强收尾。
+
+### Fixed
+
+- 构建版本号改为每次构建唯一，避免同版本重新部署时 PWA 更新提示被误判为同一构建。
+- 媒体副本 URL 正确包含附件存储 Prefix；媒体对象使用无加密标记与长期缓存头。
+- 明确媒体域名只填写域名根地址，避免与 Prefix 叠加。
+
+## [0.1.48] — 2026-11-11
+
+
+缤纷云附件存储与图片媒体增强。
+
+### Added
+
+- 实例管理 → 存储管理新增独立的附件对象存储配置，推荐缤纷云 S4（`https://s3.bitiful.net` / `cn-east-1`），支持独立 Endpoint、Bucket、Prefix、密钥与 Path-style。
+- 附件存储支持旧版异地备份配置自动回退，已有远程附件无需迁移即可继续访问；更换 Endpoint/Bucket/Prefix 前会阻止破坏性保存。
+- 公开分享中的图片可通过缤纷云 CoreIX 输出 AVIF/WebP/JPEG（`fmt`）、控制质量（`q`）和最大宽度（`w`），由服务端代理以保持分享密码、权限和撤销逻辑。
+- 可选图片标签分析（`fmt=tags`）：在公开分享时异步分析场景/物体，结果显示在编辑器附件区域；可设置为仅建议或自动添加为笔记标签。
+- 新增 `014_attachment_media.sql`，保存媒体副本键与图片标签。
+
+### Changed
+
+- 备份异地存储与附件对象存储分离；备份配置仍负责 `.3nb` 副本，附件配置负责加密附件与公开分享图片的媒体副本。
+- 媒体副本仅针对被公开分享的图片生成，原附件仍使用 AES-256-GCM 加密存储。
+
 ## [0.1.47] — 2026-11-11
+
 
 修复 PWA 拦截 sitemap。
 

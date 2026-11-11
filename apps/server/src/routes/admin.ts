@@ -10,7 +10,7 @@ import { config } from '../config.js';
 import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite } from '../services/offsite.js';
 import { revokeAllApiTokens } from '../services/sessions.js';
 import { getNoteForUser } from '../services/notes.js';
-import { getObject, listObjectEntries } from '../lib/object-storage.js';
+import { attachmentStoragePublicConfig, getObject, getAttachmentStorageConfig, listObjectEntries, saveAttachmentStorageConfig, setAttachmentStorageTestResult, testObjectStorage } from '../lib/object-storage.js';
 import { readBackup } from '../lib/storage.js';
 import { decryptBuffer, decryptString, sha256 } from '../lib/crypto.js';
 import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, runInstanceRestoreDrill, saveInstanceBackupSettings, uploadInstanceBackupToOffsite } from '../services/instance-backups.js';
@@ -53,7 +53,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         pg_database_size(current_database())::text AS database_bytes,
         (SELECT max(created_at) FROM backups) AS last_backup`,
     );
-    const [localUsage, attachmentMeta, offsiteConfig] = await Promise.all([
+    const [localUsage, attachmentMeta, offsiteConfig, attachmentConfig] = await Promise.all([
       getLocalAttachmentUsage().catch(() => ({ files: 0, bytes: 0 })),
       one<{ local_rows: string; remote_rows: string }>(
         `SELECT
@@ -62,6 +62,7 @@ export default async function adminRoutes(app: FastifyInstance) {
          FROM attachments WHERE deleted_at IS NULL`,
       ),
       getOffsiteConfig(),
+      getAttachmentStorageConfig(),
     ]);
     return {
       stats: {
@@ -94,7 +95,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         localFiles: localUsage.files,
         localAttachments: Number(attachmentMeta?.local_rows ?? 0),
         remoteAttachments: Number(attachmentMeta?.remote_rows ?? 0),
-        attachmentsEnabled: offsiteConfig.attachmentsEnabled,
+        attachmentsEnabled: attachmentConfig.enabled,
         offsiteEnabled: offsiteConfig.enabled,
       },
     };
@@ -535,6 +536,67 @@ export default async function adminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.get('/api/admin/attachment-storage', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    return { attachmentStorage: await attachmentStoragePublicConfig() };
+  });
+
+  app.put('/api/admin/attachment-storage', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const body = parse(
+      z.object({
+        enabled: z.boolean(),
+        endpoint: z.string().url().or(z.literal('')),
+        region: z.string().max(80),
+        bucket: z.string().max(200),
+        prefix: z.string().max(200),
+        accessKeyId: z.string().max(300),
+        secretAccessKey: z.string().max(500).optional(),
+        forcePathStyle: z.boolean(),
+        mediaBaseUrl: z.string().url().or(z.literal('')),
+        cdnAuthKey: z.string().max(300).optional(),
+        mediaPrefix: z.string().max(120),
+        imageFormat: z.enum(['auto', 'webp', 'jpg']),
+        imageQuality: z.number().int().min(40).max(95),
+        imageMaxWidth: z.number().int().min(0).max(4096),
+        imageTags: z.enum(['off', 'suggest', 'auto']),
+      }),
+      request.body,
+    );
+    const current = await getAttachmentStorageConfig();
+    const remote = await one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM attachments WHERE deleted_at IS NULL AND storage_key LIKE 's3:%'`,
+    );
+    const changedTarget =
+      Number(remote?.count ?? 0) > 0 &&
+      (body.endpoint !== current.endpoint || body.bucket !== current.bucket || body.prefix !== current.prefix);
+    if (changedTarget) {
+      throw errors.conflict('已有远程附件。更换 Endpoint、Bucket 或 Prefix 前，请先取回本机附件或完成迁移。');
+    }
+    await saveAttachmentStorageConfig(body);
+    await audit({ actorId: auth.user.id, action: 'admin.attachment_storage.update', meta: { enabled: body.enabled, bucket: body.bucket, media: Boolean(body.mediaBaseUrl), tags: body.imageTags }, ip: clientIp(request) });
+    return { attachmentStorage: await attachmentStoragePublicConfig() };
+  });
+
+  app.post('/api/admin/attachment-storage/test', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const configValue = await getAttachmentStorageConfig();
+    try {
+      await testObjectStorage(configValue);
+      await setAttachmentStorageTestResult(true, null);
+      await audit({ actorId: auth.user.id, action: 'admin.attachment_storage.test', meta: { ok: true }, ip: clientIp(request) });
+      return { ok: true };
+    } catch (error) {
+      const message = (error as Error).message.slice(0, 300);
+      await setAttachmentStorageTestResult(false, message);
+      await audit({ actorId: auth.user.id, action: 'admin.attachment_storage.test', meta: { ok: false, error: message }, ip: clientIp(request) });
+      throw new AppError(502, 'ATTACHMENT_STORAGE_TEST_FAILED', message);
+    }
+  });
+
   app.get('/api/admin/offsite', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
@@ -608,7 +670,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
     const { limit } = parse(z.object({ limit: z.coerce.number().int().min(1).max(500).default(200) }), request.query);
-    const objects = await listObjectEntries('', limit);
+    const objects = await listObjectEntries('', limit, 'backup');
     return {
       objects: objects.map((entry) => ({
         ...entry,

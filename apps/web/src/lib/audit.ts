@@ -52,6 +52,8 @@ const LABELS: Record<string, string> = {
   'mail.invite.sent': '发送邀请邮件',
   'mail.invite.failed': '邀请邮件发送失败',
   'admin.offsite.update': '更新对象存储设置',
+  'admin.attachment_storage.test': '测试附件对象存储',
+  'admin.attachment_storage.update': '更新附件对象存储',
   'admin.offsite.test': '测试对象存储连接',
   'admin.offsite.attachments.enable.finish': '附件迁移到对象存储完成',
   'admin.offsite.attachments.disable.finish': '附件从对象存储取回完成',

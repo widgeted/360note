@@ -383,6 +383,11 @@ export function ContextPanel() {
                         {attachment.ocrStatus === 'done' && ` · ${t('已提取文字')}`}
                         {attachment.ocrStatus === 'pending' && ` · ${t('识别中…')}`}
                       </div>
+                      {attachment.imageTags && attachment.imageTags.length > 0 && (
+                        <div className="attachment-image-tags" title={t('由缤纷云图片分析生成')}>
+                          {attachment.imageTags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}
+                        </div>
+                      )}
                     </div>
                     <a className="icon-btn icon-btn-sm" href={`/api/attachments/${attachment.id}/content`} download={attachment.filename} aria-label={t('下载')}>
                       <Download size={13} />

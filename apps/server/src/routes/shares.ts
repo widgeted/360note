@@ -11,6 +11,7 @@ import { hashPassword, verifyPassword } from '../lib/passwords.js';
 import { getNoteForUser } from '../services/notes.js';
 import { updateNote } from '../services/notes.js';
 import { notify } from '../services/sessions.js';
+import { getProcessedShareImage, scheduleImageAnalysis } from '../services/media.js';
 import { audit } from '../lib/audit.js';
 import { readAttachment, sendFileHeaders } from '../lib/storage.js';
 import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
@@ -102,9 +103,10 @@ async function publicAttachments(noteId: string) {
     size_bytes: string;
     width: number | null;
     height: number | null;
+    image_tags: unknown;
     created_at: Date;
   }>(
-    `SELECT id, note_id, filename, mime, size_bytes, width, height, created_at
+    `SELECT id, note_id, filename, mime, size_bytes, width, height, image_tags, created_at
      FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
     [noteId],
   );
@@ -153,6 +155,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         auth.user.id,
       ],
     );
+    scheduleImageAnalysis(note.id);
     await audit({
       workspaceId: note.workspaceId,
       actorId: auth.user.id,
@@ -315,6 +318,7 @@ export default async function shareRoutes(app: FastifyInstance) {
       });
     }
     await query('UPDATE share_links SET view_count = view_count + 1, last_accessed_at = now() WHERE id = $1', [share.id]).catch(() => {});
+    scheduleImageAnalysis(note.id);
     const workspace = await one<{ name: string }>('SELECT name FROM workspaces WHERE id = $1', [note.workspace_id]);
     const author = await one<{ display_name: string }>('SELECT display_name FROM users WHERE id = $1', [note.created_by]);
     const attachments = await publicAttachments(note.id);
@@ -363,6 +367,7 @@ export default async function shareRoutes(app: FastifyInstance) {
           width: row.width,
           height: row.height,
           ocrStatus: 'none',
+          imageTags: Array.isArray(row.image_tags) ? row.image_tags.map(String) : [],
           createdAt: row.created_at.toISOString(),
           url: `/api/public/shares/${token}/attachments/${row.id}`,
         })),
@@ -510,7 +515,16 @@ export default async function shareRoutes(app: FastifyInstance) {
         etag = `${row.sha256}-thumb`;
       }
     }
-    if (!data) data = await readAttachment(row.storage_key);
+    if (!data) {
+      const processed = thumb === '1' ? null : await getProcessedShareImage(attachmentId).catch(() => null);
+      if (processed) {
+        data = processed.data;
+        responseMime = processed.mime;
+        etag = processed.etag;
+      } else {
+        data = await readAttachment(row.storage_key);
+      }
+    }
     const ifNone = request.headers['if-none-match'];
     if (ifNone && ifNone.includes(etag)) return reply.status(304).send();
     return reply

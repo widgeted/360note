@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Cloud, CloudDownload, CloudUpload, Download, HardDrive, PlugZap, RefreshCw, Save, ShieldCheck } from 'lucide-react';
+import { Cloud, CloudDownload, CloudUpload, Download, HardDrive, PlugZap, RefreshCw, Save, ShieldCheck, Sparkles } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { useT } from '../../lib/i18n';
@@ -18,6 +18,28 @@ interface OffsiteConfig {
   accessKeyId: string;
   hasSecret: boolean;
   forcePathStyle: boolean;
+  lastTestAt: string | null;
+  lastTestOk: boolean | null;
+  lastError: string | null;
+}
+
+interface AttachmentStorageConfig {
+  enabled: boolean;
+  endpoint: string;
+  region: string;
+  bucket: string;
+  prefix: string;
+  accessKeyId: string;
+  hasSecret: boolean;
+  forcePathStyle: boolean;
+  mediaBaseUrl: string;
+  hasCdnAuthKey: boolean;
+  mediaPrefix: string;
+  imageFormat: 'auto' | 'webp' | 'jpg';
+  imageQuality: number;
+  imageMaxWidth: number;
+  imageTags: 'off' | 'suggest' | 'auto';
+  legacy: boolean;
   lastTestAt: string | null;
   lastTestOk: boolean | null;
   lastError: string | null;
@@ -58,6 +80,11 @@ export function OffsiteSettings() {
   const t = useT();
   const user = useAuthStore((state) => state.user);
   const [config, setConfig] = useState<OffsiteConfig | null>(null);
+  const [attachmentConfig, setAttachmentConfig] = useState<AttachmentStorageConfig | null>(null);
+  const [attachmentSecret, setAttachmentSecret] = useState('');
+  const [attachmentCdnKey, setAttachmentCdnKey] = useState('');
+  const [attachmentSaving, setAttachmentSaving] = useState(false);
+  const [attachmentTesting, setAttachmentTesting] = useState(false);
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -89,6 +116,7 @@ export function OffsiteSettings() {
   useEffect(() => {
     if (user?.role !== 'admin') return;
     api.get<{ offsite: OffsiteConfig }>('/api/admin/offsite').then((res) => setConfig(res.offsite)).catch((error: Error) => setPageError(error.message));
+    api.get<{ attachmentStorage: AttachmentStorageConfig }>('/api/admin/attachment-storage').then((res) => setAttachmentConfig(res.attachmentStorage)).catch((error: Error) => setPageError(error.message));
     void loadUsage(true);
     void loadObjects();
   }, [user?.role, loadUsage]);
@@ -270,7 +298,54 @@ export function OffsiteSettings() {
     }
   }
 
-  if (!config) return null;
+  async function saveAttachmentStorage() {
+    if (!attachmentConfig) return;
+    setAttachmentSaving(true);
+    try {
+      const response = await api.put<{ attachmentStorage: AttachmentStorageConfig }>('/api/admin/attachment-storage', {
+        ...attachmentConfig,
+        secretAccessKey: attachmentSecret || undefined,
+        cdnAuthKey: attachmentCdnKey || undefined,
+      });
+      setAttachmentConfig(response.attachmentStorage);
+      setAttachmentSecret('');
+      setAttachmentCdnKey('');
+      await loadUsage(true);
+      toast('success', t('附件存储设置已保存'));
+    } catch (error) {
+      toast('error', t('保存失败'), (error as Error).message);
+    } finally {
+      setAttachmentSaving(false);
+    }
+  }
+
+  async function testAttachmentStorage() {
+    setAttachmentTesting(true);
+    try {
+      await api.post('/api/admin/attachment-storage/test');
+      toast('success', t('附件对象存储连接成功'));
+      const response = await api.get<{ attachmentStorage: AttachmentStorageConfig }>('/api/admin/attachment-storage');
+      setAttachmentConfig(response.attachmentStorage);
+      await loadUsage(true);
+    } catch (error) {
+      toast('error', t('附件对象存储连接失败'), (error as Error).message);
+    } finally {
+      setAttachmentTesting(false);
+    }
+  }
+
+  function applyBitifulPreset() {
+    if (!attachmentConfig) return;
+    setAttachmentConfig({
+      ...attachmentConfig,
+      endpoint: 'https://s3.bitiful.net',
+      region: 'cn-east-1',
+      forcePathStyle: true,
+      prefix: attachmentConfig.prefix || '',
+    });
+  }
+
+  if (!config || !attachmentConfig) return null;
 
   const migration = usage?.migration;
   const busy = migrating || Boolean(migration?.running);
@@ -294,7 +369,7 @@ export function OffsiteSettings() {
       {pageError && <LoadFailure message={pageError} onRetry={() => void loadUsage(true)} />}
       <div className="banner banner-info" style={{ marginBottom: 12 }}>
         <ShieldCheck size={15} />
-        <div>{t('S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）可同时用于备份副本和笔记附件。所有内容在离开本机前都已使用 360note 主密钥加密，S3 提供方无法读取。')}</div>
+        <div>{t('S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）用于异地备份副本。工作区/整站备份在离开本机前已使用 360note 主密钥加密，S3 提供方无法读取。附件存储请使用下方独立设置。')}</div>
       </div>
       <div className="setting-card">
         <div className="setting-row" style={{ paddingTop: 0 }}>
@@ -375,6 +450,114 @@ export function OffsiteSettings() {
           </div>
         </div>
 
+        <div className="banner banner-info" style={{ marginBottom: 12 }}>
+          <Sparkles size={15} />
+          <div>{t('推荐使用缤纷云 S4（bitiful.com）：兼容 S3，并内置 CoreIX 图片处理。被分享的图片可按现代格式输出、控制质量与宽度，并可分析场景生成标签。原附件仍使用 AES-256-GCM 加密；只有被分享的图片才会生成未加密媒体副本。')}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={applyBitifulPreset}>
+            <Sparkles size={13} /> {t('使用缤纷云推荐配置')}
+          </button>
+          <a className="btn btn-ghost btn-sm" href="https://docs.bitiful.com/coreix/basic" target="_blank" rel="noreferrer">
+            {t('查看缤纷云媒体处理文档')}
+          </a>
+        </div>
+        <div className="offsite-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="field">
+            <label>Endpoint</label>
+            <input className="input mono" value={attachmentConfig.endpoint} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, endpoint: event.target.value })} placeholder="https://s3.bitiful.net" />
+          </div>
+          <div className="field">
+            <label>Region</label>
+            <input className="input mono" value={attachmentConfig.region} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, region: event.target.value })} placeholder="cn-east-1" />
+          </div>
+          <div className="field">
+            <label>Bucket</label>
+            <input className="input mono" value={attachmentConfig.bucket} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, bucket: event.target.value })} placeholder="360note-attachments" />
+          </div>
+          <div className="field">
+            <label>Prefix</label>
+            <input className="input mono" value={attachmentConfig.prefix} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, prefix: event.target.value })} placeholder="360note/" />
+          </div>
+          <div className="field">
+            <label>Access Key ID</label>
+            <input className="input mono" value={attachmentConfig.accessKeyId} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, accessKeyId: event.target.value })} autoComplete="off" />
+          </div>
+          <div className="field">
+            <label>Secret Access Key</label>
+            <input className="input mono" type="password" value={attachmentSecret} onChange={(event) => setAttachmentSecret(event.target.value)} placeholder={attachmentConfig.hasSecret ? t('已保存（留空保持不变）') : ''} autoComplete="new-password" />
+          </div>
+        </div>
+        <label className="checkbox-row" style={{ marginTop: 12 }}>
+          <input type="checkbox" checked={attachmentConfig.forcePathStyle} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, forcePathStyle: event.target.checked })} />
+          <span>{t('使用 Path-style 访问（缤纷云/MinIO 通常需要）')}</span>
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void saveAttachmentStorage()} disabled={attachmentSaving || busy}>
+            {attachmentSaving ? <span className="spinner" /> : <Save size={13} />} {t('保存附件存储设置')}
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void testAttachmentStorage()} disabled={attachmentTesting || busy}>
+            {attachmentTesting ? <span className="spinner" /> : <PlugZap size={13} />} {t('测试连接')}
+          </button>
+          {attachmentConfig.lastTestAt && (
+            <span className={`badge ${attachmentConfig.lastTestOk ? 'badge-green' : 'badge-red'}`}>
+              {attachmentConfig.lastTestOk ? t('连接正常') : t('连接失败')}
+            </span>
+          )}
+        </div>
+        {attachmentConfig.lastError && <div className="form-error" style={{ marginTop: 10 }}>{attachmentConfig.lastError}</div>}
+        {attachmentConfig.legacy && <p className="setting-note" style={{ marginTop: 8 }}>{t('当前沿用备份对象存储的旧配置。建议保存一份独立的附件存储配置。')}</p>}
+
+        <div className="setting-row" style={{ marginTop: 18, paddingTop: 0 }}>
+          <div className="setting-row-main">
+            <div className="setting-row-title"><Sparkles size={13} style={{ display: 'inline', marginRight: 5 }} />{t('图片加速与自动标签')}</div>
+            <div className="setting-row-desc">{t('仅对可分享的笔记图片生效（含公开和密码保护分享）。媒体副本不包含加密，请为媒体域名配置 CDN 鉴权或私有访问；未分享的笔记图片不会上传。')}</div>
+          </div>
+        </div>
+        <div className="offsite-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="field">
+            <label>{t('媒体访问域名')}</label>
+            <input className="input mono" value={attachmentConfig.mediaBaseUrl} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, mediaBaseUrl: event.target.value })} placeholder="https://img.example.com" />
+            <span className="field-hint">{t('只填域名根地址，不要包含 Prefix；留空则关闭图片加速。')}</span>
+          </div>
+          <div className="field">
+            <label>{t('CDN 鉴权 Key')}</label>
+            <input className="input mono" type="password" value={attachmentCdnKey} onChange={(event) => setAttachmentCdnKey(event.target.value)} placeholder={attachmentConfig.hasCdnAuthKey ? t('已保存（留空保持不变）') : ''} autoComplete="new-password" />
+            <span className="field-hint">{t('可选。填写后媒体 URL 会使用缤纷云高级鉴权签名。')}</span>
+          </div>
+          <div className="field">
+            <label>{t('媒体前缀')}</label>
+            <input className="input mono" value={attachmentConfig.mediaPrefix} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, mediaPrefix: event.target.value })} placeholder="media/" />
+          </div>
+          <div className="field">
+            <label>{t('输出格式')}</label>
+            <select className="select" value={attachmentConfig.imageFormat} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, imageFormat: event.target.value as AttachmentStorageConfig['imageFormat'] })}>
+              <option value="auto">{t('自动（优先 AVIF/WebP）')}</option>
+              <option value="webp">WebP</option>
+              <option value="jpg">JPEG</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>{t('图片质量')}</label>
+            <input className="input" type="number" min={40} max={95} value={attachmentConfig.imageQuality} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, imageQuality: Number(event.target.value) })} />
+            <span className="field-hint">{t('40–95；默认 82，适合网页分享。')}</span>
+          </div>
+          <div className="field">
+            <label>{t('最大宽度')}</label>
+            <input className="input" type="number" min={0} max={4096} value={attachmentConfig.imageMaxWidth} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, imageMaxWidth: Number(event.target.value) })} />
+            <span className="field-hint">{t('像素；0 表示不缩放。默认 1600。')}</span>
+          </div>
+          <div className="field">
+            <label>{t('图片标签分析')}</label>
+            <select className="select" value={attachmentConfig.imageTags} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, imageTags: event.target.value as AttachmentStorageConfig['imageTags'] })}>
+              <option value="off">{t('关闭')}</option>
+              <option value="suggest">{t('生成标签建议')}</option>
+              <option value="auto">{t('自动添加到笔记标签')}</option>
+            </select>
+            <span className="field-hint">{t('分析在公开分享时进行；标签来自缤纷云图片识别。')}</span>
+          </div>
+        </div>
+
         <div className="admin-stats" style={{ marginTop: 4 }}>
           <div className="setting-card">
             <span style={{ color: 'var(--text-tertiary)' }}><HardDrive size={15} /></span>
@@ -435,7 +618,7 @@ export function OffsiteSettings() {
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => void enableAttachments()}
-                  disabled={!usage?.configured || !config.hasSecret}
+                  disabled={!usage?.configured || !attachmentConfig.hasSecret}
                 >
                   <CloudUpload size={13} /> {mixed ? t('继续迁移剩余附件') : t('启用并迁移已有附件')}
                 </button>
@@ -465,7 +648,7 @@ export function OffsiteSettings() {
         <div className="setting-row" style={{ paddingTop: 0 }}>
           <div className="setting-row-main">
             <div className="setting-row-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('对象存储文件')}</div>
-            <div className="setting-row-desc">{t('浏览、校验和恢复对象存储中的备份与附件。恢复工作区备份会以副本形式合并，不覆盖现有内容。')}</div>
+            <div className="setting-row-desc">{t('浏览、校验和恢复备份对象存储中的文件。恢复工作区备份会以副本形式合并，不覆盖现有内容。')}</div>
           </div>
           <div className="setting-row-control">
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadObjects()} disabled={objectsLoading}>

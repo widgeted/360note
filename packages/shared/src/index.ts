@@ -110,6 +110,7 @@ export interface Attachment {
   width: number | null;
   height: number | null;
   ocrStatus: 'none' | 'pending' | 'done' | 'failed';
+  imageTags?: string[];
   createdAt: string;
   url?: string;
 }

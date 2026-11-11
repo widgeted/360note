@@ -24,6 +24,9 @@ for (const file of versionFiles) {
 }
 const assetVersion = hash.digest('hex').slice(0, 10);
 const appVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version as string;
+// Build identity must change on every deploy so the PWA update prompt can
+// distinguish a stale waiting worker from a genuinely newer build.
+const buildId = `${appVersion}-${crypto.randomBytes(6).toString('hex')}`;
 
 export default defineConfig({
   plugins: [
@@ -32,13 +35,13 @@ export default defineConfig({
       transformIndexHtml(html) {
         return html
           .replaceAll('__ASSET_VERSION__', assetVersion)
-          .replace('</head>', `  <meta name="app-build" content="${assetVersion}" />\n  <meta name="app-version" content="${appVersion}" />\n  </head>`);
+          .replace('</head>', `  <meta name="app-build" content="${buildId}" />\n  <meta name="app-version" content="${appVersion}" />\n  </head>`);
       },
       generateBundle() {
         this.emitFile({
           type: 'asset',
           fileName: 'version.json',
-          source: JSON.stringify({ version: appVersion, build: assetVersion }),
+          source: JSON.stringify({ version: appVersion, build: buildId }),
         });
       },
     },
