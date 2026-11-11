@@ -16,7 +16,8 @@ const email = /Email:\s*(\S+@\S+)/.exec(block)?.[1];
 const password = /Password:\s*(\S+)/.exec(block)?.[1];
 if (!email || !password) throw new Error('Could not read demo credentials');
 
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const headed = process.env.HEADED === '1';
+const browser = await chromium.launch({ headless: !headed, slowMo: headed ? 350 : 0, args: ['--no-sandbox'] });
 const results = {};
 
 async function contextWithWaitingWorker() {
@@ -86,8 +87,18 @@ try {
   results.iconCloseToTitle = Boolean(iconBox && titleBox) && titleBox.x - (iconBox.x + iconBox.width) <= 8;
   results.actionBottomLeft = Boolean(actionBox && titleBox) && actionBox.y > titleBox.y + titleBox.height && Math.abs(actionBox.x - titleBox.x) < 4;
   results.noticeTitle = await notice.locator('.pwa-notice-title').innerText();
+  if (process.env.PAUSE === '1') await page.pause();
+  await page.screenshot({ path: '/tmp/opencode/pwa-update-desktop.png', fullPage: false });
+  results.desktopScreenshot = '/tmp/opencode/pwa-update-desktop.png';
 
-  await notice.locator('.pwa-notice-close').click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: 'networkidle' });
+  const mobileNotice = page.locator('.pwa-notice.is-top');
+  await mobileNotice.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.screenshot({ path: '/tmp/opencode/pwa-update-mobile.png', fullPage: false });
+  results.mobileScreenshot = '/tmp/opencode/pwa-update-mobile.png';
+
+  await mobileNotice.locator('.pwa-notice-close').click();
   results.dismissHidesPrompt = (await page.locator('.pwa-notice.is-top').count()) === 0;
 
   // Public share route: same newer build, but no prompt.
