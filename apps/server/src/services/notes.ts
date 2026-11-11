@@ -37,6 +37,7 @@ interface AttachmentRow {
   height: number | null;
   ocr_status: Attachment['ocrStatus'];
   image_tags?: unknown;
+  has_thumbnail?: boolean;
   created_at: Date;
 }
 
@@ -60,6 +61,7 @@ function mapAttachment(row: AttachmentRow): Attachment {
     height: row.height,
     ocrStatus: row.ocr_status,
     imageTags: Array.isArray(row.image_tags) ? row.image_tags.map(String) : [],
+    hasThumbnail: Boolean(row.has_thumbnail),
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -123,7 +125,7 @@ export async function getFolderPath(
 
 export async function serializeNote(row: NoteRow, role: Role, client?: Queryable): Promise<Note> {
   const attachments = await many<AttachmentRow>(
-    `SELECT id, note_id, filename, mime, size_bytes, width, height, ocr_status, image_tags, created_at
+    `SELECT id, note_id, filename, mime, size_bytes, width, height, ocr_status, image_tags, has_thumbnail, created_at
      FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
     [row.id],
     client,

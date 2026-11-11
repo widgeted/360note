@@ -370,7 +370,7 @@ export function ContextPanel() {
                 visibleAttachments.map((attachment) => (
                   <div className="attachment-item" key={attachment.id}>
                     <div className="attachment-thumb">
-                      {attachment.mime.startsWith('image/') ? (
+                      {attachment.mime.startsWith('image/') || attachment.hasThumbnail ? (
                         <img src={`/api/attachments/${attachment.id}/content`} alt="" loading="lazy" />
                       ) : (
                         <FileText size={14} />

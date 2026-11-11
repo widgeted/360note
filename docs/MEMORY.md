@@ -704,6 +704,12 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-11 · v0.1.51 HEIC/PDF/视频封面
+
+- 上传允许 HEIC/HEIF/TIFF/BMP/RAW/PDF/SVG/视频；CoreIX 生成 WebP 缩略图，原文件仍加密。
+- PDF frame=0、视频 frame=auto；新增 has_thumbnail 与迁移 015。
+- 失败回退文件图标/原图；ThumbHash/主色与 CoreIX OCR 评估仍在后续。
+
 ## 2026-11-11 · v0.1.50 存储管理可读性与功能性 OCR
 
 - 连接设置默认折叠；对象表单行+横向滚动+筛选+CSV 导出。

@@ -53,15 +53,29 @@ export async function buildAttachmentThumbnail(buffer: Buffer): Promise<Buffer> 
  * Return a cached thumbnail, generating it lazily for attachments uploaded
  * before thumbnails existed. Returns null for formats we cannot decode.
  */
+export async function storeAttachmentThumbnail(storageKey: string, data: Buffer): Promise<void> {
+  const thumbKey = attachmentThumbnailStorageKey(storageKey);
+  await saveAttachment(thumbKey, data, storageKey.startsWith('s3:') ? 's3' : 'local');
+  cacheSet(storageKey, data);
+}
+
 export async function ensureAttachmentThumbnail(
   storageKey: string,
   mime: string,
   original?: Buffer,
 ): Promise<Buffer | null> {
-  if (!isDisplayableImage(mime)) return null;
   const cached = cacheGet(storageKey);
   if (cached) return cached;
   const thumbKey = attachmentThumbnailStorageKey(storageKey);
+  if (!isDisplayableImage(mime)) {
+    try {
+      const stored = await readAttachment(thumbKey);
+      cacheSet(storageKey, stored);
+      return stored;
+    } catch {
+      return null;
+    }
+  }
   if (!original) {
     try {
       const stored = await readAttachment(thumbKey);

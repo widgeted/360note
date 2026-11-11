@@ -104,9 +104,10 @@ async function publicAttachments(noteId: string) {
     width: number | null;
     height: number | null;
     image_tags: unknown;
+    has_thumbnail: boolean;
     created_at: Date;
   }>(
-    `SELECT id, note_id, filename, mime, size_bytes, width, height, image_tags, created_at
+    `SELECT id, note_id, filename, mime, size_bytes, width, height, image_tags, has_thumbnail, created_at
      FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
     [noteId],
   );
@@ -368,6 +369,7 @@ export default async function shareRoutes(app: FastifyInstance) {
           height: row.height,
           ocrStatus: 'none',
           imageTags: Array.isArray(row.image_tags) ? row.image_tags.map(String) : [],
+          hasThumbnail: Boolean(row.has_thumbnail),
           createdAt: row.created_at.toISOString(),
           url: `/api/public/shares/${token}/attachments/${row.id}`,
         })),

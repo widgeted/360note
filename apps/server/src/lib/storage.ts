@@ -241,12 +241,21 @@ export function sniffMime(buffer: Buffer, filename: string, provided?: string): 
   if (head.subarray(0, 2).toString() === 'PK') return 'application/zip';
   if (head.subarray(0, 5).toString() === '%!PS-') return 'application/postscript';
   const lower = filename.toLowerCase();
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.heic')) return 'image/heic';
+  if (lower.endsWith('.heif')) return 'image/heif';
+  if (lower.endsWith('.tif') || lower.endsWith('.tiff')) return 'image/tiff';
+  if (lower.endsWith('.bmp')) return 'image/bmp';
+  if (/\.(dng|cr2|cr3|nef|arw|raf|orf|rw2|pef|srw)$/.test(lower)) return 'image/x-raw';
+  if (/\.(mp4|m4v)$/.test(lower)) return 'video/mp4';
+  if (lower.endsWith('.webm')) return 'video/webm';
+  if (lower.endsWith('.mov')) return 'video/quicktime';
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) return 'text/markdown';
   if (lower.endsWith('.txt')) return 'text/plain';
   if (lower.endsWith('.csv')) return 'text/csv';
   if (lower.endsWith('.json')) return 'application/json';
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'text/html';
-  if (provided && /^(application\/(pdf|json|zip|msword|vnd\.)|text\/(plain|csv|markdown))[a-z0-9.+-]*$/i.test(provided)) return provided;
+  if (provided && /^(application\/(pdf|json|zip|msword|vnd\.)|text\/(plain|csv|markdown)|image\/(heic|heif|tiff|bmp|svg\+xml|x-raw)|video\/(mp4|webm|quicktime))[a-z0-9.+-]*$/i.test(provided)) return provided;
   return 'application/octet-stream';
 }
 

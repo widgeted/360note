@@ -111,6 +111,7 @@ export interface Attachment {
   height: number | null;
   ocrStatus: 'none' | 'pending' | 'done' | 'failed';
   imageTags?: string[];
+  hasThumbnail?: boolean;
   createdAt: string;
   url?: string;
 }

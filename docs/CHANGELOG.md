@@ -3,7 +3,24 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.51] — 2026-11-11
+
+CoreIX 输入兼容与封面。
+
+### Added
+
+- 允许上传 HEIC/HEIF/TIFF/BMP/常见 RAW、PDF、SVG、MP4/WebM/MOV；由 CoreIX 生成 WebP 缩略图/封面，原文件仍加密保存。
+- PDF 使用第一页生成封面，视频/动图使用 `frame=auto` 自动选帧。
+- 附件 API 返回 `hasThumbnail`；非图片附件在附件区也能显示封面。
+- 新增迁移 `015_attachment_thumbnail.sql`。
+
+### Notes
+
+- CoreIX 处理失败或媒体域名未配置时回退文件图标/原图；不会阻塞上传。
+- ThumbHash、主色占位和 CoreIX OCR 评估仍按规划后续处理。
+
 ## [0.1.50] — 2026-11-11
+
 
 存储管理可读性、功能性图片 OCR 与 CoreIX 规划。
 

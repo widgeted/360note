@@ -13,7 +13,7 @@ import { requireWorkspace } from '../services/workspaces.js';
 import { queueOcr } from '../lib/ocr.js';
 import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
 import { getAttachmentStorageConfig } from '../lib/object-storage.js';
-import { detectFunctionalImage } from '../services/media.js';
+import { detectFunctionalImage, generateCoreIxThumbnail, isCoreIxPreviewable } from '../services/media.js';
 
 export default async function attachmentRoutes(app: FastifyInstance) {
   app.post('/api/notes/:id/attachments', async (request, reply) => {
@@ -31,9 +31,6 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     }
     if (!buffer.length) throw errors.badRequest('文件为空');
     const mime = sniffMime(buffer, part.filename, part.mimetype);
-    if (/^image\/(heic|heif|tiff|bmp)$/i.test(mime)) {
-      throw errors.badRequest('不支持 HEIC/HEIF 等图片格式。请使用 PNG、JPEG、WebP、GIF 或 AVIF。');
-    }
     const filename = safeFilename(part.filename);
     const attachmentStorage = await getAttachmentStorageConfig();
     const functionalDetection = Boolean(attachmentStorage.detectFunctionalImages) && config.ocrEnabled && isDisplayableImage(mime);
@@ -56,10 +53,12 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     const localKey = attachmentStorageKey(note.workspaceId, attachmentId);
     const digest = checksum(buffer);
     const storageKey = await saveAttachment(localKey, buffer);
+    let hasThumbnail = false;
     if (isDisplayableImage(mime)) {
       // Generate before responding so the first render of the inserted image
       // does not race an asynchronous thumbnail upload to object storage.
       const thumbnail = await ensureAttachmentThumbnail(storageKey, mime, buffer);
+      hasThumbnail = Boolean(thumbnail);
       if (!thumbnail) app.log.warn({ attachmentId }, 'failed to generate attachment thumbnail');
     }
     const row = await one<{
@@ -72,8 +71,8 @@ export default async function attachmentRoutes(app: FastifyInstance) {
       height: number | null;
       created_at: Date;
     }>(
-      `INSERT INTO attachments (id, workspace_id, note_id, filename, mime, size_bytes, sha256, storage_key, width, height, created_by, ocr_status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO attachments (id, workspace_id, note_id, filename, mime, size_bytes, sha256, storage_key, width, height, created_by, ocr_status, has_thumbnail)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id, note_id, filename, mime, size_bytes, width, height, created_at`,
       [
         attachmentId,
@@ -88,8 +87,12 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         height,
         auth.user.id,
         config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
+        hasThumbnail,
       ],
     );
+    if (!hasThumbnail && isCoreIxPreviewable(mime, filename)) {
+      hasThumbnail = await generateCoreIxThumbnail(attachmentId, storageKey, mime, filename);
+    }
     if (config.ocrEnabled && !functionalDetection) void queueOcr(attachmentId, storageKey, mime, app.log);
     if (functionalDetection) void detectFunctionalImage(attachmentId, storageKey, mime, app.log);
     return reply.status(201).send({
@@ -103,6 +106,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         height: row!.height,
         ocrStatus: config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
         imageTags: [],
+        hasThumbnail,
         createdAt: row!.created_at.toISOString(),
         url: `/api/attachments/${row!.id}/content`,
         thumbnailUrl: isDisplayableImage(row!.mime) ? `/api/attachments/${row!.id}/content?thumb=1` : null,

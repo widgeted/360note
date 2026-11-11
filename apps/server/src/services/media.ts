@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { many, one, query } from '../db.js';
 import { deleteObject, getAttachmentStorageConfig, headObject, objectStorageConfigured, putObject, type AttachmentStorageConfig } from '../lib/object-storage.js';
 import { isDisplayableImage, readAttachment } from '../lib/storage.js';
+import { storeAttachmentThumbnail } from '../lib/thumbnails.js';
 import { queueOcr } from '../lib/ocr.js';
 
 interface MediaAttachmentRow {
@@ -69,6 +70,52 @@ export async function ensureMediaDerivative(attachmentId: string): Promise<strin
     await query('UPDATE attachments SET media_key = $2 WHERE id = $1', [attachmentId, key]);
   }
   return key;
+}
+
+export function isCoreIxPreviewable(mime: string, filename = ''): boolean {
+  const lower = filename.toLowerCase();
+  return (
+    /^image\/(heic|heif|tiff|bmp|x-raw|svg\+xml)$/i.test(mime) ||
+    mime === 'application/pdf' ||
+    mime.startsWith('video/') ||
+    /\.(heic|heif|tif|tiff|bmp|dng|cr2|cr3|nef|arw|raf|orf|rw2|pef|srw|svg|pdf|mp4|m4v|webm|mov)$/i.test(lower)
+  );
+}
+
+export async function generateCoreIxThumbnail(
+  attachmentId: string,
+  storageKey: string,
+  mime: string,
+  filename: string,
+): Promise<boolean> {
+  const config = await getAttachmentStorageConfig();
+  if (!usable(config) || !isCoreIxPreviewable(mime, filename)) return false;
+  const extension = EXTENSIONS[mime] ?? 'bin';
+  const tempKey = `media/analysis/${crypto.randomUUID()}.${extension}`;
+  try {
+    const data = await readAttachment(storageKey);
+    await putObject(tempKey, data, mime, 'attachment', { encrypted: false, cacheControl: 'no-store' });
+    const params: Record<string, string | number | undefined> = {
+      fmt: 'webp',
+      w: 960,
+      q: 72,
+      frame: mime === 'application/pdf' ? 0 : mime.startsWith('video/') ? 'auto' : undefined,
+    };
+    const response = await fetch(signedMediaUrl(config, tempKey, params), {
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) return false;
+    const type = response.headers.get('content-type') || '';
+    if (!type.startsWith('image/')) return false;
+    const thumbnail = Buffer.from(await response.arrayBuffer());
+    await storeAttachmentThumbnail(storageKey, thumbnail);
+    await query('UPDATE attachments SET has_thumbnail = true WHERE id = $1', [attachmentId]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await deleteObject(tempKey, 'attachment').catch(() => {});
+  }
 }
 
 export async function getProcessedShareImage(attachmentId: string): Promise<{ data: Buffer; mime: string; etag: string } | null> {
