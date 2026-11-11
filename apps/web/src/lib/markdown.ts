@@ -60,6 +60,28 @@ turndown.addRule('nhTable', {
   },
 });
 
+// Image grids are stored as a small HTML block because Markdown has no
+// native layout syntax. Keeping real <img> children inside the wrapper means
+// marked, DOMPurify and TipTap can all parse the same canonical source.
+turndown.addRule('imageGrid', {
+  filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).hasAttribute('data-image-grid'),
+  replacement: (_content, node) => {
+    const element = node as HTMLElement;
+    const raw = Number(element.getAttribute('data-columns'));
+    const columns = raw === 3 || raw === 4 ? raw : 2;
+    const images = Array.from(element.querySelectorAll('img[src]'));
+    if (!images.length) return '';
+    const lines = images.map((image) => {
+      const src = image.getAttribute('src') ?? '';
+      const alt = image.getAttribute('alt') ?? '';
+      const title = image.getAttribute('title') ?? '';
+      const titleAttribute = title ? ` title="${escapeHtml(title)}"` : '';
+      return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttribute}>`;
+    });
+    return `\n\n<div class="image-grid" data-image-grid="true" data-columns="${columns}">\n${lines.join('\n')}\n</div>\n\n`;
+  },
+});
+
 turndown.addRule('taskListItems', {
   filter: (node) =>
     node.nodeName === 'LI' &&

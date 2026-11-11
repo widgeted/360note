@@ -7,7 +7,7 @@
 - 中文版：<https://360biji.com>
 - English: <https://360note.com>
 - 仓库：<https://github.com/widgeted/360note>
-- 版本：0.1.54
+- 版本：0.1.55
 
 两个域名共用同一套账户、笔记、附件与团队空间；域名只决定界面与邮件语言。
 

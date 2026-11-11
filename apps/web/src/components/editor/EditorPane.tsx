@@ -923,7 +923,9 @@ export function EditorPane({
           editor={editor}
           onLink={openLinkDialog}
           onWiki={() => setShowWiki(true)}
-          onImage={(file) => editorHandle?.insertFiles([file])}
+          onImages={(files) => editorHandle?.insertFiles(files)}
+          onImageGrid={(columns) => editorHandle?.setImageGrid(columns)}
+          onUngroupImages={() => editorHandle?.ungroupImages()}
         />
       )}
 

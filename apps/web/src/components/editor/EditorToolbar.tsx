@@ -4,12 +4,15 @@ import {
   Bold,
   Code,
   Code2,
+  Columns2,
   Columns3,
+  Columns4,
   Heading1,
   Heading2,
   Heading3,
   ImagePlus,
   Italic,
+  LayoutGrid,
   Link2,
   List,
   ListChecks,
@@ -23,6 +26,7 @@ import {
   Strikethrough,
   Table2,
   Trash2,
+  Ungroup,
   Underline as UnderlineIcon,
   Undo2,
 } from 'lucide-react';
@@ -36,12 +40,16 @@ export function EditorToolbar({
   editor,
   onLink,
   onWiki,
-  onImage,
+  onImages,
+  onImageGrid,
+  onUngroupImages,
 }: {
   editor: Editor;
   onLink: () => void;
   onWiki: () => void;
-  onImage: (file: File) => void;
+  onImages: (files: File[]) => void;
+  onImageGrid: (columns: 2 | 3 | 4) => void;
+  onUngroupImages: () => void;
 }) {
   const t = useT();
   const isMobile = useIsMobile();
@@ -66,6 +74,7 @@ export function EditorToolbar({
       canUndo: current.can().undo(),
       canRedo: current.can().redo(),
       inTable: current.isActive('table'),
+      imageGridColumns: current.isActive('imageGrid') ? Number(current.getAttributes('imageGrid').columns) : null,
     }),
   });
 
@@ -150,6 +159,22 @@ export function EditorToolbar({
           <button type="button" className="tool-btn" onClick={() => fileRef.current?.click()} title={t('上传图片或附件')} aria-label={t('上传图片或附件')}>
             <ImagePlus size={15} />
           </button>
+          <Dropdown
+            trigger={
+              <button type="button" className="tool-btn" title={t('图片排版')} aria-label={t('图片排版')}>
+                <LayoutGrid size={15} />
+              </button>
+            }
+          >
+            {(close) => (
+              <>
+                <MenuItem icon={<Columns2 size={15} />} detail={state?.imageGridColumns === 2 ? '✓' : undefined} onClick={() => { close(); onImageGrid(2); }}>{t('一排 2 张')}</MenuItem>
+                <MenuItem icon={<Columns3 size={15} />} detail={state?.imageGridColumns === 3 ? '✓' : undefined} onClick={() => { close(); onImageGrid(3); }}>{t('一排 3 张')}</MenuItem>
+                <MenuItem icon={<Columns4 size={15} />} detail={state?.imageGridColumns === 4 ? '✓' : undefined} onClick={() => { close(); onImageGrid(4); }}>{t('一排 4 张')}</MenuItem>
+                <MenuItem icon={<Ungroup size={15} />} onClick={() => { close(); onUngroupImages(); }}>{t('拆分为单图')}</MenuItem>
+              </>
+            )}
+          </Dropdown>
           <button type="button" className="tool-btn" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title={t('插入表格')} aria-label={t('插入表格')}>
             <Table2 size={15} />
           </button>
@@ -172,9 +197,10 @@ export function EditorToolbar({
           ref={fileRef}
           type="file"
           hidden
+          multiple
           onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onImage(file);
+            const files = Array.from(event.target.files ?? []);
+            if (files.length) onImages(files);
             event.target.value = '';
           }}
         />

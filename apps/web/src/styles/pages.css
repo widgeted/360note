@@ -999,3 +999,91 @@
   text-align: center;
   color: var(--text-tertiary);
 }
+
+/* Image grids: a group of images shares the row height, so a portrait image
+   can never occupy a whole screen or a whole printed page on its own. */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 1.4em 0;
+  align-items: start;
+}
+
+.image-grid[data-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.image-grid[data-columns="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.image-grid > img,
+.image-grid > figure,
+.image-grid > p {
+  margin: 0;
+  min-width: 0;
+}
+
+.image-grid img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  max-height: none;
+  object-fit: contain;
+  background: var(--surface-sunken);
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.image-grid .prose-figure {
+  width: 100%;
+  margin: 0;
+}
+
+.image-grid figcaption {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .image-grid {
+    gap: 6px;
+  }
+
+  .image-grid[data-columns="3"],
+  .image-grid[data-columns="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  .image-grid {
+    gap: 4mm;
+    margin: 4mm 0;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .image-grid > img,
+  .image-grid > figure,
+  .image-grid > p {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Keep grid cells even in print, but stop a standalone portrait image from
+     consuming a whole page and leaving large blank areas around it. */
+  .prose img {
+    width: auto !important;
+    max-height: 150mm !important;
+  }
+
+  .image-grid img {
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    background: #f4f4f2 !important;
+  }
+}

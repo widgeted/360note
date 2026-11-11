@@ -383,6 +383,8 @@
 
 .prose img {
   max-width: 100%;
+  max-height: 60vh;
+  width: auto;
   height: auto;
   border-radius: 9px;
   margin: 1.3em auto;

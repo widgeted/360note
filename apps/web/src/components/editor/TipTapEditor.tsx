@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
-import { Extension, Node, mergeAttributes } from '@tiptap/core';
+import { Extension, Node, findParentNode, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
@@ -12,7 +12,7 @@ import Typography from '@tiptap/extension-typography';
 import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import type { DOMOutputSpec, Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import {
@@ -22,6 +22,7 @@ import {
   Heading2,
   Heading3,
   Image as ImageIcon,
+  LayoutGrid,
   Link2,
   List,
   ListChecks,
@@ -34,6 +35,7 @@ import { htmlToMarkdown, markdownToEditorHtml } from '../../lib/markdown';
 import { translate, useT } from '../../lib/i18n';
 import { attachmentThumbnailUrl, cn } from '../../lib/utils';
 import { isInlineImageMime } from '../../lib/media';
+import { toast } from '../../stores/toast';
 
 const lowlight = createLowlight(common);
 
@@ -211,6 +213,36 @@ const OptimizedImage = Image.extend({
   },
 });
 
+export type ImageGridColumns = 2 | 3 | 4;
+
+const ImageGrid = Node.create({
+  name: 'imageGrid',
+  group: 'block',
+  content: 'image+',
+  defining: true,
+
+  addAttributes() {
+    return {
+      columns: {
+        default: 2,
+        parseHTML: (element) => {
+          const value = Number(element.getAttribute('data-columns'));
+          return value === 3 || value === 4 ? value : 2;
+        },
+        renderHTML: (attributes) => ({ 'data-columns': String(attributes.columns) }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-image-grid]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-image-grid': 'true', class: 'image-grid' }), 0] satisfies DOMOutputSpec;
+  },
+});
+
 const UploadPlaceholder = Node.create<{
   retry: (id: string) => void;
   remove: (id: string) => void;
@@ -271,6 +303,8 @@ const UploadPlaceholder = Node.create<{
 export interface EditorHandle {
   editor: Editor;
   insertFiles: (files: File[]) => void;
+  setImageGrid: (columns: ImageGridColumns) => void;
+  ungroupImages: () => void;
 }
 
 export interface UploadedAttachment {
@@ -310,9 +344,13 @@ export function TipTapEditor({
   const uploadRef = useRef(uploadFile);
   const editorRef = useRef<Editor | null>(null);
   const insertFilesRef = useRef<(files: File[]) => void>(() => {});
+  const setImageGridRef = useRef<(columns: ImageGridColumns) => void>(() => {});
+  const ungroupImagesRef = useRef<() => void>(() => {});
   const retryUploadRef = useRef<(id: string) => void>(() => {});
   const removeUploadRef = useRef<(id: string) => void>(() => {});
   const uploadFilesRef = useRef(new Map<string, File>());
+  const uploadBatchesRef = useRef(new Map<string, { urls: Set<string>; completed: number; expected: number; columns: ImageGridColumns }>());
+  const uploadBatchByUploadIdRef = useRef(new Map<string, string>());
   const [slash, setSlash] = useState<{ left: number; top: number; bottom: number } | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   onChangeRef.current = onChange;
@@ -338,6 +376,7 @@ export function TipTapEditor({
         includeChildren: true,
       }),
       OptimizedImage.configure({ allowBase64: false, inline: false }),
+      ImageGrid,
       UploadPlaceholder.configure({
         retry: (id) => retryUploadRef.current(id),
         remove: (id) => removeUploadRef.current(id),
@@ -433,10 +472,136 @@ export function TipTapEditor({
     );
   }
 
+  function collectAdjacentImages(current: Editor): { images: ProseMirrorNode[]; from: number; to: number } | null {
+    const { state } = current;
+    const { $from } = state.selection;
+    const parent = $from.parent;
+    const index = $from.index();
+    let first = -1;
+    for (let i = Math.max(0, index - 1); i <= Math.min(parent.childCount - 1, index + 1); i++) {
+      if (parent.child(i).type.name === 'image') {
+        first = i;
+        break;
+      }
+    }
+    if (first < 0) return null;
+    let start = first;
+    let end = first;
+    while (start > 0 && parent.child(start - 1).type.name === 'image') start--;
+    while (end < parent.childCount - 1 && parent.child(end + 1).type.name === 'image') end++;
+    if (end - start < 1) return null;
+    let from = $from.start();
+    for (let i = 0; i < start; i++) from += parent.child(i).nodeSize;
+    let to = from;
+    const images: ProseMirrorNode[] = [];
+    for (let i = start; i <= end; i++) {
+      const child = parent.child(i);
+      images.push(child);
+      to += child.nodeSize;
+    }
+    return { images, from, to };
+  }
+
+  function findGridAtSelection(current: Editor): { node: ProseMirrorNode; pos: number } | null {
+    const { state } = current;
+    const existing = findParentNode((node) => node.type.name === 'imageGrid')(state.selection);
+    if (existing) return { node: existing.node, pos: existing.pos };
+    const { $from } = state.selection;
+    const parent = $from.parent;
+    const index = $from.index();
+    for (let i = Math.max(0, index - 1); i <= Math.min(parent.childCount - 1, index + 1); i++) {
+      const child = parent.child(i);
+      if (child.type.name !== 'imageGrid') continue;
+      let pos = $from.start();
+      for (let j = 0; j < i; j++) pos += parent.child(j).nodeSize;
+      return { node: child, pos };
+    }
+    return null;
+  }
+
+  function clampGridColumns(columns: ImageGridColumns, count: number): ImageGridColumns {
+    return Math.min(columns, Math.max(2, count)) as ImageGridColumns;
+  }
+
+  function setImageGrid(columns: ImageGridColumns): void {
+    const current = editorRef.current;
+    if (!current) return;
+    const { state, view } = current;
+    const existing = findGridAtSelection(current);
+    if (existing) {
+      const effective = clampGridColumns(columns, existing.node.childCount);
+      view.dispatch(state.tr.setNodeMarkup(existing.pos, undefined, { ...existing.node.attrs, columns: effective }).scrollIntoView());
+      return;
+    }
+    const adjacent = collectAdjacentImages(current);
+    if (!adjacent) {
+      toast('info', t('请把光标放在相邻的两张或更多图片上'));
+      return;
+    }
+    const gridNode = state.schema.nodes.imageGrid.create({ columns: clampGridColumns(columns, adjacent.images.length) }, adjacent.images);
+    const transaction = state.tr.replaceWith(adjacent.from, adjacent.to, gridNode);
+    transaction.setSelection(TextSelection.near(transaction.doc.resolve(adjacent.from + 1)));
+    view.dispatch(transaction.scrollIntoView());
+  }
+
+  function ungroupImages(): void {
+    const current = editorRef.current;
+    if (!current) return;
+    const { state, view } = current;
+    const existing = findGridAtSelection(current);
+    if (!existing) {
+      toast('info', t('请把光标放在图片组内'));
+      return;
+    }
+    const images: ProseMirrorNode[] = [];
+    existing.node.forEach((child) => images.push(child));
+    const transaction = state.tr.replaceWith(existing.pos, existing.pos + existing.node.nodeSize, images);
+    transaction.setSelection(TextSelection.near(transaction.doc.resolve(existing.pos + 1)));
+    view.dispatch(transaction.scrollIntoView());
+  }
+
+  function groupUploadedBatch(batchId: string): void {
+    const batch = uploadBatchesRef.current.get(batchId);
+    const current = editorRef.current;
+    if (!batch || !current) return;
+    const { state, view } = current;
+    const found: Array<{ node: ProseMirrorNode; pos: number }> = [];
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'image' && batch.urls.has(String(node.attrs.src ?? ''))) found.push({ node, pos });
+    });
+    if (found.length < 2) {
+      uploadBatchesRef.current.delete(batchId);
+      return;
+    }
+    const parent = state.doc.resolve(found[0].pos).parent;
+    for (let i = 1; i < found.length; i++) {
+      if (!state.doc.resolve(found[i].pos).parent.eq(parent)) {
+        uploadBatchesRef.current.delete(batchId);
+        return;
+      }
+      if (found[i - 1].pos + found[i - 1].node.nodeSize !== found[i].pos) {
+        uploadBatchesRef.current.delete(batchId);
+        return;
+      }
+    }
+    const gridNode = state.schema.nodes.imageGrid.create({ columns: batch.columns }, found.map((entry) => entry.node));
+    const first = found[0];
+    const last = found[found.length - 1];
+    const transaction = state.tr.replaceWith(first.pos, last.pos + last.node.nodeSize, gridNode);
+    transaction.setSelection(TextSelection.near(transaction.doc.resolve(first.pos + 1)));
+    view.dispatch(transaction.scrollIntoView());
+    uploadBatchesRef.current.delete(batchId);
+  }
+
   function removeUpload(id: string): void {
     const current = editorRef.current;
     const found = findUpload(id);
     uploadFilesRef.current.delete(id);
+    const batchId = uploadBatchByUploadIdRef.current.get(id);
+    if (batchId) {
+      uploadBatchByUploadIdRef.current.delete(id);
+      uploadBatchesRef.current.delete(batchId);
+    }
     if (!current || !found) return;
     current.chain().focus().deleteRange({ from: found.pos, to: found.pos + found.node.nodeSize }).run();
   }
@@ -448,12 +613,25 @@ export function TipTapEditor({
     if (!current || !found) return;
     const inlineImage = isInlineImageMime(result.mime);
     const previewImage = result.mime.startsWith('image/') && result.hasThumbnail && result.thumbnailUrl;
-    const content = inlineImage || previewImage
-      ? { type: 'image', attrs: { src: inlineImage ? result.url : result.thumbnailUrl, alt: '', title: '' } }
+    const src = inlineImage || previewImage ? (inlineImage ? result.url : result.thumbnailUrl) : null;
+    const content = src
+      ? { type: 'image', attrs: { src, alt: '', title: '' } }
       : { type: 'text', text: result.filename, marks: [{ type: 'link', attrs: { href: result.url } }] };
     current.chain().focus()
       .insertContentAt({ from: found.pos, to: found.pos + found.node.nodeSize }, content, { updateSelection: true })
       .run();
+    const batchId = uploadBatchByUploadIdRef.current.get(id);
+    uploadBatchByUploadIdRef.current.delete(id);
+    if (batchId) {
+      const batch = uploadBatchesRef.current.get(batchId);
+      if (batch) {
+        if (src) batch.urls.add(src);
+        batch.completed += 1;
+        if (batch.completed >= batch.expected) {
+          window.setTimeout(() => groupUploadedBatch(batchId), 0);
+        }
+      }
+    }
   }
 
   async function runUpload(id: string, file: File): Promise<void> {
@@ -471,12 +649,16 @@ export function TipTapEditor({
     }
   }
 
-  function insertUpload(file: File): void {
+  function insertUpload(file: File, id = crypto.randomUUID()): void {
     const current = editorRef.current;
     if (!current) return;
-    const id = crypto.randomUUID();
     uploadFilesRef.current.set(id, file);
-    current.chain().focus().insertContent({
+    // A block placeholder cannot live inside an image grid. Put it after the
+    // grid instead of splitting the existing group.
+    const insideGrid = findParentNode((node) => node.type.name === 'imageGrid')(current.state.selection);
+    const chain = current.chain().focus();
+    if (insideGrid) chain.setTextSelection(insideGrid.pos + insideGrid.node.nodeSize);
+    chain.insertContent({
       type: 'uploadPlaceholder',
       attrs: { uploadId: id, filename: file.name, progress: 0, error: null },
     }).run();
@@ -484,7 +666,18 @@ export function TipTapEditor({
   }
 
   function insertFiles(files: File[]): void {
-    for (const file of files) insertUpload(file);
+    if (!files.length) return;
+    if (files.length > 1) {
+      const batchId = crypto.randomUUID();
+      uploadBatchesRef.current.set(batchId, { urls: new Set(), completed: 0, expected: files.length, columns: 2 });
+      for (const file of files) {
+        const id = crypto.randomUUID();
+        uploadBatchByUploadIdRef.current.set(id, batchId);
+        insertUpload(file, id);
+      }
+      return;
+    }
+    insertUpload(files[0]);
   }
 
   function retryUpload(id: string): void {
@@ -495,12 +688,19 @@ export function TipTapEditor({
   }
 
   insertFilesRef.current = insertFiles;
+  setImageGridRef.current = setImageGrid;
+  ungroupImagesRef.current = ungroupImages;
   retryUploadRef.current = retryUpload;
   removeUploadRef.current = removeUpload;
 
   useEffect(() => {
     editorRef.current = editor ?? null;
-    onReadyRef.current(editor ? { editor, insertFiles: (files) => insertFilesRef.current(files) } : null);
+    onReadyRef.current(editor ? {
+      editor,
+      insertFiles: (files) => insertFilesRef.current(files),
+      setImageGrid: (columns) => setImageGridRef.current(columns),
+      ungroupImages: () => ungroupImagesRef.current(),
+    } : null);
     return () => {
       editorRef.current = null;
       onReadyRef.current(null);
@@ -617,6 +817,12 @@ export function TipTapEditor({
           description: t('插入 3 × 3 表格'),
           icon: <Table2 size={15} />,
           run: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+        },
+        {
+          title: t('图片组'),
+          description: t('把相邻图片排成 2 列'),
+          icon: <LayoutGrid size={15} />,
+          run: () => setImageGridRef.current(2),
         },
         {
           title: t('分割线'),

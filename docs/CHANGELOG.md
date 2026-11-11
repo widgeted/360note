@@ -3,7 +3,27 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.55] — 2026-11-11
+
+多图排版与打印修复。
+
+### Added
+
+- 多图一次上传自动组成图片组，默认 2 列。
+- 工具栏和斜杠菜单支持 2/3/4 列切换与“拆分为单图”。
+- 图片组在编辑器、公开分享页、HTML 导出和打印中使用同一套网格样式；点击组内图片仍打开原图。
+
+### Fixed
+
+- 竖构图图片不再独占整屏：单图屏幕最大高度 60vh；网格单元使用 4:3 画布，移动端 3/4 列自动降为 2 列。
+- 打印时图片组按行分页、单元格不跨页；单张图片限制最大高度 150mm，减少整页图片和前后大片空白。
+
+### Notes
+
+- Markdown 中图片组保存为带 `data-image-grid` / `data-columns` 的 HTML 块；Markdown 源码模式会看到该块。
+
 ## [0.1.54] — 2026-11-11
+
 
 补充媒体域名的备案与接入前置条件。
 
