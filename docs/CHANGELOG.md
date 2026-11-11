@@ -3,7 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.45] — 2026-11-11
+
+通知卡片正文对齐。
+
+### Fixed
+
+- 更新/安装等 PWA 通知卡片的正文左边缘与标题文字对齐，而不是贴在卡片最左侧。
+- 共享 `PwaNotice` 的安装提示与更新提示同时生效；通知中心和 Toast 的标题/正文原本已在同一内容列，保持不变。
+
 ## [0.1.44] — 2026-11-11
+
 
 跨窗口同步与 PWA 提示布局修正。
 

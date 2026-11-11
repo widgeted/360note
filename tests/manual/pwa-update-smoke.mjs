@@ -82,9 +82,11 @@ try {
   const iconBox = await notice.locator('.pwa-notice-icon').boundingBox();
   const titleBox = await notice.locator('.pwa-notice-title').boundingBox();
   const actionBox = await notice.locator('.pwa-notice-actions .btn').boundingBox();
+  const textBox = await notice.locator('.pwa-notice-text').boundingBox();
   results.newerBuildPromptVisible = Boolean(cardBox && titleBox && actionBox);
   results.closeTopRight = Boolean(cardBox && closeBox) && closeBox.x + closeBox.width > cardBox.x + cardBox.width - 20 && closeBox.y < titleBox.y + 8;
   results.iconCloseToTitle = Boolean(iconBox && titleBox) && titleBox.x - (iconBox.x + iconBox.width) <= 8;
+  results.contentAlignedWithTitle = Boolean(textBox && titleBox) && Math.abs(textBox.x - titleBox.x) < 1;
   results.actionBottomRight = Boolean(actionBox && cardBox && titleBox) && actionBox.y > titleBox.y + titleBox.height && actionBox.x + actionBox.width > cardBox.x + cardBox.width - 20;
   results.noticeTitle = await notice.locator('.pwa-notice-title').innerText();
   if (process.env.PAUSE === '1') await page.pause();

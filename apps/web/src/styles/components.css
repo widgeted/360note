@@ -2665,7 +2665,9 @@ a.btn {
 }
 
 .pwa-notice-text {
+  /* Align body copy with the title text after the 18px icon + 6px gap. */
   margin-top: 3px;
+  margin-left: 24px;
   color: var(--text-tertiary);
   font-size: 13px;
   line-height: 1.5;
