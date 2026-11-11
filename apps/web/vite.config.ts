@@ -82,7 +82,18 @@ export default defineConfig({
         skipWaiting: false,
         clientsClaim: true,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/s\//],
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/s\//,
+          /^\/sitemap/,
+          /^\/robots\.txt$/,
+          /^\/version\.json$/,
+          /^\/manifest\.webmanifest$/,
+          /^\/health$/,
+          /^\/(?:assets|icons|img)\//,
+          /^\/favicon\.(?:ico|png|svg)$/,
+          /^\/og-image\.png$/,
+        ],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         runtimeCaching: [
           {

@@ -3,7 +3,16 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.47] — 2026-11-11
+
+修复 PWA 拦截 sitemap。
+
+### Fixed
+
+- 将 `/sitemap*`、`/robots.txt`、`/version.json`、`/manifest.webmanifest`、`/health` 与静态资源加入 Workbox `navigateFallbackDenylist`。已登录且 Service Worker 生效时访问 `/sitemap.xml` 不再被 SPA 的 `/index.html` 兜底成“页面不存在”，而是正常返回 XML。
+
 ## [0.1.46] — 2026-11-11
+
 
 公开页面 SEO 基础配置。
 

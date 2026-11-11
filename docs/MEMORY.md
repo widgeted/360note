@@ -704,6 +704,13 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-11 · v0.1.47 修复 sitemap 被 PWA 拦截
+
+- 现象：已登录且有 Service Worker 的浏览器访问 `/sitemap.xml` 显示 SPA 404；未登录/无 SW 正常显示 XML。
+- 根因：Workbox `navigateFallback` 将所有非 `/api/`、`/s/` 的导航请求兜底到 `/index.html`。
+- 修复：denylist 增加 sitemap、robots、version.json、manifest、health、assets/icons/img/favicon/og-image。
+- 验证：登录并等待 SW 控制后访问 `/sitemap.xml`，应返回 XML 而不是 SPA 404。
+
 ## 2026-11-11 · v0.1.46 SEO 基础配置
 
 - `useDocumentTitle` 扩展为公开页 SEO hook：canonical、hreflang、description、robots、OG/Twitter、首页 WebSite JSON-LD；私有路由自动 noindex。
