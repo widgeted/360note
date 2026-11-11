@@ -3,7 +3,21 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.50] — 2026-11-11
+
+存储管理可读性、功能性图片 OCR 与 CoreIX 规划。
+
+### Changed
+
+- 备份连接设置、附件连接设置、图片加速设置默认折叠，点击“编辑连接设置”后才展开，降低误触风险。
+- 对象存储文件表改为单行、不换行、固定列宽和横向滚动；新增对象筛选与 CSV 导出。
+- 明确“媒体访问域名”是绑定到附件桶的 CDN/媒体域名根地址，不是 S3 Endpoint，也不是 `<bucket>.<endpoint>` 的拼接结果。
+- 新增“识别文档、发票、截图并自动 OCR”选项：上传图片后临时调用 CoreIX `fmt=aesthetics` 判断 `utility`，命中后调用 `fmt=tags`，把截图/发票/文档标签写入图片分析结果并自动排队 OCR；临时对象立即删除。
+- 搜索现在同时匹配附件 OCR 文本和图片标签（截图文/发票等），因此搜索“截图”“发票”或图片内文字都能找到相关笔记。
+- 新增附件媒体分析结果在编辑器附件区的标签展示。
+
 ## [0.1.49] — 2026-11-11
+
 
 附件媒体增强收尾。
 

@@ -1717,6 +1717,17 @@ const en: Record<string, string> = {
   "只填域名根地址，不要包含 Prefix；留空则关闭图片加速。": "Use the domain root only, without the prefix; leave empty to disable image acceleration.",
   "推荐使用缤纷云 S4（bitiful.com）：兼容 S3，并内置 CoreIX 图片处理。被分享的图片可按现代格式输出、控制质量与宽度，并可分析场景生成标签。原附件仍使用 AES-256-GCM 加密；只有被分享的图片才会生成未加密媒体副本。": "Bitiful S4 (bitiful.com) is recommended: S3 compatible with built-in CoreIX image processing. Shared images can use modern formats, quality and width limits, and scene labels. Original attachments remain AES-256-GCM encrypted; only shared images get an unencrypted media derivative.",
   "仅对可分享的笔记图片生效（含公开和密码保护分享）。媒体副本不包含加密，请为媒体域名配置 CDN 鉴权或私有访问；未分享的笔记图片不会上传。": "Applies only to images in shareable notes (including public and password-protected shares). Media derivatives are unencrypted; configure CDN authentication or private access. Images in notes that are not shared are never uploaded.",
+  "识别文档、发票、截图并自动 OCR": "Detect documents, invoices and screenshots for OCR",
+  "上传图片后会在缤纷云临时分析功能性图片；识别为截图、发票或文档时自动提取文字并参与搜索。临时分析对象会立即删除。": "Uploaded images are temporarily analyzed by Bitiful for functional content. Screenshots, invoices or documents are OCRed automatically and become searchable. The temporary analysis object is deleted immediately.",
+  "收起连接设置": "Hide connection settings",
+  "编辑连接设置": "Edit connection settings",
+  "筛选对象…": "Filter objects…",
+  "导出 CSV": "Export CSV",
+  "没有匹配的对象": "No matching objects",
+  "只填域名根地址，不要包含 Prefix；例如 https://img.example.com。不是 S3 Endpoint，也不是 <桶名>.<Endpoint> 拼接。": "Use the domain root only, without a prefix, e.g. https://img.example.com. This is not the S3 endpoint and is not <bucket>.<endpoint>.",
+  "备份副本会复制到对象存储；工作区备份可在“对象存储文件”中校验并恢复为副本。整站备份请按运维手册恢复。": "Backup copies are replicated to object storage; workspace backups can be verified and restored as a copy from “Object storage files”. Restore instance backups with the operations runbook.",
+  "更新附件对象存储": "Update attachment object storage",
+  "测试附件对象存储": "Test attachment object storage",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

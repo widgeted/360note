@@ -2570,17 +2570,39 @@ a.btn {
   text-decoration: none;
 }
 
-.admin-object-table td {
-  vertical-align: top;
+.admin-object-table {
+  min-width: 760px;
 }
 
-.admin-object-key {
-  min-width: 260px;
-  max-width: 520px;
+.admin-object-table th,
+.admin-object-table td {
+  padding: 6px 10px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-object-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 760px) {
+  .admin-object-tools {
+    flex-wrap: wrap;
+  }
+}
+
+.admin-object-table .admin-object-key {
+  min-width: 240px;
+  max-width: 420px;
   font-family: var(--font-mono);
   font-size: 13px;
-  overflow-wrap: anywhere;
   line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .text-green {

@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import { many, one, query } from '../db.js';
-import { getAttachmentStorageConfig, headObject, objectStorageConfigured, putObject, type AttachmentStorageConfig } from '../lib/object-storage.js';
+import { deleteObject, getAttachmentStorageConfig, headObject, objectStorageConfigured, putObject, type AttachmentStorageConfig } from '../lib/object-storage.js';
 import { isDisplayableImage, readAttachment } from '../lib/storage.js';
+import { queueOcr } from '../lib/ocr.js';
 
 interface MediaAttachmentRow {
   id: string;
@@ -89,6 +90,66 @@ export async function getProcessedShareImage(attachmentId: string): Promise<{ da
   const data = Buffer.from(await response.arrayBuffer());
   const etag = crypto.createHash('sha256').update(data).digest('hex');
   return { data, mime: contentType.split(';')[0], etag };
+}
+
+function functionalLabels(labels: string[]): string[] {
+  const blob = labels.join(' ').toLowerCase();
+  const output: string[] = [];
+  if (/screenshot|screen shot|webpage|ui|website/.test(blob)) output.push('截图', 'Screenshot');
+  if (/invoice|receipt|bill|financial|tax/.test(blob)) output.push('发票', 'Invoice');
+  if (/document|paper|form|printed|text/.test(blob)) output.push('文档', 'Document');
+  return [...new Set(output.length ? output : ['文档', 'Document'])];
+}
+
+/**
+ * Analyze a newly uploaded image for functional content (screenshots,
+ * invoices, documents). The analysis object is temporary and deleted at once.
+ * Only runs when the admin explicitly enables functional-image OCR.
+ */
+export async function detectFunctionalImage(
+  attachmentId: string,
+  storageKey: string,
+  mime: string,
+  log: { warn: (obj: unknown, msg?: string) => void },
+): Promise<void> {
+  const config = await getAttachmentStorageConfig();
+  if (!config.detectFunctionalImages || !isDisplayableImage(mime)) return;
+  if (!usable(config)) {
+    // Media processing is not configured yet; keep OCR working rather than
+    // silently dropping text extraction for every uploaded image.
+    await query('UPDATE attachments SET ocr_status = $2 WHERE id = $1', [attachmentId, 'pending']).catch(() => {});
+    queueOcr(attachmentId, storageKey, mime, log);
+    return;
+  }
+  const extension = EXTENSIONS[mime] ?? 'bin';
+  const tempKey = `media/analysis/${crypto.randomUUID()}.${extension}`;
+  try {
+    const data = await readAttachment(storageKey);
+    await putObject(tempKey, data, mime, 'attachment', { encrypted: false, cacheControl: 'no-store' });
+    const aestheticUrl = signedMediaUrl(config, tempKey, { fmt: 'aesthetics', w: 800 });
+    const aestheticResponse = await fetch(aestheticUrl, { signal: AbortSignal.timeout(20_000) });
+    if (!aestheticResponse.ok) return;
+    const aesthetic = (await aestheticResponse.json().catch(() => null)) as { utility?: boolean } | null;
+    if (!aesthetic?.utility) return;
+    const tagsUrl = signedMediaUrl(config, tempKey, { fmt: 'tags', 'tags-min': 0.3, 'tags-max': 10, w: 800 });
+    const tagsResponse = await fetch(tagsUrl, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+    const payload = tagsResponse?.ok
+      ? ((await tagsResponse.json().catch(() => null)) as { labels?: Array<{ name?: string }> } | null)
+      : null;
+    const labels = (payload?.labels ?? []).map((label) => String(label.name ?? '').trim()).filter(Boolean).slice(0, 10);
+    const merged = [...new Set([...labels, ...functionalLabels(labels)])];
+    await query(
+      'UPDATE attachments SET image_tags = $2::jsonb, media_analyzed_at = now(), ocr_status = $3 WHERE id = $1',
+      [attachmentId, JSON.stringify(merged), 'pending'],
+    );
+    queueOcr(attachmentId, storageKey, mime, log);
+  } catch (error) {
+    log.warn({ error, attachmentId }, 'functional image analysis failed');
+    await query('UPDATE attachments SET ocr_status = $2 WHERE id = $1', [attachmentId, 'pending']).catch(() => {});
+    queueOcr(attachmentId, storageKey, mime, log);
+  } finally {
+    await deleteObject(tempKey, 'attachment').catch(() => {});
+  }
 }
 
 export async function analyzeAttachmentImage(attachmentId: string): Promise<string[]> {

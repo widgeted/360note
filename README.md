@@ -7,7 +7,7 @@
 - 中文版：<https://360biji.com>
 - English: <https://360note.com>
 - 仓库：<https://github.com/widgeted/360note>
-- 版本：0.1.49
+- 版本：0.1.50
 
 两个域名共用同一套账户、笔记、附件与团队空间；域名只决定界面与邮件语言。
 
@@ -135,6 +135,7 @@ npm test
 | [`docs/MEMORY.md`](docs/MEMORY.md) | 当前状态、已知问题、重要决策 |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | 部署、运维、备份恢复、升级、事故响应 |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | 版本历史 |
+| [`docs/COREIX_PLAN.md`](docs/COREIX_PLAN.md) | 缤纷云 CoreIX 功能规划与验收 |
 | [`docs/decisions/`](docs/decisions/) | ADR 决策记录 |
 
 ---

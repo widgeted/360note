@@ -39,6 +39,7 @@ interface AttachmentStorageConfig {
   imageQuality: number;
   imageMaxWidth: number;
   imageTags: 'off' | 'suggest' | 'auto';
+  detectFunctionalImages: boolean;
   legacy: boolean;
   lastTestAt: string | null;
   lastTestOk: boolean | null;
@@ -85,6 +86,8 @@ export function OffsiteSettings() {
   const [attachmentCdnKey, setAttachmentCdnKey] = useState('');
   const [attachmentSaving, setAttachmentSaving] = useState(false);
   const [attachmentTesting, setAttachmentTesting] = useState(false);
+  const [backupEditing, setBackupEditing] = useState(false);
+  const [attachmentEditing, setAttachmentEditing] = useState(false);
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -99,6 +102,7 @@ export function OffsiteSettings() {
   const [purgeRemote, setPurgeRemote] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [objectsError, setObjectsError] = useState<string | null>(null);
+  const [objectQuery, setObjectQuery] = useState('');
   const pollRef = useRef<number | null>(null);
 
   const loadUsage = useCallback(async (force = false) => {
@@ -218,6 +222,7 @@ export function OffsiteSettings() {
       });
       setConfig(response.offsite);
       setSecret('');
+      setBackupEditing(false);
       await loadUsage(true);
       toast('success', t('设置已保存'));
     } catch (error) {
@@ -310,6 +315,7 @@ export function OffsiteSettings() {
       setAttachmentConfig(response.attachmentStorage);
       setAttachmentSecret('');
       setAttachmentCdnKey('');
+      setAttachmentEditing(false);
       await loadUsage(true);
       toast('success', t('附件存储设置已保存'));
     } catch (error) {
@@ -347,6 +353,27 @@ export function OffsiteSettings() {
 
   if (!config || !attachmentConfig) return null;
 
+  const visibleObjects = objects.filter((object) => {
+    const query = objectQuery.trim().toLowerCase();
+    if (!query) return true;
+    return object.key.toLowerCase().includes(query) || object.kind.toLowerCase().includes(query);
+  });
+
+  function exportObjects() {
+    const rows = [
+      ['key', 'kind', 'size', 'lastModified'],
+      ...visibleObjects.map((object) => [object.key, object.kind, String(object.size), object.lastModified ?? '']),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '360note-objects.csv';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
   const migration = usage?.migration;
   const busy = migrating || Boolean(migration?.running);
   const hasRemoteRows = (usage?.remote?.attachmentsCount ?? 0) > 0;
@@ -377,10 +404,15 @@ export function OffsiteSettings() {
             <div className="setting-row-title">{t('启用备份副本')}</div>
             <div className="setting-row-desc">{t('每次工作区/整站备份都会复制到对象存储。建议使用私有 bucket，并给最小权限的访问密钥。')}</div>
           </div>
-          <div className="setting-row-control">
+          <div className="setting-row-control" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setBackupEditing((value) => !value)}>
+              {backupEditing ? t('收起连接设置') : t('编辑连接设置')}
+            </button>
             <button type="button" className={`switch ${config.enabled ? 'on' : ''}`} onClick={() => setConfig({ ...config, enabled: !config.enabled })} aria-label={t('启用备份副本')} />
           </div>
         </div>
+        {backupEditing && (
+          <>
         <div className="offsite-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="field">
             <label>Endpoint</label>
@@ -426,8 +458,10 @@ export function OffsiteSettings() {
         </div>
         {config.lastError && <div className="form-error" style={{ marginTop: 10 }}>{config.lastError}</div>}
         <p className="setting-note" style={{ marginTop: 10 }}>
-          {t('备份副本只负责复制，不在应用内从远端恢复。需要恢复时，从 S3 下载 .3nb，再使用“上传备份文件”。')}
+          {t('备份副本会复制到对象存储；工作区备份可在“对象存储文件”中校验并恢复为副本。整站备份请按运维手册恢复。')}
         </p>
+          </>
+        )}
       </div>
 
       <div className="setting-card" style={{ marginTop: 12 }}>
@@ -443,13 +477,18 @@ export function OffsiteSettings() {
                 : t('附件当前保存在本机；启用后会先迁移已有附件，再切换新上传。')}
             </div>
           </div>
-          <div className="setting-row-control">
+          <div className="setting-row-control" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAttachmentEditing((value) => !value)}>
+              {attachmentEditing ? t('收起连接设置') : t('编辑连接设置')}
+            </button>
             <span className={`badge ${usage?.attachmentsEnabled ? 'badge-green' : 'badge-gray'}`}>
               {usage?.attachmentsEnabled ? t('对象存储') : t('本机')}
             </span>
           </div>
         </div>
 
+        {attachmentEditing && (
+          <>
         <div className="banner banner-info" style={{ marginBottom: 12 }}>
           <Sparkles size={15} />
           <div>{t('推荐使用缤纷云 S4（bitiful.com）：兼容 S3，并内置 CoreIX 图片处理。被分享的图片可按现代格式输出、控制质量与宽度，并可分析场景生成标签。原附件仍使用 AES-256-GCM 加密；只有被分享的图片才会生成未加密媒体副本。')}</div>
@@ -518,7 +557,7 @@ export function OffsiteSettings() {
           <div className="field">
             <label>{t('媒体访问域名')}</label>
             <input className="input mono" value={attachmentConfig.mediaBaseUrl} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, mediaBaseUrl: event.target.value })} placeholder="https://img.example.com" />
-            <span className="field-hint">{t('只填域名根地址，不要包含 Prefix；留空则关闭图片加速。')}</span>
+            <span className="field-hint">{t('只填域名根地址，不要包含 Prefix；例如 https://img.example.com。不是 S3 Endpoint，也不是 <桶名>.<Endpoint> 拼接。')}</span>
           </div>
           <div className="field">
             <label>{t('CDN 鉴权 Key')}</label>
@@ -557,6 +596,16 @@ export function OffsiteSettings() {
             <span className="field-hint">{t('分析在公开分享时进行；标签来自缤纷云图片识别。')}</span>
           </div>
         </div>
+        <label className="checkbox-row" style={{ marginTop: 12 }}>
+          <input type="checkbox" checked={attachmentConfig.detectFunctionalImages} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, detectFunctionalImages: event.target.checked })} />
+          <span>
+            <strong style={{ color: 'var(--text-soft)' }}>{t('识别文档、发票、截图并自动 OCR')}</strong>
+            <span className="field-hint" style={{ display: 'block' }}>{t('上传图片后会在缤纷云临时分析功能性图片；识别为截图、发票或文档时自动提取文字并参与搜索。临时分析对象会立即删除。')}</span>
+          </span>
+        </label>
+
+          </>
+        )}
 
         <div className="admin-stats" style={{ marginTop: 4 }}>
           <div className="setting-card">
@@ -650,7 +699,11 @@ export function OffsiteSettings() {
             <div className="setting-row-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('对象存储文件')}</div>
             <div className="setting-row-desc">{t('浏览、校验和恢复备份对象存储中的文件。恢复工作区备份会以副本形式合并，不覆盖现有内容。')}</div>
           </div>
-          <div className="setting-row-control">
+          <div className="setting-row-control admin-object-tools">
+            <input className="input input-sm" value={objectQuery} onChange={(event) => setObjectQuery(event.target.value)} placeholder={t('筛选对象…')} style={{ width: 180 }} />
+            <button type="button" className="btn btn-ghost btn-sm" onClick={exportObjects} disabled={visibleObjects.length === 0}>
+              <Download size={13} /> {t('导出 CSV')}
+            </button>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadObjects()} disabled={objectsLoading}>
               {objectsLoading ? <span className="spinner" /> : <RefreshCw size={13} />} {t('刷新文件')}
             </button>
@@ -662,9 +715,9 @@ export function OffsiteSettings() {
             <tbody>
               {objectsError ? (
                 <tr><td colSpan={5}><LoadFailure message={objectsError} onRetry={() => void loadObjects()} compact /></td></tr>
-              ) : objects.length === 0 ? (
-                <tr><td colSpan={5}><div className="context-empty">{objectsLoading ? t('加载中…') : t('没有对象或尚未配置连接')}</div></td></tr>
-              ) : objects.map((object) => (
+              ) : visibleObjects.length === 0 ? (
+                <tr><td colSpan={5}><div className="context-empty">{objectsLoading ? t('加载中…') : objectQuery ? t('没有匹配的对象') : t('没有对象或尚未配置连接')}</div></td></tr>
+              ) : visibleObjects.map((object) => (
                 <tr key={object.key}>
                   <td><div className="admin-object-key" title={object.key}>{object.key}</div></td>
                   <td>{object.kind === 'attachment' ? t('附件') : object.kind === 'workspace-backup' ? t('工作区备份') : object.kind === 'instance-backup' ? t('整站备份') : t('其他')}</td>

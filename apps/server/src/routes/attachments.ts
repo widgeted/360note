@@ -12,6 +12,8 @@ import { getNoteForUser } from '../services/notes.js';
 import { requireWorkspace } from '../services/workspaces.js';
 import { queueOcr } from '../lib/ocr.js';
 import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
+import { getAttachmentStorageConfig } from '../lib/object-storage.js';
+import { detectFunctionalImage } from '../services/media.js';
 
 export default async function attachmentRoutes(app: FastifyInstance) {
   app.post('/api/notes/:id/attachments', async (request, reply) => {
@@ -33,6 +35,8 @@ export default async function attachmentRoutes(app: FastifyInstance) {
       throw errors.badRequest('不支持 HEIC/HEIF 等图片格式。请使用 PNG、JPEG、WebP、GIF 或 AVIF。');
     }
     const filename = safeFilename(part.filename);
+    const attachmentStorage = await getAttachmentStorageConfig();
+    const functionalDetection = Boolean(attachmentStorage.detectFunctionalImages) && config.ocrEnabled && isDisplayableImage(mime);
     let width: number | null = null;
     let height: number | null = null;
     if (mime.startsWith('image/')) {
@@ -83,10 +87,11 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         width,
         height,
         auth.user.id,
-        config.ocrEnabled ? 'pending' : 'none',
+        config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
       ],
     );
-    if (config.ocrEnabled) void queueOcr(attachmentId, storageKey, mime, app.log);
+    if (config.ocrEnabled && !functionalDetection) void queueOcr(attachmentId, storageKey, mime, app.log);
+    if (functionalDetection) void detectFunctionalImage(attachmentId, storageKey, mime, app.log);
     return reply.status(201).send({
       attachment: {
         id: row!.id,
@@ -96,7 +101,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         size: Number(row!.size_bytes),
         width: row!.width,
         height: row!.height,
-        ocrStatus: config.ocrEnabled ? 'pending' : 'none',
+        ocrStatus: config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
         imageTags: [],
         createdAt: row!.created_at.toISOString(),
         url: `/api/attachments/${row!.id}/content`,

@@ -192,7 +192,7 @@ export async function listingNotes(input: {
         SELECT 1 FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
         WHERE nt.note_id = n.id AND t.name ILIKE ${p}
       ) OR EXISTS (
-        SELECT 1 FROM attachments a WHERE a.note_id = n.id AND a.deleted_at IS NULL AND (a.filename ILIKE ${p} OR a.ocr_text ILIKE ${p})
+        SELECT 1 FROM attachments a WHERE a.note_id = n.id AND a.deleted_at IS NULL AND (a.filename ILIKE ${p} OR a.ocr_text ILIKE ${p} OR a.image_tags::text ILIKE ${p})
       ))`,
     );
   }

@@ -34,6 +34,7 @@ export interface AttachmentStorageConfig extends ObjectStorageConfig {
   imageQuality: number;
   imageMaxWidth: number;
   imageTags: ImageTaggingMode;
+  detectFunctionalImages: boolean;
 }
 
 interface StoredObjectStorage {
@@ -56,6 +57,7 @@ interface StoredAttachmentStorage extends StoredObjectStorage {
   imageQuality?: number;
   imageMaxWidth?: number;
   imageTags?: ImageTaggingMode;
+  detectFunctionalImages?: boolean;
   lastTestAt?: string;
   lastTestOk?: boolean;
   lastError?: string | null;
@@ -99,6 +101,7 @@ const MEDIA_DEFAULTS = {
   imageQuality: 82,
   imageMaxWidth: 1600,
   imageTags: 'suggest' as ImageTaggingMode,
+  detectFunctionalImages: false,
 };
 
 /**
@@ -126,6 +129,7 @@ export async function getAttachmentStorageConfig(): Promise<AttachmentStorageCon
       imageQuality: Math.min(95, Math.max(40, Number(stored.imageQuality) || MEDIA_DEFAULTS.imageQuality)),
       imageMaxWidth: Math.min(4096, Math.max(0, Number(stored.imageMaxWidth) || MEDIA_DEFAULTS.imageMaxWidth)),
       imageTags: stored.imageTags ?? MEDIA_DEFAULTS.imageTags,
+      detectFunctionalImages: stored.detectFunctionalImages ?? MEDIA_DEFAULTS.detectFunctionalImages,
     };
   }
   const legacy = await getBackupStorageConfig();
@@ -172,6 +176,7 @@ export async function saveAttachmentStorageConfig(input: Partial<AttachmentStora
     imageQuality: input.imageQuality ?? existing.imageQuality ?? MEDIA_DEFAULTS.imageQuality,
     imageMaxWidth: input.imageMaxWidth ?? existing.imageMaxWidth ?? MEDIA_DEFAULTS.imageMaxWidth,
     imageTags: input.imageTags ?? existing.imageTags ?? MEDIA_DEFAULTS.imageTags,
+    detectFunctionalImages: input.detectFunctionalImages ?? existing.detectFunctionalImages ?? MEDIA_DEFAULTS.detectFunctionalImages,
     lastTestAt: existing.lastTestAt,
     lastTestOk: existing.lastTestOk,
     lastError: existing.lastError,
@@ -199,6 +204,7 @@ export async function attachmentStoragePublicConfig(): Promise<Record<string, un
     imageQuality: config.imageQuality,
     imageMaxWidth: config.imageMaxWidth,
     imageTags: config.imageTags,
+    detectFunctionalImages: config.detectFunctionalImages,
     legacy,
     lastTestAt: stored.lastTestAt ?? null,
     lastTestOk: stored.lastTestOk ?? null,

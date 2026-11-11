@@ -109,7 +109,7 @@ export default async function noteRoutes(app: FastifyInstance) {
            OR EXISTS (
              SELECT 1 FROM attachments a
              WHERE a.note_id = n.id AND a.deleted_at IS NULL
-               AND (a.filename ILIKE $3 ESCAPE '\\' OR a.ocr_text ILIKE $3 ESCAPE '\\')
+               AND (a.filename ILIKE $3 ESCAPE '\\' OR a.ocr_text ILIKE $3 ESCAPE '\\' OR a.image_tags::text ILIKE $3 ESCAPE '\\')
            )
          )
        ORDER BY rank DESC, n.is_pinned DESC, n.updated_at DESC
@@ -124,7 +124,7 @@ export default async function noteRoutes(app: FastifyInstance) {
            OR n.title ILIKE $3 ESCAPE '\\'
            OR n.content_md ILIKE $3 ESCAPE '\\'
            OR EXISTS (SELECT 1 FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = n.id AND t.name ILIKE $3 ESCAPE '\\')
-           OR EXISTS (SELECT 1 FROM attachments a WHERE a.note_id = n.id AND a.deleted_at IS NULL AND (a.filename ILIKE $3 ESCAPE '\\' OR a.ocr_text ILIKE $3 ESCAPE '\\'))
+           OR EXISTS (SELECT 1 FROM attachments a WHERE a.note_id = n.id AND a.deleted_at IS NULL AND (a.filename ILIKE $3 ESCAPE '\\' OR a.ocr_text ILIKE $3 ESCAPE '\\' OR a.image_tags::text ILIKE $3 ESCAPE '\\'))
          )`,
       [params.workspaceId, q, like],
     );
@@ -138,7 +138,7 @@ export default async function noteRoutes(app: FastifyInstance) {
       `SELECT a.id, a.note_id, n.title AS note_title, a.filename, a.mime
        FROM attachments a JOIN notes n ON n.id = a.note_id
        WHERE n.workspace_id = $1 AND n.deleted_at IS NULL AND n.trashed_at IS NULL AND a.deleted_at IS NULL
-         AND (a.filename ILIKE $2 ESCAPE '\\' OR a.ocr_text ILIKE $2 ESCAPE '\\')
+         AND (a.filename ILIKE $2 ESCAPE '\\' OR a.ocr_text ILIKE $2 ESCAPE '\\' OR a.image_tags::text ILIKE $2 ESCAPE '\\')
        ORDER BY a.created_at DESC LIMIT 12`,
       [params.workspaceId, like],
     );

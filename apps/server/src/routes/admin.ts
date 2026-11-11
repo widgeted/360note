@@ -562,6 +562,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         imageQuality: z.number().int().min(40).max(95),
         imageMaxWidth: z.number().int().min(0).max(4096),
         imageTags: z.enum(['off', 'suggest', 'auto']),
+        detectFunctionalImages: z.boolean(),
       }),
       request.body,
     );
