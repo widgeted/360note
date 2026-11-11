@@ -2,7 +2,7 @@
 /**
  * Manual PWA update-prompt regression:
  * - same build + waiting worker => no prompt
- * - newer build + waiting worker on /app => prompt with shared PwaNotice layout
+ * - newer build + waiting worker on /app => prompt with PwaNotice layout
  * - newer build + waiting worker on a public share route => no prompt
  *
  * Run: sudo /opt/node22/bin/node tests/manual/pwa-update-smoke.mjs
@@ -83,9 +83,9 @@ try {
   const titleBox = await notice.locator('.pwa-notice-title').boundingBox();
   const actionBox = await notice.locator('.pwa-notice-actions .btn').boundingBox();
   results.newerBuildPromptVisible = Boolean(cardBox && titleBox && actionBox);
-  results.closeTopLeft = Boolean(cardBox && closeBox) && closeBox.x < cardBox.x + 16 && closeBox.y < titleBox.y + 8;
+  results.closeTopRight = Boolean(cardBox && closeBox) && closeBox.x + closeBox.width > cardBox.x + cardBox.width - 20 && closeBox.y < titleBox.y + 8;
   results.iconCloseToTitle = Boolean(iconBox && titleBox) && titleBox.x - (iconBox.x + iconBox.width) <= 8;
-  results.actionBottomLeft = Boolean(actionBox && titleBox) && actionBox.y > titleBox.y + titleBox.height && Math.abs(actionBox.x - titleBox.x) < 4;
+  results.actionBottomRight = Boolean(actionBox && cardBox && titleBox) && actionBox.y > titleBox.y + titleBox.height && actionBox.x + actionBox.width > cardBox.x + cardBox.width - 20;
   results.noticeTitle = await notice.locator('.pwa-notice-title').innerText();
   if (process.env.PAUSE === '1') await page.pause();
   await page.screenshot({ path: '/tmp/opencode/pwa-update-desktop.png', fullPage: false });

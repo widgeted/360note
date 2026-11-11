@@ -3,7 +3,26 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.44] — 2026-11-11
+
+跨窗口同步与 PWA 提示布局修正。
+
+### Added
+
+- 同一浏览器的多个标签页通过 `BroadcastChannel` 同步笔记保存：其他窗口打开同一篇笔记且没有未保存修改时自动更新；有未保存修改时显示“另一窗口已更新”提示，可加载最新版本或保留本地修改并在下次保存时自动合并。
+
+### Changed
+
+- PWA 更新/安装提示的关闭按钮移到右上角，操作按钮移到右下角；图标仍紧贴标题。
+
+### Fixed
+
+- 修复两个窗口编辑同一篇笔记时另一个窗口无反应、也没有冲突提示的问题。
+- 通知展开后保留卡片背景，行动链接不再落在背景外。
+- 修复英文相对时间出现“1 undefinedday ago”：正则可选捕获组未匹配时不再插入 `undefined`。
+
 ## [0.1.43] — 2026-11-11
+
 
 PWA 更新提示纠正与统一。
 

@@ -22,6 +22,7 @@ import { toast } from './toast';
 import { translate } from '../lib/i18n';
 import { untitledNoteTitle } from '../lib/utils';
 import { mergeText } from '../lib/merge';
+import { broadcastNoteSaved } from '../lib/sync';
 
 export type NoteFilter = 'all' | 'recent' | 'favorites' | 'trash' | 'folder' | 'tag';
 export type NoteSort = 'updated' | 'created' | 'title' | 'opened';
@@ -76,6 +77,7 @@ interface AppState {
   closeNote: () => void;
   createNote: (input?: { title?: string; contentMd?: string; folderId?: string | null; tagNames?: string[]; tagIds?: string[] }) => Promise<Note | null>;
   saveNote: (input: { noteId: string; title: string; contentMd: string; baseVersion: number; reason?: 'auto' | 'manual' }) => Promise<{ ok: boolean; note?: Note; queued?: boolean; error?: string }>;
+  applyRemoteNote: (note: Note) => void;
   updateNoteMeta: (patch: { title?: string; folderId?: string | null; isFavorite?: boolean; isPinned?: boolean; tagIds?: string[] }) => Promise<void>;
   toggleFavorite: (noteId?: string) => Promise<void>;
   togglePinned: (noteId?: string) => Promise<void>;
@@ -629,6 +631,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  applyRemoteNote: (note) => {
+    set({
+      note: get().note?.id === note.id ? note : get().note,
+      notes: upsertSummary(get().notes, note),
+      syncState: 'saved',
+      syncMessage: null,
+      lastSavedAt: Date.now(),
+      conflictNoteId: null,
+      reloadTick: get().reloadTick + 1,
+    });
+    void cacheNote(note);
+  },
+
   saveNote: async ({ noteId, title, contentMd, baseVersion, reason = 'auto' }) => {
     const current = get().note;
     if (!current || current.id !== noteId) return { ok: false, error: 'note-changed' };
@@ -676,6 +691,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         conflictNoteId: null,
       });
       await cacheNote(note);
+      broadcastNoteSaved(note);
       await removeOutboxByNote(note.id);
       set({ pendingCount: (await readOutbox()).length });
       await persistSnapshot(get());
@@ -1056,6 +1072,7 @@ async function resolveConflict(
         reloadTick: get().reloadTick + 1,
       });
       await cacheNote(note);
+      broadcastNoteSaved(note);
       return note;
     } catch {
       /* fall through to conflict copy */

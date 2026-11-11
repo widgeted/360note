@@ -85,6 +85,9 @@ try {
   results.notificationItems = await page.locator('.notification-item').count();
   results.markedReadOnExpand = results.unreadCountAfter === 0;
   results.actionVisible = (await expandedItem.locator('.notification-action').count()) === 1;
+  results.expandedItemBackground = await expandedItem.evaluate((element) => getComputedStyle(element).backgroundColor);
+  results.actionInsideNotification = await expandedItem.locator('.notification-action').evaluate((element) => Boolean(element.closest('.notification-item')));
+  results.actionHasCardBackground = results.actionInsideNotification && results.expandedItemBackground !== 'rgba(0, 0, 0, 0)';
   await page.keyboard.press('Escape');
 
   const workspaceId = await page.evaluate(async () => {

@@ -4,8 +4,8 @@ import { cn } from '../lib/utils';
 
 /**
  * Shared compact notice card for PWA install/update prompts.
- * Close is anchored top-left, icon sits next to the title, actions live at the
- * bottom-left so these prompts match the notification rows used elsewhere.
+ * Close is anchored top-right, icon sits next to the title, actions live at
+ * the bottom-right so these prompts match the notification rows used elsewhere.
  */
 export function PwaNotice({
   icon,

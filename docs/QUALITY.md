@@ -410,6 +410,7 @@
 - 缓存隔离：`cache-isolation-test.mjs` 验证切换账户清除旧缓存、显式登出清除 IndexedDB。
 - 客户端 IP：nginx 覆盖 `X-Forwarded-For` 为 `CF-Connecting-IP`，Fastify `TRUST_PROXY=127.0.0.1`；已用伪造 XFF 验证不会写入审计。
 
+- `tests/manual/cross-tab-sync-smoke.mjs`：两个标签页同笔记，干净标签自动更新；脏标签显示远端更新提示并保留本地修改。
 - `tests/manual/pwa-update-smoke.mjs`：同构建 waiting worker 不提示；新构建提示；关闭左上、图标贴标题、操作按钮左下；分享路由不提示。
 - `tests/manual/notification-caption-smoke.mjs`：未读通知浅绿背景/摘要折叠/展开已读、全部笔记计数稳定、编辑器 caption 可见、分享/打印 caption 居中、图片预览按钮尺寸。
 - `tests/manual/authenticated-smoke.mjs`：管理员 6 个页签、2FA 重认证、移动设置 3 列、PWA SW。

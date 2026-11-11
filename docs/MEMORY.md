@@ -702,6 +702,13 @@ apps/web/src/styles/tokens.css        设计 token
 - 空间菜单展开右对齐（align=end, width=trigger），收起左对齐（align=start, auto）。
 - 设计文档已从“全宽触发器统一左对齐”改为上述规则。
 
+## 2026-11-11 · v0.1.44 跨窗口同步与 PWA 布局修正
+
+- 新增 `lib/sync.ts` BroadcastChannel：保存成功后广播完整 Note；其他标签页同笔记且未脏时自动 `applyRemoteNote`，脏时显示“另一窗口已更新”提示，保留本地修改或确认丢弃后加载远端。
+- 下次保存仍走服务端 409 合并；不把远端版直接覆盖本地未保存内容。
+- PwaNotice 关闭按钮改为右上角，操作按钮右下角；测试脚本新增右上/右下几何断言。
+- 验证：双标签页 Playwright 通过（干净标签自动更新；脏标签显示“另一窗口已更新”并保留本地文字）；PWA 提示右上关闭/右下操作通过；通知展开后行动链接在卡片背景内；英文 1 天前修正为 `1 day ago`。生产已部署 0.1.44。
+
 ## 2026-11-11 · v0.1.43 PWA 更新提示纠正
 
 - 新增构建产物 `/version.json` 与 `app-build` meta；更新提示仅在 waiting worker 存在且远端 build 与当前页面不同时显示。

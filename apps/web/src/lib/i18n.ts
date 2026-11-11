@@ -1674,6 +1674,13 @@ const en: Record<string, string> = {
   "删除模板": "Delete template",
   "Markdown 与排版速查": "Markdown & formatting",
   "未读": "Unread",
+  "另一窗口已更新这篇笔记": "Another tab updated this note",
+  "你的未保存修改仍保留；加载最新版本会丢弃它们，继续保存会自动合并。": "Your unsaved changes are still here. Loading the latest version discards them; continuing to save merges automatically.",
+  "保留我的编辑": "Keep my edits",
+  "加载最新版本": "Load latest version",
+  "加载最新版本？": "Load the latest version?",
+  "另一窗口已更新这篇笔记。加载最新版本会丢弃你当前未保存的修改；选择“保留我的编辑”后继续保存会自动合并。": "Another tab updated this note. Loading the latest version discards your unsaved changes; choose “Keep my edits” and the next save will merge automatically.",
+  "丢弃并加载": "Discard and load",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;
@@ -1696,7 +1703,7 @@ const EN_SINGULARS: Record<string, string> = {
 function singularizeEnglish(output: string): string {
   return output.replace(
     /\b1 (active |daily |new |saved )?(notes|spaces|members|attachments|links|words|characters|backups|days|people|copies)\b/g,
-    (_match, qualifier: string, noun: string) => `1 ${qualifier}${EN_SINGULARS[noun] ?? noun}`,
+    (_match, qualifier: string | undefined, noun: string) => `1 ${qualifier ?? ''}${EN_SINGULARS[noun] ?? noun}`,
   );
 }
 

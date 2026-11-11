@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { Note } from '@360note/shared';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -45,6 +46,7 @@ import {
 } from '../../lib/utils';
 import { api, downloadBlob } from '../../lib/api';
 import { saveDraft, readDraft, clearDraft, type Draft } from '../../lib/offline';
+import { subscribeNoteSaved } from '../../lib/sync';
 import { escapeHtml } from '../../lib/utils';
 import { markdownToEditorHtml, renderMarkdown, stripDuplicateTitle } from '../../lib/markdown';
 import { Dropdown, MenuItem } from '../Dropdown';
@@ -135,6 +137,8 @@ export function EditorPane({
   const [voiceActive, setVoiceActive] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [imageCaption, setImageCaption] = useState<{ src: string; alt: string; caption: string } | null>(null);
+  const [remoteNote, setRemoteNote] = useState<Note | null>(null);
+  const [remoteOpen, setRemoteOpen] = useState(false);
 
   useEffect(() => {
     function onEdit(event: Event) {
@@ -241,6 +245,22 @@ export function EditorPane({
   }, [note?.version, note?.id]);
 
   useEffect(() => {
+    if (!note) return;
+    return subscribeNoteSaved((remote) => {
+      if (remote.id !== note.id || remote.workspaceId !== note.workspaceId) return;
+      if (remote.version <= baseVersionRef.current) return;
+      if (dirtyRef.current) {
+        // Keep the user's unsaved words visible; resolve on demand or on the
+        // next save (the server returns 409 and the store merges).
+        setRemoteNote(remote);
+        return;
+      }
+      setRemoteNote(null);
+      useAppStore.getState().applyRemoteNote(remote);
+    });
+  }, [note?.id, note?.workspaceId]);
+
+  useEffect(() => {
     if (note) document.title = `${title || t('未命名笔记')} — ${getLocale() === 'zh-CN' ? '360笔记' : '360note'}`;
     return () => {
       document.title = getLocale() === 'zh-CN' ? '360笔记 — 把想法留下' : '360note — Keep ideas';
@@ -329,6 +349,7 @@ export function EditorPane({
           reason,
         });
         if (result.ok && result.note) {
+          setRemoteNote(null);
           if (useAppStore.getState().note?.id === noteId) baseVersionRef.current = result.note.version;
           if (titleValueRef.current === currentTitle && contentRef.current === currentContent) {
             dirtyRef.current = false;
@@ -452,6 +473,21 @@ export function EditorPane({
     contentRef.current = next;
     scheduleSave();
     scheduleDraft();
+  }
+
+
+  function loadRemoteVersion() {
+    if (!remoteNote) return;
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    saveQueuedRef.current = false;
+    dirtyRef.current = false;
+    useAppStore.getState().applyRemoteNote(remoteNote);
+    void clearDraft(remoteNote.id);
+    setRemoteNote(null);
+    setRemoteOpen(false);
   }
 
   function saveImageCaption() {
@@ -832,6 +868,21 @@ export function EditorPane({
           </div>
         </div>
       )}
+      {remoteNote && !conflictNoteId && (
+        <div style={{ padding: '10px 18px 0' }}>
+          <div className="banner banner-warning" style={{ maxWidth: 900, margin: '0 auto' }}>
+            <AlertTriangle size={15} />
+            <div className="banner-body">
+              <strong>{t('另一窗口已更新这篇笔记')}</strong>
+              {' · '}{t('你的未保存修改仍保留；加载最新版本会丢弃它们，继续保存会自动合并。')}
+            </div>
+            <div className="banner-actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRemoteNote(null)}>{t('保留我的编辑')}</button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setRemoteOpen(true)}>{t('加载最新版本')}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {conflictNoteId && (
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-warning" style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -1133,6 +1184,16 @@ export function EditorPane({
       >
         <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{note.title}</p>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={remoteOpen}
+        onClose={() => setRemoteOpen(false)}
+        onConfirm={loadRemoteVersion}
+        title={t('加载最新版本？')}
+        description={t('另一窗口已更新这篇笔记。加载最新版本会丢弃你当前未保存的修改；选择“保留我的编辑”后继续保存会自动合并。')}
+        confirmLabel={t('丢弃并加载')}
+        danger
+      />
 
       {voiceActive && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 50 }} className="animate-rise">
