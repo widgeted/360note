@@ -577,6 +577,7 @@ export function OffsiteSettings() {
             <label>{t('媒体访问域名')}</label>
             <input className="input mono" value={attachmentConfig.mediaBaseUrl} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, mediaBaseUrl: event.target.value })} placeholder="https://img.example.com" />
             <span className="field-hint">{t('只填域名根地址，不要包含 Prefix；例如 https://img.example.com。不是 S3 Endpoint，也不是 <桶名>.<Endpoint> 拼接。')}</span>
+            <span className="field-hint">{t('域名需已完成 ICP 备案，并已在缤纷云 CDN 绑定到附件桶、CNAME 生效；未备案域名无法添加为加速域名。')}</span>
           </div>
           <div className="field">
             <label>{t('CDN 鉴权 Key')}</label>

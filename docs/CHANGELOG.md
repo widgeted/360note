@@ -3,7 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.54] — 2026-11-11
+
+补充媒体域名的备案与接入前置条件。
+
+### Docs
+
+- 媒体访问域名字段增加提示：域名需完成 ICP 备案，并在缤纷云 CDN 绑定附件桶、CNAME 与证书生效；未备案域名无法添加为加速域名。
+- 设计系统与 CoreIX 规划同步记录备案、CDN 绑定和 CNAME/证书的配置顺序，并明确未配置时的回退行为。
+
 ## [0.1.53] — 2026-11-11
+
 
 编辑器上传兼容与缩略图回退修复。
 

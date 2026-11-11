@@ -1731,6 +1731,7 @@ const en: Record<string, string> = {
   "未配置域名": "Domain not set",
   "媒体域名已填写，但附件对象存储尚未启用；启用后图片加速、图片标签、功能性图片识别和 HEIC/PDF/视频封面才会生效。": "A media domain is set, but attachment object storage is not enabled yet. Image acceleration, image tags, functional-image detection and HEIC/PDF/video covers start working after storage is enabled.",
   "尚未配置媒体访问域名：分享图片优化、图片标签、功能性图片识别和 HEIC/PDF/视频封面不会生效；附件上传下载与本地 OCR 不受影响。": "No media domain is configured: share image optimization, image tags, functional-image detection and HEIC/PDF/video covers will not run. Attachment upload/download and local OCR still work.",
+  "域名需已完成 ICP 备案，并已在缤纷云 CDN 绑定到附件桶、CNAME 生效；未备案域名无法添加为加速域名。": "The domain must have ICP filing, be bound to the attachment bucket in Bitiful CDN, and have its CNAME active. Unfiled domains cannot be added as CDN acceleration domains.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;
