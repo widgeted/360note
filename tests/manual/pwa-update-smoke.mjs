@@ -56,6 +56,9 @@ try {
   await samePage.waitForURL(/\/app/, { timeout: 20_000 });
   await samePage.waitForTimeout(1500);
   results.sameBuildPromptHidden = (await samePage.locator('.pwa-notice.is-top').count()) === 0;
+  await samePage.evaluate(async () => {
+    await fetch('/api/auth/logout', { method: 'POST', headers: { 'x-360note-csrf': '1' } });
+  }).catch(() => {});
   await sameContext.close();
 
   // Newer build: route version.json to a different build.
