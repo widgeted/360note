@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MoreHorizontal, Share, SquarePlus, X } from 'lucide-react';
+import { MoreHorizontal, Share, SquarePlus } from 'lucide-react';
 import { useT } from '../lib/i18n';
+import { PwaNotice } from './PwaNotice';
 
 const STORAGE_KEY = 'nh-pwa-install-v1';
 const SHOW_DELAY_MS = 10_000;
@@ -114,30 +115,27 @@ export function PwaInstallPrompt() {
   }
 
   return (
-    <div className="pwa-install" role="dialog" aria-live="polite" aria-label={t('添加到主屏幕')}>
-      <img className="pwa-install-icon" src="/icons/icon-192.png" alt="" />
-      <div className="pwa-install-body">
-        <div className="pwa-install-title">{t('把 360笔记添加到主屏幕')}</div>
-        <div className="pwa-install-text">
-          {mode === 'ios' ? (
-            <>
-              {t('点击')}{' '}<MoreHorizontal size={13} />{' '}{t('“更多”')}{t('，再点击菜单中的')}{' '}<Share size={13} />{' '}{t('“共享”')}{t('，然后选择')}{' '}<SquarePlus size={13} />{' '}{t('“添加到主屏幕”')}
-            </>
-          ) : (
-            t('安装后可以像 App 一样打开，离线草稿仍会保留。')
-          )}
-        </div>
-      </div>
-      <div className="pwa-install-actions">
-        {mode === 'chromium' && (
+    <PwaNotice
+      title={t('把 360笔记添加到主屏幕')}
+      closeLabel={t('不再提示')}
+      ariaLabel={t('添加到主屏幕')}
+      icon={<img className="pwa-notice-app-icon" src="/icons/icon-192.png" alt="" />}
+      onClose={dismiss}
+      actions={
+        mode === 'chromium' ? (
           <button type="button" className="btn btn-primary btn-sm" onClick={() => void install()} disabled={installing}>
             {installing ? <span className="spinner" /> : null} {t('安装')}
           </button>
-        )}
-        <button type="button" className="icon-btn icon-btn-sm" onClick={dismiss} title={t('不再提示')} aria-label={t('不再提示')}>
-          <X size={15} />
-        </button>
-      </div>
-    </div>
+        ) : undefined
+      }
+    >
+      {mode === 'ios' ? (
+        <>
+          {t('点击')}{' '}<MoreHorizontal size={13} />{' '}{t('“更多”')}{t('，再点击菜单中的')}{' '}<Share size={13} />{' '}{t('“共享”')}{t('，然后选择')}{' '}<SquarePlus size={13} />{' '}{t('“添加到主屏幕”')}
+        </>
+      ) : (
+        t('安装后可以像 App 一样打开，离线草稿仍会保留。')
+      )}
+    </PwaNotice>
   );
 }

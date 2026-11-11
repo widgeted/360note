@@ -702,6 +702,13 @@ apps/web/src/styles/tokens.css        设计 token
 - 空间菜单展开右对齐（align=end, width=trigger），收起左对齐（align=start, auto）。
 - 设计文档已从“全宽触发器统一左对齐”改为上述规则。
 
+## 2026-11-11 · v0.1.43 PWA 更新提示纠正
+
+- 新增构建产物 `/version.json` 与 `app-build` meta；更新提示仅在 waiting worker 存在且远端 build 与当前页面不同时显示。
+- 更新提示只在 `/app`、`/new`、`/search`、`/clip` 显示，不在公开分享页/登录页出现。
+- 同一 waiting worker 被关闭后不再反复弹出；修复重复 `updatefound` 监听，刷新按钮增加保底 reload。
+- PwaInstallPrompt 与 PwaUpdatePrompt 共用 `PwaNotice`：关闭左上、图标贴标题、操作按钮左下，视觉与通知行统一。
+
 ## 2026-11-10 · v0.1.41 通知/计数/图片说明收尾
 
 - 通知：未读淡绿背景 + 未读徽标；默认摘要，点击展开完整内容并标记已读；操作按钮独立，支持键盘。

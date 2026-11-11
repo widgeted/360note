@@ -13,24 +13,33 @@ const versionFiles = [
   'public/icons/apple-touch-icon-152.png',
   'public/icons/apple-touch-icon-167.png',
 ];
-const assetVersion = crypto
-  .createHash('sha256')
-  .update(versionFiles.map((file) => {
-    try {
-      return fs.readFileSync(path.resolve(__dirname, file));
-    } catch {
-      return file;
-    }
-  }).join('\n'))
-  .digest('hex')
-  .slice(0, 10);
+const hash = crypto.createHash('sha256');
+for (const file of versionFiles) {
+  try {
+    hash.update(fs.readFileSync(path.resolve(__dirname, file)));
+  } catch {
+    hash.update(file);
+  }
+  hash.update('\n');
+}
+const assetVersion = hash.digest('hex').slice(0, 10);
+const appVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version as string;
 
 export default defineConfig({
   plugins: [
     {
       name: 'asset-version',
       transformIndexHtml(html) {
-        return html.replaceAll('__ASSET_VERSION__', assetVersion);
+        return html
+          .replaceAll('__ASSET_VERSION__', assetVersion)
+          .replace('</head>', `  <meta name="app-build" content="${assetVersion}" />\n  <meta name="app-version" content="${appVersion}" />\n  </head>`);
+      },
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'version.json',
+          source: JSON.stringify({ version: appVersion, build: assetVersion }),
+        });
       },
     },
     react(),

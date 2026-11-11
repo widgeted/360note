@@ -3,7 +3,20 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.43] — 2026-11-11
+
+PWA 更新提示纠正与统一。
+
+### Fixed
+
+- 更新提示只在 `/app` 等应用路由显示，分享页、登录页和公开页不再出现。
+- 通过构建生成的 `app-build` meta 与 `/version.json` 比较，只有服务端确实是新构建且存在 waiting worker 时才提示；同构建的陈旧 waiting worker 不再误报。
+- 关闭更新提示会记住当前 waiting worker，同一 worker 不会在每次页面可见时反复弹出。
+- 修复 `updatefound` 监听重复绑定；刷新按钮增加无 `controllerchange` 时的保底刷新。
+- 更新/安装提示共用 `PwaNotice`：关闭按钮左上角、图标紧挨标题、操作按钮左下角，和通知行结构统一。
+
 ## [0.1.42] — 2026-11-10
+
 
 图片说明对齐一致。
 
