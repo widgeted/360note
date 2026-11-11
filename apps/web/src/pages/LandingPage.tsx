@@ -28,7 +28,9 @@ const featureIcons = [Sparkles, Search, CloudOff, Users, Download, Lock];
 export default function LandingPage() {
   const t = useT();
   const zh = getLocale() === 'zh-CN';
-  useDocumentTitle();
+  useDocumentTitle(undefined, {
+    description: t('360笔记：一个安静、快速、本地优先的笔记空间。记录想法，建立联系，发布作品。'),
+  });
   const mockNotes = [
     { title: t('欢迎来到 360笔记'), excerpt: t('把记录、整理、搜索和分享放在同一条路径上。'), date: t('今天'), tag: t('开始') },
     { title: t('Markdown 与排版速查'), excerpt: t('标题、列表、表格、任务与链接，底层都是 Markdown。'), date: t('昨天'), tag: t('参考') },

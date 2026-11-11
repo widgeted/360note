@@ -3,7 +3,23 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.46] — 2026-11-11
+
+公开页面 SEO 基础配置。
+
+### Added
+
+- 新增中英文独立 sitemap：`/sitemap.xml` 按域名输出 `sitemap-en.xml` 或 `sitemap-zh.xml`，只包含公开的 `/`、`/about`、`/privacy`、`/terms`。
+- 公开页面动态输出 canonical、`hreflang`（en / zh-CN / x-default）、description、Open Graph、Twitter Card 与 WebSite 结构化数据。
+- `robots.txt` 声明中英文 sitemap。
+- 登录、注册、找回、邀请、应用、设置、分享等私有/非公开页面自动 `noindex`。
+
+### Notes
+
+- 两套域名仍需分别完成 Search Console / Bing Webmaster / 百度 / 360 的站点验证与 sitemap 提交；这一步需要各平台账号和 DNS/文件验证权限。
+
 ## [0.1.45] — 2026-11-11
+
 
 通知卡片正文对齐。
 

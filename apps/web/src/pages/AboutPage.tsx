@@ -6,7 +6,7 @@ import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export default function AboutPage() {
   const t = useT();
-  useDocumentTitle(t('关于'));
+  useDocumentTitle(t('关于'), { description: t('360笔记：两个域名、一套账户。记录、整理、搜索、分享与备份在同一条路径上。') });
   return (
     <div className="legal-page about-page">
       <SiteHeader />

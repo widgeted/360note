@@ -6,7 +6,11 @@ import { useDocumentTitle } from '../lib/useDocumentTitle';
 export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
   const t = useT();
   const en = getLocale() === 'en';
-  useDocumentTitle(t(kind === 'privacy' ? '隐私政策' : '服务条款'));
+  useDocumentTitle(t(kind === 'privacy' ? '隐私政策' : '服务条款'), {
+    description: t(kind === 'privacy'
+      ? '360笔记隐私政策：我们收集什么、如何保护数据，以及你如何导出或删除账户数据。'
+      : '360笔记服务条款：账户、内容、分享、备份与可接受使用规则。'),
+  });
   return (
     <div className="legal-page">
       <SiteHeader />

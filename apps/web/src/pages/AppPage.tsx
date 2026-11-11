@@ -64,6 +64,17 @@ export default function AppPage() {
     const brand = getLocale() === 'zh-CN' ? '360笔记' : '360note';
     document.title = `${t('全部笔记')} — ${brand}`;
   }, [location.pathname, t]);
+  useEffect(() => {
+    // Authenticated application surfaces are never SEO landing pages.
+    let meta = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'robots';
+      document.head.appendChild(meta);
+    }
+    meta.content = 'noindex, nofollow';
+  }, []);
+
 
   const isNewRoute = location.pathname === '/app/new';
   const requestedPanel = new URLSearchParams(location.search).get('panel');

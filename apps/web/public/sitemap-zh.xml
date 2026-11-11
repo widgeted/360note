@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://360biji.com/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://360note.com/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://360biji.com/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://360note.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://360biji.com/about</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://360note.com/about" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://360biji.com/about" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://360note.com/about" />
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://360biji.com/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://360note.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://360biji.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://360note.com/privacy" />
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://360biji.com/terms</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://360note.com/terms" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://360biji.com/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://360note.com/terms" />
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>

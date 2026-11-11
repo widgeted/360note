@@ -1681,6 +1681,10 @@ const en: Record<string, string> = {
   "加载最新版本？": "Load the latest version?",
   "另一窗口已更新这篇笔记。加载最新版本会丢弃你当前未保存的修改；选择“保留我的编辑”后继续保存会自动合并。": "Another tab updated this note. Loading the latest version discards your unsaved changes; choose “Keep my edits” and the next save will merge automatically.",
   "丢弃并加载": "Discard and load",
+  "360笔记：两个域名、一套账户。记录、整理、搜索、分享与备份在同一条路径上。": "360note: two domains, one account. Capture, organize, search, share and back up on one path.",
+  "360笔记隐私政策：我们收集什么、如何保护数据，以及你如何导出或删除账户数据。": "360note privacy policy: what we collect, how data is protected, and how to export or delete your account.",
+  "360笔记服务条款：账户、内容、分享、备份与可接受使用规则。": "360note terms: accounts, content, sharing, backups and acceptable use.",
+  "360笔记：一个安静、快速、本地优先的笔记空间。记录想法，建立联系，发布作品。": "360note: a calm, fast, local-first notebook for ideas, knowledge and publishing.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

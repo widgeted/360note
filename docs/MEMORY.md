@@ -704,6 +704,13 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-11 · v0.1.46 SEO 基础配置
+
+- `useDocumentTitle` 扩展为公开页 SEO hook：canonical、hreflang、description、robots、OG/Twitter、首页 WebSite JSON-LD；私有路由自动 noindex。
+- 新增 `public/sitemap-en.xml`、`public/sitemap-zh.xml`；Nginx `/sitemap.xml` 按域名映射；robots 声明两套 sitemap。
+- 公开页仍为 SPA，Google/Bing 可渲染 JS；百度等弱 JS 爬虫的收录效果仍需预渲染/SSR 评估。
+- 外部平台提交需要运营者账号与验证权限，未在代码中自动执行。
+
 ## 2026-11-11 · v0.1.44 跨窗口同步与 PWA 布局修正
 
 - 新增 `lib/sync.ts` BroadcastChannel：保存成功后广播完整 Note；其他标签页同笔记且未脏时自动 `applyRemoteNote`，脏时显示“另一窗口已更新”提示，保留本地修改或确认丢弃后加载远端。

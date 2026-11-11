@@ -6,4 +6,7 @@ Disallow: /login
 Disallow: /register
 Disallow: /recover
 Disallow: /invite
-# Public share pages (/s/) may be indexed only when a user explicitly shares them.
+# Public share pages are noindex by default and are not listed in the sitemap.
+
+Sitemap: https://360note.com/sitemap.xml
+Sitemap: https://360biji.com/sitemap.xml
