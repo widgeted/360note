@@ -429,7 +429,6 @@ const en: Record<string, string> = {
   '删除记录': 'Delete record',
   '已删除撤销记录': 'Revoked link deleted',
   '文件超过 {size} MB 的上传限制': 'The file exceeds the {size} MB upload limit',
-  '不支持 HEIC/HEIF 等图片格式，请使用 PNG、JPEG、WebP、GIF 或 AVIF': 'HEIC/HEIF and similar formats are not supported. Use PNG, JPEG, WebP, GIF or AVIF.',
   '上传已取消': 'Upload cancelled',
   '上传超时，请重试': 'Upload timed out. Try again.',
   '网络错误，上传未完成': 'Network error: the upload did not finish',

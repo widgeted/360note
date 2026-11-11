@@ -33,6 +33,7 @@ import {
 import { htmlToMarkdown, markdownToEditorHtml } from '../../lib/markdown';
 import { translate, useT } from '../../lib/i18n';
 import { attachmentThumbnailUrl, cn } from '../../lib/utils';
+import { isInlineImageMime } from '../../lib/media';
 
 const lowlight = createLowlight(common);
 
@@ -277,6 +278,8 @@ export interface UploadedAttachment {
   filename: string;
   mime: string;
   url: string;
+  hasThumbnail?: boolean;
+  thumbnailUrl?: string | null;
 }
 
 export function TipTapEditor({
@@ -443,8 +446,10 @@ export function TipTapEditor({
     const found = findUpload(id);
     uploadFilesRef.current.delete(id);
     if (!current || !found) return;
-    const content = result.mime.startsWith('image/')
-      ? { type: 'image', attrs: { src: result.url, alt: '', title: '' } }
+    const inlineImage = isInlineImageMime(result.mime);
+    const previewImage = result.mime.startsWith('image/') && result.hasThumbnail && result.thumbnailUrl;
+    const content = inlineImage || previewImage
+      ? { type: 'image', attrs: { src: inlineImage ? result.url : result.thumbnailUrl, alt: '', title: '' } }
       : { type: 'text', text: result.filename, marks: [{ type: 'link', attrs: { href: result.url } }] };
     current.chain().focus()
       .insertContentAt({ from: found.pos, to: found.pos + found.node.nodeSize }, content, { updateSelection: true })

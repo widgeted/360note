@@ -3,7 +3,19 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.53] — 2026-11-11
+
+编辑器上传兼容与缩略图回退修复。
+
+### Fixed
+
+- 移除编辑器上传前对 HEIC/HEIF/TIFF/BMP 的旧拦截，服务端已经实现的接收、存储和 CoreIX 封面逻辑现在真正可达。
+- 附件列表缩略图统一使用 `?thumb=1`：普通图片显示缩略图；HEIC/RAW/PDF/视频有 CoreIX 封面时显示封面，无封面时回退文件图标，不再出现破图或加载原文件。
+- 上传响应补充 `hasThumbnail` 与 `thumbnailUrl`；HEIC 等非浏览器图片插入编辑器时优先使用生成的 WebP 封面，没有封面则插入文件链接。
+- 清理不再使用的前端 HEIC 拒绝文案。
+
 ## [0.1.52] — 2026-11-11
+
 
 设置页分隔线与管理表格密度修复。
 

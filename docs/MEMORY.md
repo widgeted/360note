@@ -704,6 +704,12 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-11 · v0.1.53 上传兼容与缩略图回退
+
+- 删除前端 HEIC/HEIF/TIFF/BMP 拦截，服务端接收逻辑真正可达。
+- 附件列表改用 `?thumb=1`；有封面显示封面，无封面回退文件图标。
+- 上传响应返回 `hasThumbnail`/`thumbnailUrl`；HEIC 插入编辑器优先用 WebP 封面，否则插入链接。
+
 ## 2026-11-11 · v0.1.52 分隔线与表格密度
 
 - `.setting-row-heading` 统一标题行：`padding-top: 0` 时必须有 14px 下间距，避免 border-bottom 贴住字段标签。

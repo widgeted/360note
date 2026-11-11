@@ -109,7 +109,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         hasThumbnail,
         createdAt: row!.created_at.toISOString(),
         url: `/api/attachments/${row!.id}/content`,
-        thumbnailUrl: isDisplayableImage(row!.mime) ? `/api/attachments/${row!.id}/content?thumb=1` : null,
+        thumbnailUrl: hasThumbnail || isDisplayableImage(row!.mime) ? `/api/attachments/${row!.id}/content?thumb=1` : null,
       },
     });
   });

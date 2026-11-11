@@ -559,11 +559,6 @@ export function EditorPane({
     if (isLocalNote(note.id) || !navigator.onLine) {
       return Promise.reject(new Error(t('离线时无法上传附件；联网后会恢复上传。')));
     }
-    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
-    const unsupported = ['image/heic', 'image/heif', 'image/tiff', 'image/bmp'];
-    if (unsupported.includes(file.type) || ['heic', 'heif', 'tif', 'tiff', 'bmp'].includes(extension)) {
-      return Promise.reject(new Error(t('不支持 HEIC/HEIF 等图片格式，请使用 PNG、JPEG、WebP、GIF 或 AVIF')));
-    }
     if (instance?.maxUploadBytes && file.size > instance.maxUploadBytes) {
       return Promise.reject(new Error(t('文件超过 {size} MB 的上传限制', { size: Math.round(instance.maxUploadBytes / 1024 / 1024) })));
     }
@@ -586,7 +581,7 @@ export function EditorPane({
       };
       xhr.onload = () => {
         const data = xhr.response as {
-          attachment?: { id: string; filename: string; mime: string; url?: string };
+          attachment?: { id: string; filename: string; mime: string; url?: string; hasThumbnail?: boolean; thumbnailUrl?: string | null };
           error?: { message?: string };
         } | null;
         if (xhr.status >= 200 && xhr.status < 300 && data?.attachment) {
@@ -596,6 +591,8 @@ export function EditorPane({
             filename: data.attachment.filename,
             mime: data.attachment.mime,
             url: data.attachment.url ?? `/api/attachments/${data.attachment.id}/content`,
+            hasThumbnail: Boolean(data.attachment.hasThumbnail),
+            thumbnailUrl: data.attachment.thumbnailUrl ?? null,
           });
           return;
         }

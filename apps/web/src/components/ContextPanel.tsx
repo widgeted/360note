@@ -25,6 +25,7 @@ import { renderMarkdown } from '../lib/markdown';
 import { Avatar } from './Avatar';
 import { ConfirmDialog } from './Modal';
 import { toast } from '../stores/toast';
+import { isInlineImageMime } from '../lib/media';
 
 const REASON_LABELS: Record<string, string> = {
   auto: '自动保存',
@@ -370,8 +371,8 @@ export function ContextPanel() {
                 visibleAttachments.map((attachment) => (
                   <div className="attachment-item" key={attachment.id}>
                     <div className="attachment-thumb">
-                      {attachment.mime.startsWith('image/') || attachment.hasThumbnail ? (
-                        <img src={`/api/attachments/${attachment.id}/content`} alt="" loading="lazy" />
+                      {attachment.hasThumbnail || isInlineImageMime(attachment.mime) ? (
+                        <img src={`/api/attachments/${attachment.id}/content?thumb=1`} alt="" loading="lazy" />
                       ) : (
                         <FileText size={14} />
                       )}
