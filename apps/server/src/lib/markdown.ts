@@ -37,6 +37,8 @@ export function renderMarkdownHtml(markdown: string): string {
     const caption = imageCaption(attrs);
     return caption ? `<figure class="prose-figure">${img}<figcaption>${caption}</figcaption></figure>` : match;
   });
+  // Keep wide tables readable in exported sites and on phones.
+  html = html.replace(/<table\b[\s\S]*?<\/table>/gi, (table) => `<div class="table-scroll">${table}</div>`);
   return sanitizeHtml(html, {
     allowedTags: ALLOWED_TAGS,
     allowedAttributes: ALLOWED_ATTRS,
@@ -91,6 +93,9 @@ export function exportHtmlDocument(input: {
   table { width:100%; border-collapse: collapse; margin:1.6em 0; font-size:14.5px; }
   th, td { border-bottom:1px solid var(--line); text-align:left; padding:10px 12px; vertical-align:top; }
   th { color:var(--muted); font-weight:600; font-size:13px; text-transform: uppercase; letter-spacing:.05em; }
+  .table-scroll { max-width:100%; overflow-x:auto; margin:1.6em 0; -webkit-overflow-scrolling:touch; }
+  .table-scroll table { margin:0; min-width:560px; }
+  @media (max-width:640px) { .table-scroll table { min-width:560px; } }
   img { max-width:100%; height:auto; border-radius:8px; margin: 1em 0; }
   .prose-figure { margin: 1.5em 0; }
   .prose-figure img { margin: 0; }
@@ -128,6 +133,13 @@ export function exportHtmlDocument(input: {
     .attachments h2, .attachments ul { font-size: 9.5pt; }
     .prose-figure figcaption { font-size: 9pt; color: #666; }
     img { max-height: 150mm; }
+    .table-scroll { overflow: visible; margin: 1em 0; }
+    .table-scroll table { min-width: 0; width: 100%; margin: 0; break-inside: auto; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    h1, h2, h3, h4, h5, h6 { break-after: avoid; page-break-after: avoid; }
+    table { break-inside: auto; }
+    blockquote { break-inside: avoid; }
     .image-grid { gap:2mm; margin:3mm 0; break-inside:auto; }
     .image-grid > img, .image-grid > figure, .image-grid > p { break-inside:avoid; page-break-inside:avoid; }
     .image-grid img { width:100%; max-height:none; }

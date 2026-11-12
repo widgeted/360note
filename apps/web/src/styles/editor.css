@@ -230,9 +230,16 @@
 }
 
 .prose hr {
-  margin: 2.4em 0;
+  margin: 1.5em 0;
   border: 0;
   border-top: 1px solid var(--line);
+}
+
+.prose hr + h1,
+.prose hr + h2,
+.prose hr + h3,
+.prose hr + h4 {
+  margin-top: 0.9em;
 }
 
 .prose code {

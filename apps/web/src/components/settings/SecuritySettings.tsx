@@ -16,7 +16,7 @@ import type { SessionInfo, User } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { getLocale, translate, useT } from '../../lib/i18n';
-import { copyText, formatNoteDate, formatRelativeShort } from '../../lib/utils';
+import { copyText, formatRelativeShort } from '../../lib/utils';
 import { Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 
@@ -244,14 +244,13 @@ export default function SecuritySettings() {
                 <th>{t('设备')}</th>
                 <th>{t('地址')}</th>
                 <th>{t('最后活动')}</th>
-                <th>{t('首次登录')}</th>
                 <th>{t('操作')}</th>
               </tr>
             </thead>
             <tbody>
               {sessionsError ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={4}>
                     <div className="form-error">
                       <AlertCircle size={14} /> {sessionsError}
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadSessions()}>{t('重试')}</button>
@@ -259,7 +258,7 @@ export default function SecuritySettings() {
                   </td>
                 </tr>
               ) : sessions.length === 0 ? (
-                <tr><td colSpan={5}><div className="context-empty">{t('暂无登录设备')}</div></td></tr>
+                <tr><td colSpan={4}><div className="context-empty">{t('暂无登录设备')}</div></td></tr>
               ) : sessions.map((session) => (
                 <tr key={session.id}>
                   <td>
@@ -271,7 +270,6 @@ export default function SecuritySettings() {
                   </td>
                   <td className="mono">{session.ip || t('未知地址')}</td>
                   <td>{formatRelativeShort(session.lastSeenAt)}</td>
-                  <td>{formatNoteDate(session.createdAt)}</td>
                   <td>
                     {!session.current && (
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeSession(session.id)}>

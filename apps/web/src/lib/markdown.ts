@@ -109,6 +109,12 @@ export function htmlToMarkdown(html: string): string {
     if (original) image.setAttribute('src', original);
     image.removeAttribute('data-original-src');
   });
+  // TipTap wraps list item text in a paragraph. Turndown then emits a loose
+  // list with extra indentation and blank lines. Unwrap single-block
+  // paragraphs so normal lists round-trip as compact Markdown.
+  withoutPlaceholders.querySelectorAll('li > p').forEach((paragraph) => {
+    paragraph.replaceWith(...Array.from(paragraph.childNodes));
+  });
   return turndown
     .turndown(withoutPlaceholders.body.innerHTML)
     // Turndown escapes brackets in inline text. Wiki links are deliberate
@@ -126,28 +132,70 @@ function sanitize(html: string): string {
   });
 }
 
+function taskCheckboxForItem(item: HTMLLIElement): HTMLInputElement | null {
+  const input = item.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (!input) return null;
+  // A nested task list owns its own checkbox; do not treat the parent item as
+  // a task just because a descendant is one.
+  return input.closest('ul,ol') === item.parentElement ? input : null;
+}
+
+function markTaskItem(item: HTMLLIElement, keepInputs: boolean): void {
+  const input = taskCheckboxForItem(item);
+  const checked = Boolean(input?.checked);
+  if (!keepInputs) input?.remove();
+  item.setAttribute('data-type', 'taskItem');
+  item.setAttribute('data-checked', String(checked));
+  if (keepInputs) return;
+  if ([...item.children].some((child) => child.tagName === 'P')) return;
+
+  // Move the item's direct text/inline content into the paragraph TipTap
+  // expects, while keeping a nested list outside that paragraph.
+  const nestedLists = [...item.children].filter((child) => child.tagName === 'UL' || child.tagName === 'OL');
+  const contentNodes = [...item.childNodes].filter((node) => !nestedLists.includes(node as Element));
+  const paragraph = item.ownerDocument.createElement('p');
+  paragraph.append(...contentNodes);
+  if (!paragraph.textContent?.trim() && !paragraph.querySelector('img,br')) paragraph.innerHTML = '<br>';
+  item.prepend(paragraph);
+}
+
 function enhanceTaskLists(html: string, keepInputs = false): string {
   if (!html.includes('type="checkbox"')) return html;
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('ul').forEach((ul) => {
-    const items = [...ul.children].filter((child) => child.tagName === 'LI');
+    const items = [...ul.children].filter((child): child is HTMLLIElement => child.tagName === 'LI');
     if (!items.length) return;
-    const allTasks = items.every((item) => item.querySelector('input[type="checkbox"]'));
-    if (!allTasks) return;
-    ul.setAttribute('data-type', 'taskList');
-    items.forEach((item) => {
-      const input = item.querySelector<HTMLInputElement>('input[type="checkbox"]');
-      const checked = Boolean(input?.checked);
-      if (!keepInputs) input?.remove();
-      item.setAttribute('data-type', 'taskItem');
-      item.setAttribute('data-checked', String(checked));
-      if (!keepInputs && !item.querySelector('p')) {
-        const p = doc.createElement('p');
-        p.innerHTML = item.innerHTML.trim() || '<br>';
-        item.innerHTML = '';
-        item.appendChild(p);
+    const flags = items.map((item) => Boolean(taskCheckboxForItem(item)));
+    if (!flags.some(Boolean)) return;
+
+    // A list with only task items can be converted in place.
+    if (flags.every(Boolean)) {
+      ul.setAttribute('data-type', 'taskList');
+      items.forEach((item) => markTaskItem(item, keepInputs));
+      return;
+    }
+
+    // Mixed bullet/task lists are not representable as a single TipTap list.
+    // Split them into consecutive normal and task lists while preserving the
+    // original order and content.
+    const replacement = doc.createDocumentFragment();
+    let index = 0;
+    while (index < items.length) {
+      const isTask = flags[index];
+      const group: HTMLLIElement[] = [];
+      while (index < items.length && flags[index] === isTask) group.push(items[index++]);
+      const list = doc.createElement('ul');
+      for (const attribute of [...ul.attributes]) {
+        if (attribute.name !== 'data-type') list.setAttribute(attribute.name, attribute.value);
       }
-    });
+      if (isTask) {
+        list.setAttribute('data-type', 'taskList');
+        group.forEach((item) => markTaskItem(item, keepInputs));
+      }
+      group.forEach((item) => list.appendChild(item));
+      replacement.appendChild(list);
+    }
+    ul.replaceWith(replacement);
   });
   return doc.body.innerHTML;
 }
@@ -236,6 +284,16 @@ export function renderMarkdown(markdown: string, options: { toc?: boolean; wikiL
     const captionEl = doc.createElement('figcaption');
     captionEl.textContent = caption;
     figure.appendChild(captionEl);
+  });
+  // Public pages render bare tables from Markdown. Wrap them so wide tables
+  // can scroll on narrow screens instead of squeezing columns into one
+  // character per line.
+  root.querySelectorAll('table').forEach((table) => {
+    if (table.parentElement?.classList.contains('table-scroll')) return;
+    const wrapper = doc.createElement('div');
+    wrapper.className = 'table-scroll';
+    table.replaceWith(wrapper);
+    wrapper.appendChild(table);
   });
   if (options.wikiLinks !== false) wikiLinkify(root);
   root.querySelectorAll('a[href]').forEach((anchor) => {

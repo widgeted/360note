@@ -1771,6 +1771,7 @@ const en: Record<string, string> = {
   "切换到另一个站点版本；账户、笔记、附件与空间共享，登录状态按域名独立。": "Switch to the other site edition. Accounts, notes, attachments and workspaces are shared; sign-in state is separate per domain.",
   "前往中文版": "Open Chinese edition",
   "正在加载模板…": "Loading templates…",
+  "主题、语言与编辑器宽度": "Theme, language and editor width",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

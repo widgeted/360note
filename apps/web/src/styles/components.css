@@ -1021,6 +1021,9 @@ a.btn {
   color: var(--text-secondary);
   font-size: 13px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: background var(--dur), color var(--dur), border-color var(--dur);
 }
 
@@ -2584,7 +2587,7 @@ a.btn {
 }
 
 .admin-device-table {
-  min-width: 680px;
+  min-width: 600px;
 }
 
 .admin-device-table th,

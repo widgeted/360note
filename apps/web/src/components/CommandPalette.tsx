@@ -262,8 +262,8 @@ export function CommandPalette() {
     },
     {
       id: 'settings-appearance',
-      title: t('外观与语言'),
-      description: t('主题、字体、编辑器宽度'),
+      title: t('外观'),
+      description: t('主题、语言与编辑器宽度'),
       icon: <Languages size={15} />,
       keywords: 'appearance theme language font',
       run: () => go('/app/settings/appearance'),

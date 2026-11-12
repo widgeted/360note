@@ -52,7 +52,7 @@ export default function AppearanceSettings() {
 
   return (
     <>
-      <h1 className="settings-title">{t('外观与语言')}</h1>
+      <h1 className="settings-title">{t('外观')}</h1>
       <p className="settings-subtitle">{t('主题与阅读宽度会同步到你的账户；界面语言由访问的站点版本决定。')}</p>
 
       <section className="settings-section">
