@@ -29,11 +29,6 @@ export function EmptyEditorState() {
           {t('新建笔记')}
         </button>
       </div>
-      <div className="editor-empty-hints">
-        <span><Check size={12} /> {t('自动保存')} · {t('离线可写')}</span>
-        <span><Clock3 size={12} /> {t('历史版本与冲突副本')}</span>
-        <span><FileText size={12} /> {t('Markdown 随时导出')}</span>
-      </div>
       <div className="editor-empty-actions editor-empty-actions-secondary">
         <button type="button" className="btn btn-secondary" onClick={() => navigate('/app/settings/data?import=1')}>
           <UploadCloud size={13} /> {t('导入笔记')}
@@ -46,6 +41,11 @@ export function EmptyEditorState() {
         <button type="button" className="btn btn-ghost" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}>
           {t('打开命令面板')} <kbd>{shortcutLabel('Mod+K')}</kbd>
         </button>
+      </div>
+      <div className="editor-empty-hints">
+        <span><Check size={12} /> {t('自动保存')} · {t('离线可写')}</span>
+        <span><Clock3 size={12} /> {t('历史版本与冲突副本')}</span>
+        <span><FileText size={12} /> {t('Markdown 随时导出')}</span>
       </div>
     </div>
   );

@@ -1245,7 +1245,7 @@ kbd {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 40px 120px;
+  padding: 24px 40px 146px;
   text-align: center;
   background:
     radial-gradient(660px 420px at 50% 16%, color-mix(in srgb, var(--blue) 4%, transparent), transparent 70%),
@@ -1298,24 +1298,28 @@ kbd {
 }
 
 .editor-empty-hints {
-  margin-top: 30px;
+  margin-top: 18px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  max-width: 680px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 
 .editor-empty-hints span {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   justify-content: center;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {
   .editor-empty {
-    padding: 20px 20px 72px;
+    padding: 20px 20px 96px;
   }
 }
 

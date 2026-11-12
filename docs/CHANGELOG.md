@@ -3,7 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.1.59] — 2026-11-12
+
+空状态提示排版收紧。
+
+### Changed
+
+- “自动保存 · 离线可写”“历史版本与冲突副本”“Markdown 随时导出”改为桌面单行、窄屏自动换行，并移动到“打开命令面板”下方。
+- 空状态整体保持水平居中，主操作与导入/模板按钮间距更紧凑。
+
 ## [0.1.58] — 2026-11-12
+
 
 语言切换、空状态排版与模板加载修复。
 
