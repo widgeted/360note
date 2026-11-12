@@ -1245,7 +1245,7 @@ kbd {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 24px 40px 120px;
   text-align: center;
   background:
     radial-gradient(660px 420px at 50% 16%, color-mix(in srgb, var(--blue) 4%, transparent), transparent 70%),
@@ -1293,6 +1293,10 @@ kbd {
   margin-top: 18px;
 }
 
+.editor-empty-actions-tertiary {
+  margin-top: 6px;
+}
+
 .editor-empty-hints {
   margin-top: 30px;
   display: flex;
@@ -1307,6 +1311,12 @@ kbd {
   align-items: center;
   gap: 7px;
   justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .editor-empty {
+    padding: 20px 20px 72px;
+  }
 }
 
 /* ---------- Context panel ---------- */

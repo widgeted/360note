@@ -41,6 +41,8 @@ export function EmptyEditorState() {
         <button type="button" className="btn btn-secondary" onClick={() => window.dispatchEvent(new Event('nh:open-templates'))}>
           <LayoutTemplate size={13} /> {t('从模板创建')}
         </button>
+      </div>
+      <div className="editor-empty-actions editor-empty-actions-tertiary">
         <button type="button" className="btn btn-ghost" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}>
           {t('打开命令面板')} <kbd>{shortcutLabel('Mod+K')}</kbd>
         </button>

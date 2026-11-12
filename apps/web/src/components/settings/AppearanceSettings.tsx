@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Languages, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, ExternalLink, Languages, Monitor, Moon, Sun } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
 import { getLocale, setLocale, useT } from '../../lib/i18n';
 import { applyTheme, storeTheme, type ThemePreference } from '../../lib/theme';
@@ -32,17 +32,28 @@ export default function AppearanceSettings() {
     void persist({ theme: next });
   }
 
-  async function switchLanguage() {
+  function switchLanguage() {
+    const host = window.location.hostname.toLowerCase();
+    const target =
+      host === '360note.com' || host === 'www.360note.com'
+        ? 'https://360biji.com'
+        : host === '360biji.com' || host === 'www.360biji.com'
+          ? 'https://360note.com'
+          : null;
+    if (target) {
+      window.location.assign(`${target}${window.location.pathname}${window.location.search}${window.location.hash}`);
+      return;
+    }
+    // Localhost/preview has no counterpart domain; toggle in place for testing.
     const next = locale === 'en' ? 'zh-CN' : 'en';
     setLocale(next);
-    await persist({ locale: next });
     toast('success', next === 'zh-CN' ? t('已切换到中文') : t('已切换到英文'));
   }
 
   return (
     <>
       <h1 className="settings-title">{t('外观与语言')}</h1>
-      <p className="settings-subtitle">{t('主题与阅读宽度会同步到你的账户；界面语言只影响当前浏览器。')}</p>
+      <p className="settings-subtitle">{t('主题与阅读宽度会同步到你的账户；界面语言由访问的站点版本决定。')}</p>
 
       <section className="settings-section">
         <div className="settings-section-head">
@@ -118,11 +129,11 @@ export default function AppearanceSettings() {
         <div className="setting-row">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('界面语言')}</div>
-            <div className="setting-row-desc">{t('切换后立即生效；账户、笔记、附件与空间保持不变，其他设备可在本页单独切换。')}</div>
+            <div className="setting-row-desc">{t('切换到另一个站点版本；账户、笔记、附件与空间共享，登录状态按域名独立。')}</div>
           </div>
           <div className="setting-row-control">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void switchLanguage()}>
-              <Languages size={13} /> {locale === 'en' ? '中文' : 'English'}
+            <button type="button" className="btn btn-secondary btn-sm" onClick={switchLanguage}>
+              <Languages size={13} /> {locale === 'en' ? t('前往中文版') : 'Turn to English version'} <ExternalLink size={11} />
             </button>
           </div>
         </div>

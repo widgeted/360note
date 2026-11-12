@@ -44,14 +44,32 @@ export default function AppPage() {
   const setMobileSidebar = useAppStore((state) => state.setMobileSidebar);
   const [showTemplates, setShowTemplates] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
   const newNoteGuard = useRef(false);
   const autoOpenedNote = useRef<string | null>(null);
 
+  async function loadTemplates() {
+    setTemplatesLoading(true);
+    setTemplatesError(null);
+    try {
+      const response = await api.get<{ templates: CustomTemplate[] }>('/api/templates');
+      setCustomTemplates(response.templates);
+    } catch (error) {
+      setTemplatesError((error as Error).message);
+    } finally {
+      setTemplatesLoading(false);
+      setTemplatesLoaded(true);
+    }
+  }
+
   useEffect(() => {
-    if (!showTemplates) return;
-    api.get<{ templates: CustomTemplate[] }>('/api/templates')
-      .then((response) => setCustomTemplates(response.templates))
-      .catch(() => {});
+    void loadTemplates();
+  }, []);
+
+  useEffect(() => {
+    if (showTemplates) void loadTemplates();
   }, [showTemplates]);
 
   const settingsMode = location.pathname.startsWith('/app/settings');
@@ -293,7 +311,14 @@ export default function AppPage() {
         size="md"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {customTemplates.length === 0 ? (
+          {(!templatesLoaded || templatesLoading) && customTemplates.length === 0 ? (
+            <div className="loading-row"><span className="spinner" /> {t('正在加载模板…')}</div>
+          ) : templatesError && customTemplates.length === 0 ? (
+            <div className="form-error">
+              {templatesError}
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadTemplates()}>{t('重试')}</button>
+            </div>
+          ) : customTemplates.length === 0 ? (
             <div className="context-empty">{t('还没有模板。可以到模板设置新建，或稍后重试。')}</div>
           ) : (
             customTemplates.map((template) => (

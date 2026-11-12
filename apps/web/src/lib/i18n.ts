@@ -3,7 +3,6 @@ import { useSyncExternalStore } from 'react';
 export type Locale = 'zh-CN' | 'en';
 
 const LOCALE_KEY = 'nh-locale';
-const LOCALE_OVERRIDE_KEY = 'nh-locale-override';
 const listeners = new Set<() => void>();
 
 /**
@@ -21,12 +20,6 @@ function domainLocale(): Locale | null {
 }
 
 function detectLocale(): Locale {
-  try {
-    const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
-    if (override === 'zh-CN' || override === 'en') return override;
-  } catch {
-    /* ignore */
-  }
   const forced = domainLocale();
   if (forced) return forced;
   try {
@@ -63,8 +56,6 @@ export function setLocale(locale: Locale): void {
   currentLocale = locale;
   try {
     localStorage.setItem(LOCALE_KEY, locale);
-    // An explicit choice overrides the domain default on future visits.
-    localStorage.setItem(LOCALE_OVERRIDE_KEY, locale);
   } catch {
     /* ignore */
   }
@@ -1776,6 +1767,10 @@ const en: Record<string, string> = {
   "主题与阅读宽度会同步到你的账户；界面语言只影响当前浏览器。": "Theme and reading width sync to your account. Interface language applies to this browser only.",
   "切换后立即生效；账户、笔记、附件与空间保持不变，其他设备可在本页单独切换。": "Takes effect immediately. Your account, notes, attachments and workspaces stay the same. Switch separately on other devices.",
   "检测到新的登录设备或 IP 时，会在应用内提醒。": "New devices or IP addresses trigger an in-app alert.",
+  "主题与阅读宽度会同步到你的账户；界面语言由访问的站点版本决定。": "Theme and reading width sync to your account. Interface language follows the site edition you visit.",
+  "切换到另一个站点版本；账户、笔记、附件与空间共享，登录状态按域名独立。": "Switch to the other site edition. Accounts, notes, attachments and workspaces are shared; sign-in state is separate per domain.",
+  "前往中文版": "Open Chinese edition",
+  "正在加载模板…": "Loading templates…",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;
