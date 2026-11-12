@@ -1289,6 +1289,10 @@ kbd {
   margin-top: 20px;
 }
 
+.editor-empty-actions-secondary {
+  margin-top: 18px;
+}
+
 .editor-empty-hints {
   margin-top: 30px;
   display: flex;

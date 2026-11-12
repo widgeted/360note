@@ -6,6 +6,7 @@ export interface CustomTemplate {
   description: string;
   titleTemplate: string;
   contentTemplate: string;
+  builtinKey?: string | null;
   createdAt: string;
   updatedAt: string;
 }

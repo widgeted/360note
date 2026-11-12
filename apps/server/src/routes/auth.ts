@@ -4,7 +4,7 @@ import { z } from 'zod';
 import QRCode from 'qrcode';
 import { config } from '../config.js';
 import { one, query, transaction } from '../db.js';
-import { clientIp, clearSessionCookie, requireAuth, sessionCookieName, setSessionCookie } from '../auth.js';
+import { clientIp, clearSessionCookie, ensureDeviceId, requireAuth, sessionCookieName, setSessionCookie, userAgent } from '../auth.js';
 import { encryptString, decryptString, generateRecoveryKey, hashRecoveryKey, randomToken, safeEqual, sha256, signToken, verifyToken } from '../lib/crypto.js';
 import { errors } from '../lib/errors.js';
 import { hashPassword, passwordIssues, verifyPassword } from '../lib/passwords.js';
@@ -13,7 +13,7 @@ import { emailSchema, parse, passwordSchema } from '../lib/validate.js';
 import { audit } from '../lib/audit.js';
 import { publicUser, type DbUser } from '../lib/users.js';
 import { avatarColor, welcomeSeed } from '../lib/seed.js';
-import { createSession, listSessions, notify, revokeAllApiTokens, revokeAllSessions, revokeSession } from '../services/sessions.js';
+import { createSession, listSessions, notify, revokeAllApiTokens, revokeAllSessions, revokeDeviceSession, revokeOtherDevices, revokeSession } from '../services/sessions.js';
 import { createNote } from '../services/notes.js';
 import { consumeEmailCode, issueEmailCode } from '../services/email-codes.js';
 import { normalizeLocale, sendEmailChangedEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../lib/mailer.js';
@@ -32,6 +32,17 @@ const registerSchema = z.object({
 async function userCount(): Promise<number> {
   const row = await one<{ count: string }>('SELECT count(*)::text AS count FROM users WHERE deleted_at IS NULL');
   return Number(row?.count ?? 0);
+}
+
+async function isNewSignInDevice(userId: string, deviceId: string, ip: string, agent: string): Promise<boolean> {
+  const previous = await one<{ ip: string | null; device_id: string | null; user_agent: string | null }>(
+    'SELECT ip, device_id, user_agent FROM sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [userId],
+  );
+  if (!previous) return false;
+  if (previous.device_id && previous.device_id !== deviceId) return true;
+  if (!previous.device_id && previous.user_agent && previous.user_agent !== agent) return true;
+  return Boolean(previous.ip && previous.ip !== ip);
 }
 
 async function workspacesFor(userId: string) {
@@ -245,7 +256,8 @@ export default async function authRoutes(app: FastifyInstance) {
       app.log.warn({ error }, 'failed to seed welcome notes');
     }
 
-    const session = await createSession(user.id, request);
+    const deviceId = ensureDeviceId(request, reply);
+    const session = await createSession(user.id, request, deviceId);
     setSessionCookie(reply, session.token);
     await audit({ actorId: user.id, action: 'auth.register', ip: clientIp(request), meta: { firstUser } });
     void sendWelcomeEmail(user.email, displayName, normalizeLocale(body.locale)).catch((error) => {
@@ -303,19 +315,17 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.send({ twoFactorRequired: true, challengeToken });
     }
 
-    const previous = await one<{ ip: string | null }>(
-      'SELECT ip FROM sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [user.id],
-    );
     await one('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = now() WHERE id = $1 RETURNING id', [user.id]);
-    const session = await createSession(user.id, request);
+    const deviceId = ensureDeviceId(request, reply);
+    const newDevice = await isNewSignInDevice(user.id, deviceId, ip, userAgent(request));
+    const session = await createSession(user.id, request, deviceId);
     setSessionCookie(reply, session.token);
-    if (previous?.ip && previous.ip !== ip) {
+    if (newDevice) {
       await notify({
         userId: user.id,
         type: 'security',
-        title: '新的登录设备',
-        titleEn: 'New sign-in device',
+        title: '新的登录活动',
+        titleEn: 'New sign-in activity',
         body: `检测到来自 ${ip || '未知地址'} 的登录。如不是你本人，请立即在设置中退出该设备并修改密码。`,
         bodyEn: `A sign-in from ${ip || 'an unknown location'} was detected. If this was not you, revoke the device in Settings and change your password immediately.`,
         link: '/settings/security',
@@ -347,12 +357,26 @@ export default async function authRoutes(app: FastifyInstance) {
     }
     if (!valid) throw errors.unauthorized('验证码不正确或已使用');
     await one('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = now() WHERE id = $1 RETURNING id', [user.id]);
-    const session = await createSession(user.id, request);
+    const ip = clientIp(request);
+    const deviceId = ensureDeviceId(request, reply);
+    const newDevice = await isNewSignInDevice(user.id, deviceId, ip, userAgent(request));
+    const session = await createSession(user.id, request, deviceId);
     setSessionCookie(reply, session.token);
+    if (newDevice) {
+      await notify({
+        userId: user.id,
+        type: 'security',
+        title: '新的登录活动',
+        titleEn: 'New sign-in activity',
+        body: `检测到来自 ${ip || '未知地址'} 的登录。如不是你本人，请立即在设置中退出该设备并修改密码。`,
+        bodyEn: `A sign-in from ${ip || 'an unknown location'} was detected. If this was not you, revoke the device in Settings and change your password immediately.`,
+        link: '/settings/security',
+      });
+    }
     await audit({
       actorId: user.id,
       action: 'auth.login.2fa',
-      ip: clientIp(request),
+      ip,
       meta: { backupCode: usedBackup },
     });
     const fresh = await one<DbUser>('SELECT * FROM users WHERE id = $1', [user.id]);
@@ -450,7 +474,14 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.get('/api/auth/sessions', async (request) => {
     const auth = requireAuth(request);
-    return { sessions: await listSessions(auth.user.id, auth.session?.id) };
+    const query = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(50).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      request.query,
+    );
+    return listSessions(auth.user.id, auth.session?.id, query.limit, query.offset);
   });
 
   app.delete('/api/auth/sessions/:id', async (request) => {
@@ -462,9 +493,19 @@ export default async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.delete('/api/auth/devices/:id', async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const revoked = await revokeDeviceSession(id, auth.user.id);
+    if (!revoked) throw errors.notFound('设备不存在');
+    await audit({ actorId: auth.user.id, action: 'auth.device.revoke', targetType: 'device', targetId: id, ip: clientIp(request) });
+    return { ok: true };
+  });
+
   app.post('/api/auth/sessions/revoke-others', async (request) => {
     const auth = requireAuth(request);
-    await revokeAllSessions(auth.user.id, auth.session?.id);
+    if (auth.session) await revokeOtherDevices(auth.user.id, auth.session.id);
+    else await revokeAllSessions(auth.user.id);
     await audit({ actorId: auth.user.id, action: 'auth.session.revoke_others', ip: clientIp(request) });
     return { ok: true };
   });

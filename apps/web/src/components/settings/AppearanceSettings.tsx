@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Check, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Languages, Monitor, Moon, Sun } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
-import { useT } from '../../lib/i18n';
+import { getLocale, setLocale, useT } from '../../lib/i18n';
 import { applyTheme, storeTheme, type ThemePreference } from '../../lib/theme';
 import { api } from '../../lib/api';
 import { toast } from '../../stores/toast';
@@ -10,6 +10,7 @@ import type { User } from '@360note/shared';
 
 export default function AppearanceSettings() {
   const t = useT();
+  const locale = getLocale();
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const [theme, setTheme] = useState<ThemePreference>((user?.prefs?.theme as ThemePreference) ?? 'system');
@@ -31,10 +32,17 @@ export default function AppearanceSettings() {
     void persist({ theme: next });
   }
 
+  async function switchLanguage() {
+    const next = locale === 'en' ? 'zh-CN' : 'en';
+    setLocale(next);
+    await persist({ locale: next });
+    toast('success', next === 'zh-CN' ? t('已切换到中文') : t('已切换到英文'));
+  }
+
   return (
     <>
-      <h1 className="settings-title">{t('外观')}</h1>
-      <p className="settings-subtitle">{t('主题与阅读宽度会同步到你的账户，在其他设备上也会生效。界面语言由访问域名决定。')}</p>
+      <h1 className="settings-title">{t('外观与语言')}</h1>
+      <p className="settings-subtitle">{t('主题与阅读宽度会同步到你的账户；界面语言只影响当前浏览器。')}</p>
 
       <section className="settings-section">
         <div className="settings-section-head">
@@ -100,6 +108,24 @@ export default function AppearanceSettings() {
             <span className="field-hint" style={{ display: 'block' }}>{t('关闭过渡与浮动动画，适合对动效敏感的用户。')}</span>
           </span>
         </label>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-head">
+          <span className="settings-section-title">{t('语言')}</span>
+          <span className="settings-section-desc">{locale === 'en' ? 'English' : '中文'}</span>
+        </div>
+        <div className="setting-row">
+          <div className="setting-row-main">
+            <div className="setting-row-title">{t('界面语言')}</div>
+            <div className="setting-row-desc">{t('切换后立即生效；账户、笔记、附件与空间保持不变，其他设备可在本页单独切换。')}</div>
+          </div>
+          <div className="setting-row-control">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void switchLanguage()}>
+              <Languages size={13} /> {locale === 'en' ? '中文' : 'English'}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="settings-section">

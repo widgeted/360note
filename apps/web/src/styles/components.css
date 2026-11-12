@@ -2583,6 +2583,31 @@ a.btn {
   text-decoration: none;
 }
 
+.admin-device-table {
+  min-width: 680px;
+}
+
+.admin-device-table th,
+.admin-device-table td {
+  white-space: nowrap;
+}
+
+.admin-device-table td {
+  height: 43px;
+}
+
+.device-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 560;
+}
+
+.device-name svg {
+  color: var(--text-tertiary);
+}
+
 .admin-object-table {
   min-width: 760px;
 }

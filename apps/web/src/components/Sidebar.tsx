@@ -10,6 +10,7 @@ import {
   FolderPlus,
   Hash,
   LogOut,
+  Moon,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -17,6 +18,7 @@ import {
   Plus,
   Settings,
   Star,
+  Sun,
   Trash2,
   UserRound,
   UsersRound,
@@ -26,6 +28,7 @@ import type { Folder, Tag } from '@360note/shared';
 import { useAppStore, type NoteFilter } from '../stores/app';
 import { useAuthStore } from '../stores/auth';
 import { getLocale, useT } from '../lib/i18n';
+import { getStoredTheme, storeTheme } from '../lib/theme';
 import { cn } from '../lib/utils';
 import { Avatar } from './Avatar';
 import { LogoLockup } from './Logo';
@@ -110,6 +113,7 @@ export function Sidebar() {
   const workspaces = useAuthStore((state) => state.workspaces);
   const logout = useAuthStore((state) => state.logout);
   const setWorkspaces = useAuthStore((state) => state.setWorkspaces);
+  const setUser = useAuthStore((state) => state.setUser);
   const workspaceId = useAppStore((state) => state.workspaceId);
   const folders = useAppStore((state) => state.folders);
   const tags = useAppStore((state) => state.tags);
@@ -636,6 +640,23 @@ export function Sidebar() {
             >
               {(close) => (
                 <>
+                <MenuItem
+                  icon={getStoredTheme() === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                  onClick={async () => {
+                    close();
+                    const next = getStoredTheme() === 'dark' ? 'light' : 'dark';
+                    storeTheme(next);
+                    try {
+                      const response = await api.patch<{ user: typeof user }>('/api/me/prefs', { theme: next });
+                      if (response.user) setUser(response.user);
+                    } catch {
+                      /* local theme still applies */
+                    }
+                    toast('success', next === 'dark' ? t('已切换到深色主题') : t('已切换到浅色主题'));
+                  }}
+                >
+                  {t('切换明暗主题')}
+                </MenuItem>
                 <MenuItem
                   icon={<Settings size={14} />}
                   onClick={() => {

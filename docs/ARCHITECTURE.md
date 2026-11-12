@@ -73,8 +73,8 @@ Fastify API (Node.js, TypeScript)
 
 | 表 | 关键字段 | 说明 |
 |---|---|---|
-| `users` | id, email, password_hash, role, totp_*, recovery_key_hash, prefs, enc_* | 账户；`enc_*` 为未来 E2EE 预留，未启用 |
-| `sessions` | id, user_id, token_hash, user_agent, ip, expires_at, revoked_at | 会话；令牌哈希存储 |
+| `users` | id, email, password_hash, role, totp_*, recovery_key_hash, prefs, templates_seeded_at, enc_* | 账户；`enc_*` 为未来 E2EE 预留，未启用 |
+| `sessions` | id, user_id, token_hash, device_id, user_agent, ip, expires_at, revoked_at | 会话；令牌哈希存储；`device_id` 来自长期设备 Cookie，用于按设备聚合 |
 | `totp_backup_codes` | user_id, code_hash, used_at | 一次性备用码 |
 | `login_attempts` | email, ip, success, created_at | 登录审计/风控 |
 
@@ -133,7 +133,7 @@ Fastify API (Node.js, TypeScript)
 |---|---|
 | `jobs` | 导入预览/执行、备份创建/恢复的异步任务；进度/结果/错误 |
 | `backups` | 工作区备份：filename, storage_key, kind(auto/manual/pre-restore), status, note_count, attachment_count, meta |
-| `templates` | id, user_id, name, description, title_template, content_template, created_at | 用户自定义模板与变量 |
+| `templates` | id, user_id, name, description, title_template, content_template, builtin_key, created_at | 用户模板与变量；`builtin_key` 标记首次生成的默认模板 |
 | `notifications` | 应用内通知（安全、邀请、评论、共享编辑） |
 | `api_tokens` | 个人 API 令牌（哈希存储、前缀、scope、最后使用、撤销） |
 | `instance_settings` | AI、备份策略等实例级设置；敏感值 AES-GCM 加密 |

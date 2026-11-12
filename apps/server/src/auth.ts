@@ -2,11 +2,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import { config } from './config.js';
 import { one, query } from './db.js';
-import { sha256 } from './lib/crypto.js';
+import { randomToken, sha256 } from './lib/crypto.js';
 import { errors } from './lib/errors.js';
 import type { AuthContext, DbSession, DbUser } from './lib/users.js';
 
 const COOKIE_NAME = config.env === 'production' ? '__Host-nh_session' : 'nh_session';
+const DEVICE_COOKIE_NAME = config.env === 'production' ? '__Host-nh_device' : 'nh_device';
 
 export function setSessionCookie(reply: FastifyReply, token: string): void {
   reply.setCookie(COOKIE_NAME, token, {
@@ -25,6 +26,21 @@ export function clearSessionCookie(reply: FastifyReply): void {
     secure: config.env === 'production',
     sameSite: 'lax',
   });
+}
+
+/** Stable browser/device identity, separate from the session token. */
+export function ensureDeviceId(request: FastifyRequest, reply: FastifyReply): string {
+  const existing = request.cookies?.[DEVICE_COOKIE_NAME];
+  const valid = typeof existing === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(existing);
+  const deviceId = valid ? existing : randomToken(16);
+  reply.setCookie(DEVICE_COOKIE_NAME, deviceId, {
+    path: '/',
+    httpOnly: true,
+    secure: config.env === 'production',
+    sameSite: 'lax',
+    maxAge: 2 * 365 * 24 * 60 * 60,
+  });
+  return deviceId;
 }
 
 async function resolveBearer(request: FastifyRequest): Promise<AuthContext | null> {

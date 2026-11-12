@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { parse } from '../lib/validate.js';
 import { createTemplate, deleteTemplate, listTemplates, mapTemplate, updateTemplate } from '../services/templates.js';
+import { normalizeLocale } from '../lib/mailer.js';
 
 const templateBody = z.object({
   name: z.string().trim().min(1).max(120),
@@ -14,7 +15,8 @@ const templateBody = z.object({
 export default async function templateRoutes(app: FastifyInstance) {
   app.get('/api/templates', async (request) => {
     const auth = requireAuth(request);
-    const rows = await listTemplates(auth.user.id);
+    const locale = normalizeLocale(request.headers['x-locale'] ?? auth.user.prefs?.locale ?? request.headers['accept-language']);
+    const rows = await listTemplates(auth.user.id, locale);
     return { templates: rows.map(mapTemplate) };
   });
 

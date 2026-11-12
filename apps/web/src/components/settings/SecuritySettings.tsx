@@ -16,7 +16,7 @@ import type { SessionInfo, User } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { getLocale, translate, useT } from '../../lib/i18n';
-import { copyText, formatFullDate, formatRelativeShort } from '../../lib/utils';
+import { copyText, formatNoteDate, formatRelativeShort } from '../../lib/utils';
 import { Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 
@@ -25,6 +25,7 @@ export default function SecuritySettings() {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessionsTotal, setSessionsTotal] = useState(0);
   const [setupOpen, setSetupOpen] = useState(false);
   const [setup, setSetup] = useState<{ secret: string; qr: string; otpauthUrl: string } | null>(null);
   const [setupCode, setSetupCode] = useState('');
@@ -48,10 +49,15 @@ export default function SecuritySettings() {
     loadSessions();
   }, []);
 
-  async function loadSessions() {
+  async function loadSessions(offset = 0, append = false) {
     try {
-      const response = await api.get<{ sessions: SessionInfo[] }>('/api/auth/sessions');
-      setSessions(response.sessions);
+      const response = await api.get<{ sessions: SessionInfo[]; total: number }>(`/api/auth/sessions?limit=50&offset=${offset}`);
+      setSessions((current) => {
+        if (!append) return response.sessions;
+        const seen = new Set(current.map((session) => session.id));
+        return [...current, ...response.sessions.filter((session) => !seen.has(session.id))];
+      });
+      setSessionsTotal(response.total);
       setSessionsError(null);
     } catch (error) {
       setSessionsError((error as Error).message);
@@ -119,8 +125,9 @@ export default function SecuritySettings() {
 
   async function revokeSession(id: string) {
     try {
-      await api.delete(`/api/auth/sessions/${id}`);
-      setSessions((current) => current.filter((session) => session.id !== id));
+      await api.delete(`/api/auth/devices/${id}`);
+      await loadSessions();
+      toast('success', t('设备已退出'));
     } catch (error) {
       toast('error', t('操作失败'), (error as Error).message);
     }
@@ -129,7 +136,7 @@ export default function SecuritySettings() {
   async function revokeOthers() {
     try {
       await api.post('/api/auth/sessions/revoke-others');
-      setSessions((current) => current.filter((session) => session.current));
+      await loadSessions();
       toast('success', t('其他设备已退出'));
     } catch (error) {
       toast('error', t('操作失败'), (error as Error).message);
@@ -208,7 +215,7 @@ export default function SecuritySettings() {
         <div className="setting-row">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('登录通知')}</div>
-            <div className="setting-row-desc">{t('检测到新的登录设备或 IP 时，会在应用内提醒；必要时也会发送账户安全邮件。')}</div>
+            <div className="setting-row-desc">{t('检测到新的登录设备或 IP 时，会在应用内提醒。')}</div>
           </div>
           <div className="setting-row-control"><span className="badge badge-green"><Check size={9} /> {t('已启用')}</span></div>
         </div>
@@ -228,40 +235,62 @@ export default function SecuritySettings() {
       <section className="settings-section">
         <div className="settings-section-head">
           <span className="settings-section-title">{t('登录设备')}</span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={revokeOthers}>{t('退出其他设备')}</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={revokeOthers} disabled={!sessions.some((session) => !session.current)}>{t('退出其他设备')}</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {sessionsError && (
-            <div className="form-error">
-              <AlertCircle size={14} /> {sessionsError}
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadSessions()}>{t('重试')}</button>
-            </div>
+        <div className="setting-card" style={{ padding: 0, overflowX: 'auto' }}>
+          <table className="data-table admin-device-table">
+            <thead>
+              <tr>
+                <th>{t('设备')}</th>
+                <th>{t('地址')}</th>
+                <th>{t('最后活动')}</th>
+                <th>{t('首次登录')}</th>
+                <th>{t('操作')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessionsError ? (
+                <tr>
+                  <td colSpan={5}>
+                    <div className="form-error">
+                      <AlertCircle size={14} /> {sessionsError}
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadSessions()}>{t('重试')}</button>
+                    </div>
+                  </td>
+                </tr>
+              ) : sessions.length === 0 ? (
+                <tr><td colSpan={5}><div className="context-empty">{t('暂无登录设备')}</div></td></tr>
+              ) : sessions.map((session) => (
+                <tr key={session.id}>
+                  <td>
+                    <span className="device-name">
+                      <MonitorSmartphone size={14} />
+                      <span>{describeAgent(session.userAgent)}</span>
+                      {session.current && <span className="badge badge-blue">{t('当前设备')}</span>}
+                    </span>
+                  </td>
+                  <td className="mono">{session.ip || t('未知地址')}</td>
+                  <td>{formatRelativeShort(session.lastSeenAt)}</td>
+                  <td>{formatNoteDate(session.createdAt)}</td>
+                  <td>
+                    {!session.current && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeSession(session.id)}>
+                        <LogOut size={12} /> {t('退出')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+          <p className="setting-note">{t('同一台设备只保留一条记录；关闭浏览器再打开不会新增设备。')}</p>
+          {sessions.length < sessionsTotal && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadSessions(sessions.length, true)}>
+              {t('加载更多')}
+            </button>
           )}
-          {!sessionsError && sessions.length === 0 && <div className="context-empty">{t('暂无登录设备')}</div>}
-          {sessions.map((session) => (
-            <div key={session.id} className="setting-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: 12 }}>
-              <span style={{ color: 'var(--text-tertiary)', marginTop: 1 }}>
-                <MonitorSmartphone size={16} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, fontWeight: 560, color: 'var(--text)' }}>{describeAgent(session.userAgent)}</span>
-                  {session.current && <span className="badge badge-blue">{t('当前设备')}</span>}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 3 }}>
-                  {session.ip || t('未知地址')} · {t('最后活动')} {formatRelativeShort(session.lastSeenAt)}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  {t('登录于 {date}', { date: formatFullDate(session.createdAt) })}
-                </div>
-              </div>
-              {!session.current && (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void revokeSession(session.id)}>
-                  <LogOut size={12} /> {t('退出')}
-                </button>
-              )}
-            </div>
-          ))}
         </div>
       </section>
 

@@ -91,7 +91,7 @@ export default function EditorSettings() {
             <Sparkles size={13} /> {t('从模板创建')}
           </button>
         </div>
-        <p className="setting-note">{t('内置会议记录、日报与项目简报模板。模板只负责开头，之后可以随意修改或删除。')}</p>
+        <p className="setting-note">{t('默认模板会出现在模板列表中，可以修改或删除；也可以新建自己的模板。')}</p>
       </section>
 
       <section className="settings-section">

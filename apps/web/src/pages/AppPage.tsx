@@ -13,7 +13,6 @@ import { EmptyEditorState } from '../components/editor/EmptyEditorState';
 const EditorPane = lazy(() => import('../components/editor/EditorPane').then((module) => ({ default: module.EditorPane })));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 import { Modal } from '../components/Modal';
-import { toast } from '../stores/toast';
 import { api } from '../lib/api';
 import { applyCustomTemplate, type CustomTemplate } from '../lib/templates';
 import { cn } from '../lib/utils';
@@ -212,20 +211,6 @@ export default function AppPage() {
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
-  async function useTemplate(template: 'meeting' | 'daily' | 'project') {
-    const date = new Date().toLocaleDateString(getLocale() === 'zh-CN' ? 'zh-CN' : 'en-US');
-    const content = t(
-      template === 'meeting' ? '会议记录模板' : template === 'daily' ? '日记模板' : '项目简报模板',
-      { date },
-    );
-    const created = await createNote({
-      title: template === 'meeting' ? t('会议记录') : template === 'daily' ? t('日报') : t('项目简报'),
-      contentMd: content,
-    });
-    setShowTemplates(false);
-    if (created) navigate(`/app/note/${created.id}`);
-  }
-
   async function useCustomTemplate(template: CustomTemplate) {
     const currentWorkspace = workspaces.find((entry) => entry.id === workspaceId);
     const resolved = applyCustomTemplate(template, {
@@ -308,46 +293,26 @@ export default function AppPage() {
         size="md"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { id: 'meeting' as const, title: t('会议记录'), desc: t('议程、讨论、决定与行动项') },
-            { id: 'daily' as const, title: t('日报'), desc: t('今天发生了什么、想法与明天') },
-            { id: 'project' as const, title: t('项目简报'), desc: t('目标、范围、里程碑与风险') },
-          ].map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              className="backlink-item"
-              onClick={() => void useTemplate(template.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}
-            >
-              <span className="feature-icon" style={{ margin: 0, width: 30, height: 30 }}><FileText size={14} /></span>
-              <span style={{ flex: 1 }}>
-                <span className="backlink-title">{template.title}</span>
-                <span className="backlink-excerpt">{template.desc}</span>
-              </span>
-              <Plus size={14} style={{ color: 'var(--text-tertiary)' }} />
-            </button>
-          ))}
-          {customTemplates.length > 0 && (
-            <>
-              <div className="setting-note" style={{ marginTop: 10 }}>{t('自定义模板')}</div>
-              {customTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  className="backlink-item"
-                  onClick={() => void useCustomTemplate(template)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}
-                >
-                  <span className="feature-icon" style={{ margin: 0, width: 30, height: 30 }}><FileText size={14} /></span>
-                  <span style={{ flex: 1 }}>
-                    <span className="backlink-title">{template.name}</span>
-                    <span className="backlink-excerpt">{template.description || t('自定义模板')}</span>
-                  </span>
-                  <Plus size={14} style={{ color: 'var(--text-tertiary)' }} />
-                </button>
-              ))}
-            </>
+          {customTemplates.length === 0 ? (
+            <div className="context-empty">{t('还没有模板。可以到模板设置新建，或稍后重试。')}</div>
+          ) : (
+            customTemplates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className="backlink-item"
+                onClick={() => void useCustomTemplate(template)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}
+              >
+                <span className="feature-icon" style={{ margin: 0, width: 30, height: 30 }}><FileText size={14} /></span>
+                <span style={{ flex: 1 }}>
+                  <span className="backlink-title">{template.name}</span>
+                  <span className="backlink-excerpt">{template.description || t('模板')}</span>
+                </span>
+                {template.builtinKey && <span className="badge badge-gray">{t('默认')}</span>}
+                <Plus size={14} style={{ color: 'var(--text-tertiary)' }} />
+              </button>
+            ))
           )}
           <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setShowTemplates(false); navigate('/app/settings/templates'); }}>
             {t('管理模板')}

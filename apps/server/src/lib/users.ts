@@ -31,6 +31,7 @@ export interface DbSession {
   id: string;
   user_id: string;
   token_hash: string;
+  device_id: string | null;
   user_agent: string;
   ip: string;
   created_at: Date;

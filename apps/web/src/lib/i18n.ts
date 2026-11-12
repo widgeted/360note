@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 export type Locale = 'zh-CN' | 'en';
 
 const LOCALE_KEY = 'nh-locale';
+const LOCALE_OVERRIDE_KEY = 'nh-locale-override';
 const listeners = new Set<() => void>();
 
 /**
@@ -20,6 +21,12 @@ function domainLocale(): Locale | null {
 }
 
 function detectLocale(): Locale {
+  try {
+    const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
+    if (override === 'zh-CN' || override === 'en') return override;
+  } catch {
+    /* ignore */
+  }
   const forced = domainLocale();
   if (forced) return forced;
   try {
@@ -47,10 +54,17 @@ export function getLocale(): Locale {
   return currentLocale;
 }
 
+/** Subscribe to locale changes so hooks can re-render after an in-place switch. */
+export function useLocale(): Locale {
+  return useSyncExternalStore(subscribe, getLocale, getLocale);
+}
+
 export function setLocale(locale: Locale): void {
   currentLocale = locale;
   try {
     localStorage.setItem(LOCALE_KEY, locale);
+    // An explicit choice overrides the domain default on future visits.
+    localStorage.setItem(LOCALE_OVERRIDE_KEY, locale);
   } catch {
     /* ignore */
   }
@@ -1741,6 +1755,27 @@ const en: Record<string, string> = {
   "把相邻图片排成 2 列": "Lay out adjacent images in 2 columns",
   "请把光标放在相邻的两张或更多图片上": "Place the cursor next to two or more adjacent images first",
   "请把光标放在图片组内": "Place the cursor inside an image grid first",
+  "设备": "Device",
+  "地址": "Address",
+  "首次登录": "First sign-in",
+  "设备已退出": "Device signed out",
+  "同一台设备只保留一条记录；关闭浏览器再打开不会新增设备。": "One row per device. Closing and reopening the browser does not add a new device.",
+  "我的模板": "My templates",
+  "还没有模板。": "No templates yet.",
+  "默认": "Default",
+  "默认模板只会在首次使用时生成一次；可以像自定义模板一样修改或删除，删除后不会自动恢复。": "Default templates are created once on first use. You can edit or delete them like any custom template; deleting them will not recreate them.",
+  "默认模板和自定义模板都在这里管理，可以编辑、删除或参考后新建。变量会在创建时替换。": "Default and custom templates are managed here. Edit, delete, or use one as a reference. Variables are filled in when a note is created.",
+  "还没有模板。可以到模板设置新建，或稍后重试。": "No templates yet. Create one in template settings, or try again shortly.",
+  "默认模板会出现在模板列表中，可以修改或删除；也可以新建自己的模板。": "Default templates appear in the template list and can be edited or deleted. You can also create your own.",
+  "界面语言": "Interface language",
+  "切换后立即生效，账户、笔记、附件与空间保持不变。": "Takes effect immediately. Your account, notes, attachments and workspaces stay the same.",
+  "主题、阅读宽度和界面语言会同步到你的账户，在其他设备上也会生效。": "Theme, reading width and interface language sync to your account and apply on other devices.",
+  "已切换到中文": "Switched to Chinese",
+  "已切换到英文": "Switched to English",
+  "默认模板与自定义模板": "Default and custom templates",
+  "主题与阅读宽度会同步到你的账户；界面语言只影响当前浏览器。": "Theme and reading width sync to your account. Interface language applies to this browser only.",
+  "切换后立即生效；账户、笔记、附件与空间保持不变，其他设备可在本页单独切换。": "Takes effect immediately. Your account, notes, attachments and workspaces stay the same. Switch separately on other devices.",
+  "检测到新的登录设备或 IP 时，会在应用内提醒。": "New devices or IP addresses trigger an in-app alert.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

@@ -42,6 +42,7 @@ export interface SessionInfo {
   createdAt: string;
   lastSeenAt: string;
   expiresAt: string;
+  sessionCount?: number;
 }
 
 export interface Workspace {

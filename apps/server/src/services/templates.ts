@@ -1,5 +1,6 @@
-import { many, one, query } from '../db.js';
+import { many, one, query, transaction } from '../db.js';
 import { errors } from '../lib/errors.js';
+import { defaultTemplates } from '../lib/default-templates.js';
 
 export interface TemplateRow {
   id: string;
@@ -8,6 +9,7 @@ export interface TemplateRow {
   description: string;
   title_template: string;
   content_template: string;
+  builtin_key: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -19,12 +21,38 @@ export function mapTemplate(row: TemplateRow) {
     description: row.description,
     titleTemplate: row.title_template,
     contentTemplate: row.content_template,
+    builtinKey: row.builtin_key,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
 }
 
-export async function listTemplates(userId: string) {
+export async function ensureDefaultTemplates(userId: string, locale: 'zh' | 'en'): Promise<void> {
+  const seeded = await one<{ templates_seeded_at: Date | null }>(
+    'SELECT templates_seeded_at FROM users WHERE id = $1',
+    [userId],
+  );
+  if (!seeded || seeded.templates_seeded_at) return;
+  await transaction(async (client) => {
+    const locked = await client.query<{ templates_seeded_at: Date | null }>(
+      'SELECT templates_seeded_at FROM users WHERE id = $1 FOR UPDATE',
+      [userId],
+    );
+    if (!locked.rows[0] || locked.rows[0].templates_seeded_at) return;
+    for (const template of defaultTemplates(locale)) {
+      await client.query(
+        `INSERT INTO templates (user_id, name, description, title_template, content_template, builtin_key)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (user_id, builtin_key) DO NOTHING`,
+        [userId, template.name, template.description, template.titleTemplate, template.contentTemplate, template.key],
+      );
+    }
+    await client.query('UPDATE users SET templates_seeded_at = now() WHERE id = $1', [userId]);
+  });
+}
+
+export async function listTemplates(userId: string, locale: 'zh' | 'en' = 'zh') {
+  await ensureDefaultTemplates(userId, locale);
   return many<TemplateRow>(
     'SELECT * FROM templates WHERE user_id = $1 ORDER BY updated_at DESC',
     [userId],

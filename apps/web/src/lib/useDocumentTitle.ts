@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getLocale } from './i18n';
+import { getLocale, useLocale } from './i18n';
 
 function brand(): string {
   return getLocale() === 'zh-CN' ? '360笔记' : '360note';
@@ -77,6 +77,7 @@ export function useDocumentTitle(
   options?: { description?: string; noindex?: boolean },
 ): void {
   const location = useLocation();
+  const locale = useLocale();
   const description = options?.description;
   const explicitNoindex = options?.noindex;
 
@@ -117,5 +118,5 @@ export function useDocumentTitle(
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     if (path === '/') upsertStructuredData(canonical, pageDescription);
     else document.head.querySelectorAll('script[data-nh-seo-jsonld]').forEach((element) => element.remove());
-  }, [title, description, explicitNoindex, location.pathname]);
+  }, [title, description, explicitNoindex, location.pathname, locale]);
 }

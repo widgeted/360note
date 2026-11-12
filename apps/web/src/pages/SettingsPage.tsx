@@ -35,7 +35,7 @@ import { ArrowLeft } from 'lucide-react';
 
 const SECTIONS = [
   { id: 'account', icon: UserRound, label: '账户', group: '个人' },
-  { id: 'appearance', icon: Palette, label: '外观', group: '个人' },
+  { id: 'appearance', icon: Palette, label: '外观与语言', group: '个人' },
   { id: 'editor', icon: Keyboard, label: '编辑器', group: '个人' },
   { id: 'security', icon: ShieldCheck, label: '安全', group: '个人' },
   { id: 'data', icon: CloudDownload, label: '数据与备份', group: '数据' },

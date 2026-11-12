@@ -101,23 +101,26 @@ export default function TemplateSettings() {
   return (
     <>
       <h1 className="settings-title">{t('模板')}</h1>
-      <p className="settings-subtitle">{t('把常用的笔记结构保存为模板，新建时一键展开。变量会在创建时替换。')}</p>
+      <p className="settings-subtitle">{t('默认模板和自定义模板都在这里管理，可以编辑、删除或参考后新建。变量会在创建时替换。')}</p>
 
       <section className="settings-section">
         <div className="settings-section-head">
-          <span className="settings-section-title">{t('自定义模板')}</span>
+          <span className="settings-section-title">{t('我的模板')}</span>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => setDraft({ ...EMPTY })}>
             <Plus size={13} /> {t('新建模板')}
           </button>
         </div>
         {templates.length === 0 ? (
-          <div className="context-empty">{t('还没有自定义模板。')}</div>
+          <div className="context-empty">{t('还没有模板。')}</div>
         ) : (
           <div className="settings-section" style={{ marginTop: 10, padding: 0 }}>
             {templates.map((template) => (
               <div className="setting-row" key={template.id}>
                 <div className="setting-row-main">
-                  <div className="setting-row-title"><LayoutTemplate size={13} style={{ display: 'inline', marginRight: 5 }} />{template.name}</div>
+                  <div className="setting-row-title">
+                    <LayoutTemplate size={13} style={{ display: 'inline', marginRight: 5 }} />{template.name}
+                    {template.builtinKey && <span className="badge badge-gray" style={{ marginLeft: 6 }}>{t('默认')}</span>}
+                  </div>
                   <div className="setting-row-desc">{template.description || t('无描述')} · {formatRelativeShort(template.updatedAt)}</div>
                 </div>
                 <div className="setting-row-control" style={{ display: 'flex', gap: 4 }}>
@@ -144,7 +147,7 @@ export default function TemplateSettings() {
             ))}
           </div>
         )}
-        <p className="setting-note" style={{ marginTop: 8 }}>{t('模板只属于你自己，可以随时修改或删除。')}</p>
+        <p className="setting-note" style={{ marginTop: 8 }}>{t('默认模板只会在首次使用时生成一次；可以像自定义模板一样修改或删除，删除后不会自动恢复。')}</p>
       </section>
 
       <Modal
