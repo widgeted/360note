@@ -2372,10 +2372,6 @@ kbd {
   white-space: nowrap;
 }
 
-.split-pane .topbar-breadcrumb {
-  display: none;
-}
-
 .split-pane .split-current-badge {
   margin-left: 8px;
 }
