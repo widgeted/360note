@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Activity, Ban, Cloud, CloudUpload, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Server, Share2, ShieldCheck, Trash2, UserCheck, Users } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Activity, Ban, Cloud, CloudUpload, Database, Download, HardDrive, LogOut, MoreHorizontal, Save, Search, Server, Share2, ShieldCheck, Trash2, UserCheck, Users } from 'lucide-react';
 import type { AuditEntry } from '@360note/shared';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -11,6 +12,7 @@ import { ConfirmDialog } from '../Modal';
 import { OffsiteSettings } from './OffsiteSettings';
 import { useAuthStore } from '../../stores/auth';
 import { LoadFailure } from '../LoadFailure';
+import { AdminAiSettings } from './AdminAiSettings';
 
 interface Stats {
   users: number;
@@ -24,15 +26,6 @@ interface Stats {
   failedJobs: number;
   databaseBytes: number;
   lastBackupAt: string | null;
-}
-
-interface AttachmentStorageStats {
-  localBytes: number;
-  localFiles: number;
-  localAttachments: number;
-  remoteAttachments: number;
-  attachmentsEnabled: boolean;
-  offsiteEnabled: boolean;
 }
 
 interface OffsiteUsage {
@@ -57,11 +50,26 @@ interface AdminUser {
   disabledAt: string | null;
 }
 
+const ADMIN_PAGES = [
+  ['overview', '概览'],
+  ['users', '用户'],
+  ['content', '内容'],
+  ['storage', '存储'],
+  ['backup', '备份'],
+  ['audit', '审计'],
+  ['ai', 'AI'],
+] as const;
+
+type AdminPage = (typeof ADMIN_PAGES)[number][0];
+
 export default function AdminSettings() {
   const t = useT();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const rawPage = location.pathname.match(/^\/app\/settings\/admin\/([^/]+)/)?.[1];
+  const page = (ADMIN_PAGES.some(([id]) => id === rawPage) ? rawPage : 'overview') as AdminPage;
   const currentUser = useAuthStore((state) => state.user);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [attachmentStorage, setAttachmentStorage] = useState<AttachmentStorageStats | null>(null);
   const [offsiteUsage, setOffsiteUsage] = useState<OffsiteUsage | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
@@ -83,7 +91,10 @@ export default function AdminSettings() {
   const [runtime, setRuntime] = useState<{ uptimeSeconds: number; memoryBytes: number; nodeVersion: string } | null>(null);
   const [retention, setRetention] = useState(30);
   const [saving, setSaving] = useState(false);
-  const [adminTab, setAdminTab] = useState<'overview' | 'storage' | 'users' | 'shares' | 'comments' | 'logs'>('overview');
+  const [contentTab, setContentTab] = useState<'shares' | 'comments'>('shares');
+  const [contentQuery, setContentQuery] = useState('');
+  const [auditQuery, setAuditQuery] = useState('');
+  const [userQuery, setUserQuery] = useState('');
   const [instanceBackups, setInstanceBackups] = useState<Array<{ id: string; filename: string; size: number; offsiteStatus: string; offsiteError: string | null; createdAt: string }>>([]);
   const [instanceBackupSettings, setInstanceBackupSettings] = useState({ enabled: false, frequencyHours: 24, retentionCount: 7, drillEnabled: true, drillFrequencyHours: 24, lastDrillAt: null as string | null, lastDrillOk: null as boolean | null, lastDrillError: null as string | null, lastDrillBackup: null as string | null });
   const [instanceBackupBusy, setInstanceBackupBusy] = useState(false);
@@ -92,22 +103,28 @@ export default function AdminSettings() {
   const [deleteComment, setDeleteComment] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime; attachmentStorage: AttachmentStorageStats }>('/api/admin/stats').then((res) => {
+    api.get<{ stats: Stats; instance: typeof instance; runtime: typeof runtime }>('/api/admin/stats').then((res) => {
       setStats(res.stats);
       setInstance(res.instance as typeof instance);
       setRuntime(res.runtime as typeof runtime);
-      setAttachmentStorage(res.attachmentStorage);
       setRetention(res.instance?.backupRetentionDays ?? 30);
       setPageError(null);
     }).catch((error: Error) => setPageError(error.message));
-    void refreshOffsiteUsage();
-    api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch((error: Error) => setPageError(error.message));
-    void loadAudit(0);
-    void refreshIpBlocks();
-    void refreshInstanceBackups();
-    void loadShares(0);
-    void loadPublicComments(0);
   }, []);
+
+  useEffect(() => {
+    if (page === 'users') {
+      api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch((error: Error) => setPageError(error.message));
+      void refreshIpBlocks();
+    }
+    if (page === 'content') {
+      if (contentTab === 'shares') void loadShares(0);
+      else void loadPublicComments(0);
+    }
+    if (page === 'audit') void loadAudit(0);
+    if (page === 'backup') void refreshInstanceBackups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, contentTab]);
 
   async function refreshIpBlocks() {
     const response = await api.get<{ blocks: Array<{ id: string; ip: string; reason: string | null; createdAt: string }> }>('/api/admin/ip-blocks');
@@ -312,35 +329,121 @@ export default function AdminSettings() {
     }
   }
 
+  function downloadCsv(filename: string, rows: string[][]) {
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  const normalizedUserQuery = userQuery.trim().toLowerCase();
+  const visibleUsers = normalizedUserQuery
+    ? users.filter((member) => [member.email, member.displayName, member.role].some((value) => value.toLowerCase().includes(normalizedUserQuery)))
+    : users;
+  const normalizedContentQuery = contentQuery.trim().toLowerCase();
+  const visibleShares = normalizedContentQuery
+    ? shares.filter((share) => [share.url, share.ownerName ?? '', share.workspaceName, share.permission].some((value) => value.toLowerCase().includes(normalizedContentQuery)))
+    : shares;
+  const visibleComments = normalizedContentQuery
+    ? publicComments.filter((comment) => [comment.body, comment.authorName, comment.noteTitle, comment.ip ?? ''].some((value) => value.toLowerCase().includes(normalizedContentQuery)))
+    : publicComments;
+  const normalizedAuditQuery = auditQuery.trim().toLowerCase();
+  const visibleAudit = normalizedAuditQuery
+    ? audit.filter((entry) => [entry.action, entry.actorName ?? '', entry.ip ?? ''].some((value) => value.toLowerCase().includes(normalizedAuditQuery)))
+    : audit;
+
+  function exportContent() {
+    if (contentTab === 'shares') {
+      downloadCsv('360note-shares.csv', [
+        ['url', 'owner', 'workspace', 'permission', 'password', 'expiresAt', 'views'],
+        ...visibleShares.map((share) => [share.url, share.ownerName ?? '', share.workspaceName, share.permission, String(share.hasPassword), share.expiresAt ?? '', String(share.viewCount)]),
+      ]);
+      return;
+    }
+    downloadCsv('360note-comments.csv', [
+      ['body', 'author', 'ip', 'note', 'createdAt'],
+      ...visibleComments.map((comment) => [comment.body, comment.authorName, comment.ip ?? '', comment.noteTitle, comment.createdAt]),
+    ]);
+  }
+
+  function exportUsers() {
+    downloadCsv('360note-users.csv', [
+      ['email', 'name', 'role', 'workspaces', 'notes', 'storageBytes', 'sessions', 'lastLogin', 'disabled', 'sharingDisabled'],
+      ...visibleUsers.map((member) => [member.email, member.displayName, member.role, String(member.workspaceCount), String(member.noteCount), String(member.storageBytes), String(member.sessionCount), member.lastLoginAt ?? '', String(Boolean(member.disabledAt)), String(member.sharingDisabled)]),
+    ]);
+  }
+
+  function exportAudit() {
+    downloadCsv('360note-audit.csv', [
+      ['time', 'actor', 'action', 'ip'],
+      ...visibleAudit.map((entry) => [entry.createdAt, entry.actorName ?? '', entry.action, entry.ip ?? '']),
+    ]);
+  }
+
   return (
     <>
       <h1 className="settings-title">{t('实例管理')}</h1>
-      <p className="settings-subtitle">{t('实例级的统计、存储、用户、备份保留与审计。只有实例管理员可见。')}</p>
+      <p className="settings-subtitle">{t('实例级运行状态、用户与访问、公开内容、附件存储、备份恢复与审计。只有实例管理员可见。')}</p>
 
       {pageError && <LoadFailure message={pageError} onRetry={() => window.location.reload()} />}
 
       <div className="admin-tabs">
-        {([
-          ['overview', t('概览')],
-          ['storage', t('存储管理')],
-          ['users', t('用户管理')],
-          ['shares', t('公开链接')],
-          ['comments', t('公开评论')],
-          ['logs', t('操作日志')],
-        ] as const).map(([id, label]) => (
-          <button key={id} type="button" className={cn('admin-tab', adminTab === id && 'active')} onClick={() => setAdminTab(id)}>
-            {label}
+        {ADMIN_PAGES.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={cn('admin-tab', page === id && 'active')}
+            aria-current={page === id ? 'page' : undefined}
+            onClick={() => navigate(id === 'overview' ? '/app/settings/admin' : `/app/settings/admin/${id}`)}
+          >
+            {t(label)}
           </button>
         ))}
       </div>
 
-      {adminTab === 'storage' && (
+      {page === 'storage' && (
         <div className="admin-storage-panel">
-          <OffsiteSettings />
+          <OffsiteSettings mode="attachment" />
         </div>
       )}
 
-      <section className="settings-section" hidden={adminTab !== 'overview'}>
+      {page === 'backup' && (
+        <div className="admin-storage-panel">
+          <OffsiteSettings mode="backup" />
+        </div>
+      )}
+
+      {page === 'ai' && <AdminAiSettings />}
+
+      {page === 'content' && (
+        <section className="settings-section">
+          <div className="settings-section-head">
+            <span className="settings-section-title">{t('公开内容')}</span>
+            <span className="settings-section-desc">{contentTab === 'shares' ? t('共 {n} 条链接', { n: sharesTotal }) : t('共 {n} 条评论', { n: commentsTotal })}</span>
+          </div>
+          <div className="setting-inline-form" style={{ marginBottom: 6 }}>
+            <div className="segmented">
+              <button type="button" className={contentTab === 'shares' ? 'active' : ''} onClick={() => { setContentTab('shares'); setContentQuery(''); }}>{t('分享链接')}</button>
+              <button type="button" className={contentTab === 'comments' ? 'active' : ''} onClick={() => { setContentTab('comments'); setContentQuery(''); }}>{t('公开评论')}</button>
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 180, maxWidth: 320 }}>
+              <input className="input input-sm" value={contentQuery} onChange={(event) => setContentQuery(event.target.value)} placeholder={t('筛选当前页…')} />
+            </div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={exportContent} disabled={(contentTab === 'shares' ? visibleShares : visibleComments).length === 0}>
+              <Download size={13} /> {t('导出 CSV')}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { if (contentTab === 'shares') void loadShares(sharesOffset); else void loadPublicComments(commentsOffset); }}>
+              {t('刷新')}
+            </button>
+          </div>
+        </section>
+      )}
+
+      <section className="settings-section" hidden={page !== 'overview'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('运行概况')}</span>
           <span className="settings-section-desc">v{instance?.version ?? '—'}</span>
@@ -378,34 +481,23 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'overview'}>
-        <div className="settings-section-head">
-          <span className="settings-section-title">{t('附件存储')}</span>
-          <span className="settings-section-desc">{attachmentStorage?.attachmentsEnabled ? t('对象存储') : t('本机')}</span>
-        </div>
-        <div className="admin-stats">
-          <div className="setting-card">
-            <span style={{ color: 'var(--text-tertiary)' }}><HardDrive size={15} /></span>
-            <div className="admin-stat-value">{formatBytes(offsiteUsage?.local.bytes ?? attachmentStorage?.localBytes ?? 0)}</div>
-            <div className="setting-note">{t('本机附件占用')} · {offsiteUsage?.local.files ?? attachmentStorage?.localFiles ?? 0} {t('个文件')}</div>
+      {page === 'overview' && (
+        <section className="settings-section">
+          <div className="settings-section-head">
+            <span className="settings-section-title">{t('管理入口')}</span>
+            <span className="settings-section-desc">{t('按职责进入对应页面')}</span>
           </div>
-          <div className="setting-card">
-            <span style={{ color: 'var(--text-tertiary)' }}><Cloud size={15} /></span>
-            <div className="admin-stat-value">{formatBytes(offsiteUsage?.remote?.attachments.bytes ?? 0)}</div>
-            <div className="setting-note">{t('对象存储附件')} · {offsiteUsage?.remote?.attachments.objects ?? 0} {t('个对象')}</div>
+          <div className="setting-inline-form">
+            {ADMIN_PAGES.filter(([id]) => id !== 'overview').map(([id, label]) => (
+              <button key={id} type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/app/settings/admin/${id}`)}>
+                {t(label)}
+              </button>
+            ))}
           </div>
-          <div className="setting-card">
-            <span style={{ color: 'var(--text-tertiary)' }}><CloudUpload size={15} /></span>
-            <div className="admin-stat-value">{formatBytes(offsiteUsage?.remote?.backups.bytes ?? 0)}</div>
-            <div className="setting-note">{t('对象存储备份')} · {offsiteUsage?.remote?.backups.objects ?? 0} {t('个对象')}</div>
-          </div>
-        </div>
-        <p className="setting-note" style={{ marginTop: 6 }}>
-          {t('本机附件与对象存储附件分开统计；切换存储不会改变附件链接。可在“存储管理”中启用、停用并迁移。')}
-        </p>
-      </section>
+        </section>
+      )}
 
-      <section className="settings-section" hidden={adminTab !== 'overview'}>
+      <section className="settings-section" hidden={page !== 'backup'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('备份保留')}</span>
         </div>
@@ -421,7 +513,7 @@ export default function AdminSettings() {
         <p className="setting-note" style={{ marginTop: 6 }}>{t('自动备份保留 14 份；超过保留天数的备份会被清理。')}</p>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'overview'}>
+      <section className="settings-section" hidden={page !== 'backup'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('整站备份')}</span>
           <span className="settings-section-desc">{instanceBackups.length}</span>
@@ -472,19 +564,29 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'users'}>
+      <section className="settings-section" hidden={page !== 'users'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('用户')}</span>
-          <span className="settings-section-desc">{users.length}</span>
+          <span className="settings-section-desc">{visibleUsers.length} / {users.length}</span>
+        </div>
+        <div className="setting-inline-form" style={{ marginBottom: 10 }}>
+          <div className="field" style={{ flex: 1, minWidth: 180, maxWidth: 320 }}>
+            <input className="input input-sm" value={userQuery} onChange={(event) => setUserQuery(event.target.value)} placeholder={t('筛选用户邮箱、昵称或角色…')} />
+          </div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={exportUsers} disabled={visibleUsers.length === 0}>
+            <Download size={13} /> {t('导出 CSV')}
+          </button>
         </div>
         <div className="setting-card" style={{ padding: 0, overflowX: 'auto' }}>
           <table className="data-table admin-users-table">
-            <thead><tr><th>{t('邮箱')}</th><th>{t('昵称')}</th><th>{t('角色')}</th><th>{t('空间 / 笔记')}</th><th>{t('附件存储')}</th><th>{t('会话')}</th><th>{t('最后登录')}</th><th>{t('操作')}</th></tr></thead>
+            <thead><tr><th>{t('邮箱')}</th><th>{t('名称')}</th><th>{t('角色')}</th><th>{t('空间/笔记')}</th><th>{t('大小')}</th><th>{t('操作')}</th></tr></thead>
             <tbody>
-              {users.map((member) => (
+              {visibleUsers.length === 0 ? (
+                <tr><td colSpan={6}><div className="context-empty">{userQuery ? t('没有匹配的用户') : t('暂无用户')}</div></td></tr>
+              ) : visibleUsers.map((member) => (
                 <tr key={member.id}>
-                  <td><strong>{member.email}</strong></td>
-                  <td>{member.displayName}</td>
+                  <td><strong title={member.email}>{member.email}</strong></td>
+                  <td title={member.displayName}>{member.displayName}</td>
                   <td>
                     <select className="select select-sm" value={member.role} disabled={member.id === currentUser?.id} onChange={(event) => void changeRole(member, event.target.value as 'user' | 'admin')}>
                       <option value="user">{t('普通用户')}</option>
@@ -495,8 +597,6 @@ export default function AdminSettings() {
                   </td>
                   <td>{member.workspaceCount} / {member.noteCount}</td>
                   <td>{formatBytes(member.storageBytes)}</td>
-                  <td>{member.sessionCount}</td>
-                  <td>{member.lastLoginAt ? formatRelativeShort(member.lastLoginAt) : '—'}</td>
                   <td>
                     <Dropdown
                       width="auto"
@@ -542,7 +642,7 @@ export default function AdminSettings() {
         <p className="setting-note" style={{ marginTop: 8 }}>{t('管理员可以查看账户元数据、空间/笔记/附件数量、会话与审计日志，并可调整角色或强制退出设备。不会提供读取用户笔记正文的后门；正文只在其授权的空间内可访问。')}</p>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'shares'}>
+      <section className="settings-section" hidden={page !== 'content' || contentTab !== 'shares'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('分享链接')}</span>
           <span className="settings-section-desc">{t('共 {n} 条', { n: sharesTotal })}</span>
@@ -554,18 +654,18 @@ export default function AdminSettings() {
               <tr>
                 <th>{t('链接')}</th>
                 <th>{t('用户')}</th>
-                <th>{t('权限')}</th>
+                <th>{t('访问')}</th>
                 <th>{t('类型')}</th>
                 <th>{t('过期时间')}</th>
-                <th>{t('次数')}</th>
+                <th>{t('浏览')}</th>
               </tr>
             </thead>
             <tbody>
               {sharesLoading ? (
                 <tr><td colSpan={6}><div className="loading-row"><span className="spinner" /> {t('加载中…')}</div></td></tr>
-              ) : shares.length === 0 ? (
+              ) : visibleShares.length === 0 ? (
                 <tr><td colSpan={6}><div className="context-empty">{t('暂无有效分享')}</div></td></tr>
-              ) : shares.map((share) => (
+              ) : visibleShares.map((share) => (
                 <tr key={share.id}>
                   <td><a className="admin-share-link" href={share.url} target="_blank" rel="noopener noreferrer" title={share.url}>{share.url}</a></td>
                   <td>{share.ownerName ?? '—'}</td>
@@ -589,12 +689,13 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'users'}>
+      <section className="settings-section" hidden={page !== 'users'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('注册 IP 限制')}</span>
           <span className="settings-section-desc">{ipBlocks.length}</span>
         </div>
         <p className="setting-note">{t('禁止这些 IP 注册新账号。已有账号的登录不受影响；邮箱可以更换，网络限制更直接。')}</p>
+        <p className="setting-note">{t('当前注册模式：{mode}', { mode: instance?.registrationMode === 'invite' ? t('仅邀请') : t('开放') })}</p>
         <div className="setting-inline-form" style={{ marginTop: 10 }}>
           <div className="field"><label>IP</label><input className="input" value={blockIp} onChange={(event) => setBlockIp(event.target.value)} placeholder="203.0.113.10" /></div>
           <div className="field"><label>{t('原因（可选）')}</label><input className="input" value={blockReason} onChange={(event) => setBlockReason(event.target.value)} /></div>
@@ -611,7 +712,7 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'comments'}>
+      <section className="settings-section" hidden={page !== 'content' || contentTab !== 'comments'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('公开评论')}</span>
           <span className="settings-section-desc">{t('共 {n} 条', { n: commentsTotal })}</span>
@@ -623,9 +724,9 @@ export default function AdminSettings() {
             <tbody>
               {commentsLoading ? (
                 <tr><td colSpan={5}><div className="loading-row"><span className="spinner" /> {t('加载中…')}</div></td></tr>
-              ) : publicComments.length === 0 ? (
+              ) : visibleComments.length === 0 ? (
                 <tr><td colSpan={5}><div className="context-empty">{t('暂无公开评论')}</div></td></tr>
-              ) : publicComments.map((comment) => (
+              ) : visibleComments.map((comment) => (
                 <tr key={comment.id}>
                   <td><div className="admin-comment-body">{comment.body}</div></td>
                   <td>
@@ -647,18 +748,26 @@ export default function AdminSettings() {
         </div>
       </section>
 
-      <section className="settings-section" hidden={adminTab !== 'logs'}>
+      <section className="settings-section" hidden={page !== 'audit'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('日志')}</span>
           <span className="settings-section-desc">{t('共 {n} 条', { n: auditTotal })}</span>
         </div>
+        <div className="setting-inline-form" style={{ marginBottom: 10 }}>
+          <div className="field" style={{ flex: 1, minWidth: 180, maxWidth: 320 }}>
+            <input className="input input-sm" value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder={t('筛选当前页…')} />
+          </div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={exportAudit} disabled={visibleAudit.length === 0}>
+            <Download size={13} /> {t('导出 CSV')}
+          </button>
+        </div>
         <div className="admin-log-list">
           {auditLoading ? (
             <div className="loading-row"><span className="spinner" /> {t('加载中…')}</div>
-          ) : audit.length === 0 ? (
-            <div className="context-empty">{t('暂无记录')}</div>
+          ) : visibleAudit.length === 0 ? (
+            <div className="context-empty">{auditQuery ? t('没有匹配记录') : t('暂无记录')}</div>
           ) : (
-            audit.map((entry) => (
+            visibleAudit.map((entry) => (
               <div key={entry.id} className="admin-log-row">
                 <span className="admin-log-time">{formatFullDate(entry.createdAt)}</span>
                 <span className="admin-log-actor" title={entry.actorName ?? t('系统')}>{entry.actorName ?? t('系统')}</span>

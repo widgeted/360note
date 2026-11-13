@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
+  Columns2,
   Copy,
   Download,
   FileCode2,
@@ -64,10 +65,18 @@ export function EditorPane({
   noteId,
   reloadTick,
   onMobileBack,
+  splitEnabled = false,
+  canSplit = false,
+  onToggleSplit,
+  onRegisterFlush,
 }: {
   noteId: string;
   reloadTick: number;
   onMobileBack: () => void;
+  splitEnabled?: boolean;
+  canSplit?: boolean;
+  onToggleSplit?: () => void;
+  onRegisterFlush?: (flush: () => Promise<void>) => void;
 }) {
   const t = useT();
   const navigate = useNavigate();
@@ -376,6 +385,10 @@ export function EditorPane({
     [note?.id, note?.canEdit, note?.trashedAt, saveNote],
   );
   saveNowRef.current = saveNow;
+
+  useEffect(() => {
+    onRegisterFlush?.(() => saveNowRef.current('manual'));
+  }, [onRegisterFlush]);
 
   const scheduleSave = useCallback(() => {
     dirtyRef.current = true;
@@ -772,6 +785,17 @@ export function EditorPane({
               aria-label={hasActiveShare ? t('已创建分享链接') : t('分享')}
             >
               <Share2 size={16} />
+            </button>
+          )}
+          {!isMobile && canSplit && onToggleSplit && (
+            <button
+              type="button"
+              className={cn('icon-btn', splitEnabled && 'active')}
+              onClick={onToggleSplit}
+              title={splitEnabled ? t('关闭分屏参考') : t('开启分屏参考')}
+              aria-label={splitEnabled ? t('关闭分屏参考') : t('开启分屏参考')}
+            >
+              <Columns2 size={16} />
             </button>
           )}
           <button

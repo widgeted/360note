@@ -10,12 +10,15 @@ import { ContextPanel } from '../components/ContextPanel';
 import { CommandPalette } from '../components/CommandPalette';
 import { PwaInstallPrompt } from '../components/PwaInstallPrompt';
 import { EmptyEditorState } from '../components/editor/EmptyEditorState';
+import { SplitNotePreview } from '../components/editor/SplitNotePreview';
 const EditorPane = lazy(() => import('../components/editor/EditorPane').then((module) => ({ default: module.EditorPane })));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 import { Modal } from '../components/Modal';
 import { api } from '../lib/api';
 import { applyCustomTemplate, type CustomTemplate } from '../lib/templates';
 import { cn } from '../lib/utils';
+import { useMediaQuery } from '../lib/useMediaQuery';
+import { toast } from '../stores/toast';
 
 export default function AppPage() {
   const t = useT();
@@ -47,6 +50,16 @@ export default function AppPage() {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const canSplit = useMediaQuery('(min-width: 1280px)');
+  const [splitEnabled, setSplitEnabled] = useState(() => canSplit && localStorage.getItem('nh-split-enabled') === '1');
+  const [splitOtherId, setSplitOtherId] = useState<string | null>(() => localStorage.getItem('nh-split-other'));
+  const [splitActivePane, setSplitActivePane] = useState<0 | 1>(0);
+  const [awaitingReference, setAwaitingReference] = useState(false);
+  const flushSplitRef = useRef<(() => Promise<void>) | null>(null);
+  const lastActiveNoteRef = useRef<string | null>(null);
+  const pendingReferenceNoteRef = useRef<string | null>(null);
+  const initialSplitCheckDone = useRef(false);
+  const collapsedBySplitRef = useRef(false);
   const newNoteGuard = useRef(false);
   const autoOpenedNote = useRef<string | null>(null);
 
@@ -116,17 +129,106 @@ export default function AppPage() {
   }, [note?.id, requestedPanel, setContextTab]);
 
   useEffect(() => {
+    localStorage.setItem('nh-split-enabled', splitEnabled ? '1' : '0');
+    if (splitOtherId) localStorage.setItem('nh-split-other', splitOtherId);
+    else localStorage.removeItem('nh-split-other');
+  }, [splitEnabled, splitOtherId]);
+
+  useEffect(() => {
+    if (initialSplitCheckDone.current) return;
+    initialSplitCheckDone.current = true;
+    if (splitEnabled && splitOtherId && splitOtherId === noteId) {
+      setSplitOtherId(null);
+      setAwaitingReference(true);
+    }
+  }, [splitEnabled, splitOtherId, noteId]);
+
+  useEffect(() => {
+    if (canSplit || !splitEnabled) return;
+    setSplitEnabled(false);
+    setSplitOtherId(null);
+    setAwaitingReference(false);
+    setSplitActivePane(0);
+    if (collapsedBySplitRef.current) {
+      collapsedBySplitRef.current = false;
+      if (useAppStore.getState().sidebarCollapsed) toggleSidebar();
+    }
+    toast('info', t('屏幕较窄，已关闭未聚焦的笔记'));
+  }, [canSplit, splitEnabled, t, toggleSidebar]);
+
+  useEffect(() => {
     if (!initializedWorkspace) return;
     if (noteId) {
+      const previous = lastActiveNoteRef.current;
+      if (pendingReferenceNoteRef.current && noteId !== pendingReferenceNoteRef.current) {
+        pendingReferenceNoteRef.current = null;
+      }
+      if (pendingReferenceNoteRef.current === noteId) {
+        return;
+      }
+      if (splitEnabled && awaitingReference && previous && noteId !== previous) {
+        pendingReferenceNoteRef.current = noteId;
+        setSplitOtherId(noteId);
+        setAwaitingReference(false);
+        navigate(`/app/note/${previous}`, { replace: true });
+        return;
+      }
+      if (splitEnabled && splitOtherId === noteId && previous && previous !== noteId) {
+        setSplitOtherId(previous);
+        setSplitActivePane((pane) => (pane === 0 ? 1 : 0));
+      }
+      lastActiveNoteRef.current = noteId;
       if (autoOpenedNote.current !== noteId) {
         autoOpenedNote.current = noteId;
         void openNote(noteId);
       }
     } else {
       autoOpenedNote.current = null;
+      lastActiveNoteRef.current = null;
+      if (splitEnabled) {
+        setSplitEnabled(false);
+        setSplitOtherId(null);
+        setAwaitingReference(false);
+        setSplitActivePane(0);
+      }
       if (!settingsMode && note) closeNote();
     }
-  }, [noteId, initializedWorkspace, openNote, closeNote, settingsMode, note]);
+  }, [noteId, initializedWorkspace, openNote, closeNote, settingsMode, note, splitEnabled, splitOtherId, awaitingReference, navigate]);
+
+  function toggleSplit() {
+    if (!canSplit) return;
+    if (splitEnabled) {
+      setSplitEnabled(false);
+      setSplitOtherId(null);
+      setAwaitingReference(false);
+      setSplitActivePane(0);
+      if (collapsedBySplitRef.current) {
+        collapsedBySplitRef.current = false;
+        if (useAppStore.getState().sidebarCollapsed) toggleSidebar();
+      }
+      return;
+    }
+    setSplitEnabled(true);
+    setSplitActivePane(0);
+    const currentId = noteId;
+    const existing = splitOtherId && splitOtherId !== currentId ? splitOtherId : null;
+    const candidate = existing ?? useAppStore.getState().notes.find((entry) => entry.id !== currentId)?.id ?? null;
+    setSplitOtherId(candidate);
+    setAwaitingReference(!candidate);
+    if (!useAppStore.getState().sidebarCollapsed) {
+      collapsedBySplitRef.current = true;
+      toggleSidebar();
+    }
+  }
+
+  async function focusOtherNote() {
+    if (!splitOtherId) {
+      setAwaitingReference(true);
+      return;
+    }
+    await flushSplitRef.current?.();
+    navigate(`/app/note/${splitOtherId}`);
+  }
 
   useEffect(() => {
     if (!isNewRoute || !initializedWorkspace || newNoteGuard.current) return;
@@ -265,14 +367,69 @@ export default function AppPage() {
           <main className="main-pane">
             {showEditor ? (
               note && note.id === noteId ? (
-                <Suspense fallback={<div className="editor-empty"><span className="spinner spinner-lg" /></div>}>
-                  <EditorPane
-                    key={note.id}
-                    noteId={note.id}
-                    reloadTick={reloadTick}
-                    onMobileBack={() => navigate('/app')}
-                  />
-                </Suspense>
+                splitEnabled && canSplit ? (
+                  <div className={cn('split-workspace', splitActivePane === 1 && 'active-right')}>
+                    {splitActivePane === 0 ? (
+                      <>
+                        <div className="split-pane split-pane-active">
+                          <Suspense fallback={<div className="editor-empty"><span className="spinner spinner-lg" /></div>}>
+                            <EditorPane
+                              key={note.id}
+                              noteId={note.id}
+                              reloadTick={reloadTick}
+                              onMobileBack={() => navigate('/app')}
+                              splitEnabled={splitEnabled}
+                              canSplit={canSplit}
+                              onToggleSplit={toggleSplit}
+                              onRegisterFlush={(flush) => { flushSplitRef.current = flush; }}
+                            />
+                          </Suspense>
+                        </div>
+                        <SplitNotePreview
+                          noteId={splitOtherId}
+                          awaiting={awaitingReference}
+                          onFocus={() => void focusOtherNote()}
+                          onChoose={() => setAwaitingReference(true)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <SplitNotePreview
+                          noteId={splitOtherId}
+                          awaiting={awaitingReference}
+                          onFocus={() => void focusOtherNote()}
+                          onChoose={() => setAwaitingReference(true)}
+                        />
+                        <div className="split-pane split-pane-active">
+                          <Suspense fallback={<div className="editor-empty"><span className="spinner spinner-lg" /></div>}>
+                            <EditorPane
+                              key={note.id}
+                              noteId={note.id}
+                              reloadTick={reloadTick}
+                              onMobileBack={() => navigate('/app')}
+                              splitEnabled={splitEnabled}
+                              canSplit={canSplit}
+                              onToggleSplit={toggleSplit}
+                              onRegisterFlush={(flush) => { flushSplitRef.current = flush; }}
+                            />
+                          </Suspense>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <Suspense fallback={<div className="editor-empty"><span className="spinner spinner-lg" /></div>}>
+                    <EditorPane
+                      key={note.id}
+                      noteId={note.id}
+                      reloadTick={reloadTick}
+                      onMobileBack={() => navigate('/app')}
+                      splitEnabled={splitEnabled}
+                      canSplit={canSplit}
+                      onToggleSplit={toggleSplit}
+                    />
+                  </Suspense>
+                )
               ) : loadingNote ? (
                 <div className="editor-empty">
                   <span className="spinner spinner-lg" />

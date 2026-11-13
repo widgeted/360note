@@ -77,7 +77,7 @@ interface StorageUsage {
   };
 }
 
-export function OffsiteSettings() {
+export function OffsiteSettings({ mode = 'all' }: { mode?: 'all' | 'attachment' | 'backup' }) {
   const t = useT();
   const user = useAuthStore((state) => state.user);
   const [config, setConfig] = useState<OffsiteConfig | null>(null);
@@ -392,15 +392,17 @@ export function OffsiteSettings() {
   return (
     <section className="settings-section">
       <div className="settings-section-head">
-        <span className="settings-section-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('异地备份与对象存储（S3 兼容）')}</span>
+        <span className="settings-section-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{mode === 'attachment' ? t('附件存储') : mode === 'backup' ? t('备份对象存储') : t('异地备份与对象存储（S3 兼容）')}</span>
         <span className="settings-section-desc">{t('实例管理员')}</span>
       </div>
       {pageError && <LoadFailure message={pageError} onRetry={() => void loadUsage(true)} />}
       <div className="banner banner-info" style={{ marginBottom: 12 }}>
         <ShieldCheck size={15} />
-        <div>{t('S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）用于异地备份副本。工作区/整站备份在离开本机前已使用 360note 主密钥加密，S3 提供方无法读取。附件存储请使用下方独立设置。')}</div>
+        <div>{mode === 'attachment'
+          ? t('附件存储在独立的对象存储桶中；被分享的图片可按 CoreIX 规则生成媒体副本，原附件仍加密保存。')
+          : t('S3 兼容存储（MinIO、R2、Backblaze、AWS S3 等）用于异地备份副本。工作区/整站备份在离开本机前已使用 360note 主密钥加密，S3 提供方无法读取。')}</div>
       </div>
-      <div className="setting-card">
+      {mode !== 'attachment' && <div className="setting-card">
         <div className="setting-row setting-row-heading">
           <div className="setting-row-main">
             <div className="setting-row-title">{t('启用备份副本')}</div>
@@ -464,9 +466,9 @@ export function OffsiteSettings() {
         </p>
           </>
         )}
-      </div>
+      </div>}
 
-      <div className="setting-card" style={{ marginTop: 12 }}>
+      {mode !== 'backup' && <div className="setting-card" style={{ marginTop: 12 }}>
         <div className="setting-row setting-row-heading">
           <div className="setting-row-main">
             <div className="setting-row-title">
@@ -603,12 +605,12 @@ export function OffsiteSettings() {
           </div>
           <div className="field">
             <label>{t('最大宽度')}</label>
-            <input className="input" type="number" min={0} max={4096} value={attachmentConfig.imageMaxWidth} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, imageMaxWidth: Number(event.target.value) })} />
+            <input className="input" type="number" min={0} max={4096} value={attachmentConfig!.imageMaxWidth} onChange={(event) => setAttachmentConfig({ ...attachmentConfig!, imageMaxWidth: Number(event.target.value) })} />
             <span className="field-hint">{t('像素；0 表示不缩放。默认 1600。')}</span>
           </div>
           <div className="field">
             <label>{t('图片标签分析')}</label>
-            <select className="select" value={attachmentConfig.imageTags} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, imageTags: event.target.value as AttachmentStorageConfig['imageTags'] })}>
+            <select className="select" value={attachmentConfig!.imageTags} onChange={(event) => setAttachmentConfig({ ...attachmentConfig!, imageTags: event.target.value as AttachmentStorageConfig['imageTags'] })}>
               <option value="off">{t('关闭')}</option>
               <option value="suggest">{t('生成标签建议')}</option>
               <option value="auto">{t('自动添加到笔记标签')}</option>
@@ -617,7 +619,7 @@ export function OffsiteSettings() {
           </div>
         </div>
         <label className="checkbox-row" style={{ marginTop: 12 }}>
-          <input type="checkbox" checked={attachmentConfig.detectFunctionalImages} onChange={(event) => setAttachmentConfig({ ...attachmentConfig, detectFunctionalImages: event.target.checked })} />
+          <input type="checkbox" checked={attachmentConfig!.detectFunctionalImages} onChange={(event) => setAttachmentConfig({ ...attachmentConfig!, detectFunctionalImages: event.target.checked })} />
           <span>
             <strong style={{ color: 'var(--text-soft)' }}>{t('识别文档、发票、截图并自动 OCR')}</strong>
             <span className="field-hint" style={{ display: 'block' }}>{t('上传图片后会在缤纷云临时分析功能性图片；识别为截图、发票或文档时自动提取文字并参与搜索。临时分析对象会立即删除。')}</span>
@@ -638,11 +640,11 @@ export function OffsiteSettings() {
             <div className="admin-stat-value">{formatBytes(usage?.remote?.attachments.bytes ?? 0)}</div>
             <div className="setting-note">{t('对象存储附件')} · {usage?.remote?.attachments.objects ?? 0} {t('个对象')}</div>
           </div>
-          <div className="setting-card">
+          {mode !== 'attachment' && <div className="setting-card">
             <span style={{ color: 'var(--text-tertiary)' }}><CloudUpload size={15} /></span>
             <div className="admin-stat-value">{formatBytes(usage?.remote?.backups.bytes ?? 0)}</div>
             <div className="setting-note">{t('对象存储备份')} · {usage?.remote?.backups.objects ?? 0} {t('个对象')}</div>
-          </div>
+          </div>}
         </div>
 
         {usage?.remote && !usage.remote.available && (
@@ -687,7 +689,7 @@ export function OffsiteSettings() {
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => void enableAttachments()}
-                  disabled={!usage?.configured || !attachmentConfig.hasSecret}
+                  disabled={!usage?.configured || !attachmentConfig!.hasSecret}
                 >
                   <CloudUpload size={13} /> {mixed ? t('继续迁移剩余附件') : t('启用并迁移已有附件')}
                 </button>
@@ -711,9 +713,9 @@ export function OffsiteSettings() {
         <p className="setting-note">
           {t('附件通过站点域名加密代理访问，因此图片 URL 显示为 360biji.com 或 360note.com，而不是对象存储域名；实际文件保存在对象存储。')}
         </p>
-      </div>
+      </div>}
 
-      <div className="setting-card" style={{ marginTop: 12 }}>
+      {mode !== 'attachment' && <div className="setting-card" style={{ marginTop: 12 }}>
         <div className="setting-row setting-row-heading">
           <div className="setting-row-main">
             <div className="setting-row-title"><Cloud size={13} style={{ display: 'inline', marginRight: 5 }} />{t('对象存储文件')}</div>
@@ -761,7 +763,7 @@ export function OffsiteSettings() {
           </table>
         </div>
         <p className="setting-note" style={{ marginTop: 8 }}>{t('整站备份只支持校验和下载，数据库级恢复请按运维手册执行。')}</p>
-      </div>
+      </div>}
       <ConfirmDialog
         open={Boolean(restoreKey)}
         onClose={() => setRestoreKey(null)}

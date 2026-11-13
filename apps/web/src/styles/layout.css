@@ -2149,3 +2149,126 @@ kbd {
     padding-right: 62px;
   }
 }
+
+/* ---------- Desktop split reference workspace ---------- */
+.split-workspace {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  background: var(--surface);
+}
+
+.split-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.split-pane + .split-pane {
+  border-left: 1px solid var(--line);
+}
+
+.split-pane-preview {
+  background: var(--paper-50);
+}
+
+.split-preview-head {
+  flex: none;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.split-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.split-preview-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.split-preview-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px 64px;
+}
+
+.split-preview-prose {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.split-preview-meta {
+  margin-bottom: 16px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.split-preview-empty {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.split-preview-empty strong {
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.split-preview-empty p {
+  max-width: 320px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.split-preview-empty svg {
+  color: var(--text-faint);
+}
+
+@media (max-width: 760px) {
+  .split-workspace {
+    display: none;
+  }
+}
+
+.split-pane .editor-page {
+  padding-left: 34px;
+  padding-right: 34px;
+}
+
+.split-pane-active {
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--blue) 55%, transparent);
+}
