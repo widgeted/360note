@@ -555,14 +555,13 @@ function NoteItem({
           </>
         ) : (
           <>
-            {onOpenAsReference && (
+            {onOpenAsReference && !active && !reference && (
               <button
                 type="button"
                 className="quick-icon-btn"
                 onClick={() => onOpenAsReference(note.id)}
-                disabled={active || reference}
-                title={active ? t('正在编辑区') : reference ? t('已在参考区') : t('作为参考打开')}
-                aria-label={active ? t('正在编辑区') : reference ? t('已在参考区') : t('作为参考打开')}
+                title={t('作为参考打开')}
+                aria-label={t('作为参考打开')}
               >
                 <Columns2 size={13} />
               </button>

@@ -3,7 +3,17 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.2.4] — 2026-11-13
+
+移除冗余的参考入口。
+
+### Fixed
+
+- 已经是当前编辑笔记或参考笔记的列表项，不再显示“作为参考打开”按钮；此前以禁用态保留，容易误以为可以点击。
+- 这两类笔记悬停时只保留收藏与置顶，操作与当前状态一致。
+
 ## [0.2.3] — 2026-11-13
+
 
 空状态交互清理。
 
