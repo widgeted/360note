@@ -25,6 +25,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ### Docs
 
 - 设计系统新增笔记表格、分隔线/打印、任务列表与设置导航单行规则。
+- 新增 `docs/SEO.md`、IndexNow 验证文件与 `npm run seo:indexnow`；已向两个域名提交公开页面，返回 202/200。
 
 ## [0.1.59] — 2026-11-12
 

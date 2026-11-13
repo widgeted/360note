@@ -704,6 +704,12 @@ apps/web/src/styles/tokens.css        设计 token
 
 - PwaNotice 正文增加 24px 左偏移，与图标后的标题文字对齐；安装/更新提示共享该规则。
 
+## 2026-11-13 · SEO 主动提交
+
+- 新增 IndexNow key 文件与 `scripts/indexnow.mjs`；`npm run seo:indexnow` 提交两域公开页。
+- 2026-11-13 首次提交 360note.com / 360biji.com 的 /、/about、/privacy、/terms，返回 202。
+- Google Search Console、Baidu、360 仍需账号验证，无法无权限代提交；私有页面与分享页不提交。
+
 ## 2026-11-12 · v0.1.60 笔记排版与打印修复
 
 - 设置导航短标签“外观”/Appearance，语言入口保留；导航项单行。

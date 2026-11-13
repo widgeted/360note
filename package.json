@@ -14,7 +14,8 @@
     "test": "npm run test -w @360note/server && npm run test -w @360note/web",
     "typecheck": "npm run typecheck -w @360note/shared && npm run typecheck -w @360note/server && npm run typecheck -w @360note/web",
     "test:integration": "node tests/integration/postgres-api.mjs && node tests/integration/jobs-recovery.mjs && node tests/integration/backup-restore-drill.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "seo:indexnow": "node scripts/indexnow.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",

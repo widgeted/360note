@@ -136,6 +136,7 @@ npm test
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | 部署、运维、备份恢复、升级、事故响应 |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | 版本历史 |
 | [`docs/COREIX_PLAN.md`](docs/COREIX_PLAN.md) | 缤纷云 CoreIX 功能规划与验收 |
+| [`docs/SEO.md`](docs/SEO.md) | 搜索引擎提交与索引记录 |
 | [`docs/decisions/`](docs/decisions/) | ADR 决策记录 |
 
 ---
