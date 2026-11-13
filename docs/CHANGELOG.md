@@ -3,7 +3,18 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] — 2026-11-13
+
+空状态交互清理。
+
+### Fixed
+
+- 未打开任何笔记（新建/导入/从模板创建页）时，左侧列表不再显示“作为参考打开”；该操作需要一篇正在编辑的笔记作为对照。
+- 同一空状态下不再显示参考/当前编辑状态图标，避免出现点击无效或指向不存在编辑区的提示。
+- 分屏状态持久化后直接落到 `/app` 时，空状态不闪现参考图标。
+
 ## [0.2.2] — 2026-11-13
+
 
 统一分屏状态标识与左侧列表标记。
 

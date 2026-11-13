@@ -383,7 +383,11 @@ export default function AppPage() {
         </Suspense>
       ) : (
         <>
-          <NoteListPane onOpenAsReference={openAsReference} referenceNoteId={splitOtherId} splitActive={splitEnabled && canSplit} />
+          <NoteListPane
+            onOpenAsReference={showEditor ? openAsReference : undefined}
+            referenceNoteId={splitOtherId}
+            splitActive={showEditor && splitEnabled && canSplit}
+          />
           <main className="main-pane">
             {showEditor ? (
               note && note.id === noteId ? (
