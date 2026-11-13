@@ -54,7 +54,7 @@ export function SplitNotePreview({
   return (
     <section className="split-pane split-pane-preview" aria-label={t('参考笔记')}>
       <header className="split-preview-head">
-        <span className="split-preview-badge"><Columns2 size={12} /> {t('参考')}</span>
+        <span className="split-preview-badge"><BookOpen size={12} /> {t('参考')}</span>
         <span className="split-preview-title" title={note?.title}>{note?.title || t('参考笔记')}</span>
         {note && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={onChoose}>

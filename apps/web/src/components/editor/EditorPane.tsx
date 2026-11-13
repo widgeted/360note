@@ -19,6 +19,7 @@ import {
   Mic,
   MoreHorizontal,
   PanelRight,
+  Pencil,
   Pin,
   PinOff,
   RotateCcw,
@@ -732,6 +733,11 @@ export function EditorPane({
         <button type="button" className="icon-btn mobile-back-btn" onClick={onMobileBack} aria-label={t('返回笔记')}>
           <ArrowLeft size={17} />
         </button>
+        {splitEnabled && (
+          <span className="split-current-badge">
+            <Pencil size={12} /> {t('当前编辑')}
+          </span>
+        )}
         <div className="topbar-breadcrumb">
           <button type="button" className="breadcrumb-item" onClick={() => navigate('/app')} title={t('当前空间')}>
             {currentWorkspace?.name ?? t('全部笔记')}
@@ -752,7 +758,6 @@ export function EditorPane({
             </span>
           ))}
         </div>
-        {splitEnabled && <span className="split-current-badge">{t('当前编辑')}</span>}
         <div className="topbar-actions">
           <span className="topbar-save">
             <span className={cn('save-glyph', syncState === 'saving' && 'saving', (syncState === 'offline' || syncState === 'error') && syncState, syncState === 'error' && 'error')} />

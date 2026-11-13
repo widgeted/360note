@@ -3,7 +3,20 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] — 2026-11-13
+
+统一分屏状态标识与左侧列表标记。
+
+### Changed
+
+- 左侧笔记列表改用右上角状态图标标识身份：参考为绿色书本，当前编辑为黄色铅笔，移除原来的左侧边框。
+- “当前编辑”徽标增加铅笔图标，并移到编辑栏最左侧，与参考栏的“参考”徽标位置、尺寸和图标规范一致。
+- 参考徽标改用书本图标；两栏徽标都带同尺寸小图标。
+- 分屏内编辑栏左内边距与参考栏对齐，保证两个徽标位于各自区域同一水平位置。
+- 分屏关闭时列表不显示状态图标，避免与普通选中态混淆。
+
 ## [0.2.1] — 2026-11-13
+
 
 分屏交互与后台表格修复。
 

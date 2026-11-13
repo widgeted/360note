@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowDownUp,
+  BookOpen,
   Check,
   CheckSquare,
   Columns2,
@@ -10,6 +11,7 @@ import {
   Loader2,
   MoreHorizontal,
   PanelLeftOpen,
+  Pencil,
   Pin,
   PinOff,
   RotateCcw,
@@ -35,7 +37,7 @@ const SORT_LABELS: Record<string, string> = {
   opened: '按最近打开',
 };
 
-export function NoteListPane({ onOpenAsReference, referenceNoteId }: { onOpenAsReference?: (noteId: string) => void; referenceNoteId?: string | null }) {
+export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }: { onOpenAsReference?: (noteId: string) => void; referenceNoteId?: string | null; splitActive?: boolean }) {
   const t = useT();
   const navigate = useNavigate();
   const notes = useAppStore((state) => state.notes);
@@ -364,6 +366,7 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId }: { onOpenAsR
             selected={selectedIds.has(note.id)}
             active={currentNote?.id === note.id}
             reference={referenceNoteId === note.id}
+            showState={splitActive}
             onToggleSelect={() => toggleSelected(note.id)}
             onOpen={() => navigate(`/app/note/${note.id}`)}
             onOpenAsReference={onOpenAsReference}
@@ -383,6 +386,7 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId }: { onOpenAsR
             selected={selectedIds.has(note.id)}
             active={currentNote?.id === note.id}
             reference={referenceNoteId === note.id}
+            showState={splitActive}
             onToggleSelect={() => toggleSelected(note.id)}
             onOpen={() => navigate(`/app/note/${note.id}`)}
             onOpenAsReference={onOpenAsReference}
@@ -464,6 +468,7 @@ function NoteItem({
   selected,
   active,
   reference,
+  showState,
   onToggleSelect,
   onOpen,
   onFavorite,
@@ -478,6 +483,7 @@ function NoteItem({
   selected: boolean;
   active: boolean;
   reference?: boolean;
+  showState?: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
   onFavorite: () => void;
@@ -489,7 +495,7 @@ function NoteItem({
   const t = useT();
   return (
     <div
-      className={cn('note-item', selected && 'selected', active && 'active', reference && 'is-reference')}
+      className={cn('note-item', selected && 'selected', active && 'active', showState && (active || reference) && 'has-state')}
       role="button"
       tabIndex={0}
       onClick={selectionMode ? onToggleSelect : onOpen}
@@ -502,6 +508,16 @@ function NoteItem({
         }
       }}
     >
+      {showState && reference && (
+        <span className="note-item-state is-reference" title={t('参考')} aria-label={t('参考')}>
+          <BookOpen size={12} />
+        </span>
+      )}
+      {showState && active && (
+        <span className="note-item-state is-editing" title={t('当前编辑')} aria-label={t('当前编辑')}>
+          <Pencil size={12} />
+        </span>
+      )}
       <div className="note-item-top">
         {selectionMode && (
           <span className={cn('note-check', selected && 'checked')} aria-hidden="true">
