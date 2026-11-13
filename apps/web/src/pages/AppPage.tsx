@@ -11,6 +11,7 @@ import { CommandPalette } from '../components/CommandPalette';
 import { PwaInstallPrompt } from '../components/PwaInstallPrompt';
 import { EmptyEditorState } from '../components/editor/EmptyEditorState';
 import { SplitNotePreview } from '../components/editor/SplitNotePreview';
+import { ReferenceNotePicker } from '../components/editor/ReferenceNotePicker';
 const EditorPane = lazy(() => import('../components/editor/EditorPane').then((module) => ({ default: module.EditorPane })));
 const SettingsPage = lazy(() => import('./SettingsPage'));
 import { Modal } from '../components/Modal';
@@ -54,10 +55,9 @@ export default function AppPage() {
   const [splitEnabled, setSplitEnabled] = useState(() => canSplit && localStorage.getItem('nh-split-enabled') === '1');
   const [splitOtherId, setSplitOtherId] = useState<string | null>(() => localStorage.getItem('nh-split-other'));
   const [splitActivePane, setSplitActivePane] = useState<0 | 1>(0);
-  const [awaitingReference, setAwaitingReference] = useState(false);
+  const [referencePickerOpen, setReferencePickerOpen] = useState(false);
   const flushSplitRef = useRef<(() => Promise<void>) | null>(null);
   const lastActiveNoteRef = useRef<string | null>(null);
-  const pendingReferenceNoteRef = useRef<string | null>(null);
   const initialSplitCheckDone = useRef(false);
   const collapsedBySplitRef = useRef(false);
   const newNoteGuard = useRef(false);
@@ -139,7 +139,6 @@ export default function AppPage() {
     initialSplitCheckDone.current = true;
     if (splitEnabled && splitOtherId && splitOtherId === noteId) {
       setSplitOtherId(null);
-      setAwaitingReference(true);
     }
   }, [splitEnabled, splitOtherId, noteId]);
 
@@ -147,7 +146,6 @@ export default function AppPage() {
     if (canSplit || !splitEnabled) return;
     setSplitEnabled(false);
     setSplitOtherId(null);
-    setAwaitingReference(false);
     setSplitActivePane(0);
     if (collapsedBySplitRef.current) {
       collapsedBySplitRef.current = false;
@@ -160,19 +158,6 @@ export default function AppPage() {
     if (!initializedWorkspace) return;
     if (noteId) {
       const previous = lastActiveNoteRef.current;
-      if (pendingReferenceNoteRef.current && noteId !== pendingReferenceNoteRef.current) {
-        pendingReferenceNoteRef.current = null;
-      }
-      if (pendingReferenceNoteRef.current === noteId) {
-        return;
-      }
-      if (splitEnabled && awaitingReference && previous && noteId !== previous) {
-        pendingReferenceNoteRef.current = noteId;
-        setSplitOtherId(noteId);
-        setAwaitingReference(false);
-        navigate(`/app/note/${previous}`, { replace: true });
-        return;
-      }
       if (splitEnabled && splitOtherId === noteId && previous && previous !== noteId) {
         setSplitOtherId(previous);
         setSplitActivePane((pane) => (pane === 0 ? 1 : 0));
@@ -188,19 +173,17 @@ export default function AppPage() {
       if (splitEnabled) {
         setSplitEnabled(false);
         setSplitOtherId(null);
-        setAwaitingReference(false);
         setSplitActivePane(0);
       }
       if (!settingsMode && note) closeNote();
     }
-  }, [noteId, initializedWorkspace, openNote, closeNote, settingsMode, note, splitEnabled, splitOtherId, awaitingReference, navigate]);
+  }, [noteId, initializedWorkspace, openNote, closeNote, settingsMode, note, splitEnabled, splitOtherId, navigate]);
 
   function toggleSplit() {
     if (!canSplit) return;
     if (splitEnabled) {
       setSplitEnabled(false);
       setSplitOtherId(null);
-      setAwaitingReference(false);
       setSplitActivePane(0);
       if (collapsedBySplitRef.current) {
         collapsedBySplitRef.current = false;
@@ -214,7 +197,7 @@ export default function AppPage() {
     const existing = splitOtherId && splitOtherId !== currentId ? splitOtherId : null;
     const candidate = existing ?? useAppStore.getState().notes.find((entry) => entry.id !== currentId)?.id ?? null;
     setSplitOtherId(candidate);
-    setAwaitingReference(!candidate);
+    if (!candidate) setReferencePickerOpen(true);
     if (!useAppStore.getState().sidebarCollapsed) {
       collapsedBySplitRef.current = true;
       toggleSidebar();
@@ -223,11 +206,48 @@ export default function AppPage() {
 
   async function focusOtherNote() {
     if (!splitOtherId) {
-      setAwaitingReference(true);
+      setReferencePickerOpen(true);
       return;
     }
     await flushSplitRef.current?.();
     navigate(`/app/note/${splitOtherId}`);
+  }
+
+  function selectReference(selectedId: string) {
+    if (!canSplit) {
+      toast('warning', t('窗口太窄，无法开启分屏参考'));
+      return;
+    }
+    if (selectedId === noteId) {
+      toast('info', t('这篇笔记正在编辑区'));
+      return;
+    }
+    setReferencePickerOpen(false);
+    if (!splitEnabled) {
+      setSplitEnabled(true);
+      setSplitActivePane(0);
+      if (!useAppStore.getState().sidebarCollapsed) {
+        collapsedBySplitRef.current = true;
+        toggleSidebar();
+      }
+    }
+    setSplitOtherId(selectedId);
+  }
+
+  function openAsReference(selectedId: string) {
+    if (!canSplit) {
+      toast('warning', t('窗口太窄，无法开启分屏参考'));
+      return;
+    }
+    if (selectedId === noteId) {
+      toast('info', t('这篇笔记正在编辑区'));
+      return;
+    }
+    if (splitOtherId === selectedId) {
+      toast('info', t('这篇笔记已在参考区'));
+      return;
+    }
+    selectReference(selectedId);
   }
 
   useEffect(() => {
@@ -363,7 +383,7 @@ export default function AppPage() {
         </Suspense>
       ) : (
         <>
-          <NoteListPane />
+          <NoteListPane onOpenAsReference={openAsReference} referenceNoteId={splitOtherId} />
           <main className="main-pane">
             {showEditor ? (
               note && note.id === noteId ? (
@@ -387,18 +407,16 @@ export default function AppPage() {
                         </div>
                         <SplitNotePreview
                           noteId={splitOtherId}
-                          awaiting={awaitingReference}
                           onFocus={() => void focusOtherNote()}
-                          onChoose={() => setAwaitingReference(true)}
+                          onChoose={() => setReferencePickerOpen(true)}
                         />
                       </>
                     ) : (
                       <>
                         <SplitNotePreview
                           noteId={splitOtherId}
-                          awaiting={awaitingReference}
                           onFocus={() => void focusOtherNote()}
-                          onChoose={() => setAwaitingReference(true)}
+                          onChoose={() => setReferencePickerOpen(true)}
                         />
                         <div className="split-pane split-pane-active">
                           <Suspense fallback={<div className="editor-empty"><span className="spinner spinner-lg" /></div>}>
@@ -460,6 +478,13 @@ export default function AppPage() {
 
       <CommandPalette />
       <PwaInstallPrompt />
+      <ReferenceNotePicker
+        open={referencePickerOpen}
+        onClose={() => setReferencePickerOpen(false)}
+        activeNoteId={noteId}
+        referenceNoteId={splitOtherId}
+        onSelect={selectReference}
+      />
       <Modal
         open={showTemplates}
         onClose={() => setShowTemplates(false)}

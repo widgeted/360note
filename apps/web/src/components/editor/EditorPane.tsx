@@ -752,6 +752,7 @@ export function EditorPane({
             </span>
           ))}
         </div>
+        {splitEnabled && <span className="split-current-badge">{t('当前编辑')}</span>}
         <div className="topbar-actions">
           <span className="topbar-save">
             <span className={cn('save-glyph', syncState === 'saving' && 'saving', (syncState === 'offline' || syncState === 'error') && syncState, syncState === 'error' && 'error')} />

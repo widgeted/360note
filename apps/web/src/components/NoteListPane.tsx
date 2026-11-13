@@ -5,6 +5,7 @@ import {
   ArrowDownUp,
   Check,
   CheckSquare,
+  Columns2,
   FilePlus2,
   Loader2,
   MoreHorizontal,
@@ -34,7 +35,7 @@ const SORT_LABELS: Record<string, string> = {
   opened: '按最近打开',
 };
 
-export function NoteListPane() {
+export function NoteListPane({ onOpenAsReference, referenceNoteId }: { onOpenAsReference?: (noteId: string) => void; referenceNoteId?: string | null }) {
   const t = useT();
   const navigate = useNavigate();
   const notes = useAppStore((state) => state.notes);
@@ -362,8 +363,10 @@ export function NoteListPane() {
             selectionMode={selectionMode}
             selected={selectedIds.has(note.id)}
             active={currentNote?.id === note.id}
+            reference={referenceNoteId === note.id}
             onToggleSelect={() => toggleSelected(note.id)}
             onOpen={() => navigate(`/app/note/${note.id}`)}
+            onOpenAsReference={onOpenAsReference}
             onFavorite={() => void toggleFavorite(note.id)}
             onPin={() => void togglePinned(note.id)}
             onRestore={() => void restoreNote(note.id).then(() => undefined)}
@@ -379,8 +382,10 @@ export function NoteListPane() {
             selectionMode={selectionMode}
             selected={selectedIds.has(note.id)}
             active={currentNote?.id === note.id}
+            reference={referenceNoteId === note.id}
             onToggleSelect={() => toggleSelected(note.id)}
             onOpen={() => navigate(`/app/note/${note.id}`)}
+            onOpenAsReference={onOpenAsReference}
             onFavorite={() => void toggleFavorite(note.id)}
             onPin={() => void togglePinned(note.id)}
             onRestore={() => void restoreNote(note.id).then(() => undefined)}
@@ -458,29 +463,33 @@ function NoteItem({
   selectionMode,
   selected,
   active,
+  reference,
   onToggleSelect,
   onOpen,
   onFavorite,
   onPin,
   onRestore,
   onDelete,
+  onOpenAsReference,
 }: {
   note: NoteSummary;
   trash: boolean;
   selectionMode: boolean;
   selected: boolean;
   active: boolean;
+  reference?: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
   onFavorite: () => void;
   onPin: () => void;
   onRestore: () => void;
   onDelete: () => void;
+  onOpenAsReference?: (noteId: string) => void;
 }) {
   const t = useT();
   return (
     <div
-      className={cn('note-item', selected && 'selected', active && 'active')}
+      className={cn('note-item', selected && 'selected', active && 'active', reference && 'is-reference')}
       role="button"
       tabIndex={0}
       onClick={selectionMode ? onToggleSelect : onOpen}
@@ -530,6 +539,18 @@ function NoteItem({
           </>
         ) : (
           <>
+            {onOpenAsReference && (
+              <button
+                type="button"
+                className="quick-icon-btn"
+                onClick={() => onOpenAsReference(note.id)}
+                disabled={active || reference}
+                title={active ? t('正在编辑区') : reference ? t('已在参考区') : t('作为参考打开')}
+                aria-label={active ? t('正在编辑区') : reference ? t('已在参考区') : t('作为参考打开')}
+              >
+                <Columns2 size={13} />
+              </button>
+            )}
             <button type="button" className="quick-icon-btn" onClick={onFavorite} title={note.isFavorite ? t('取消收藏') : t('收藏')} aria-label={note.isFavorite ? t('取消收藏') : t('收藏')}>
               {note.isFavorite ? <StarOff size={13} /> : <Star size={13} />}
             </button>

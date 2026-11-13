@@ -1811,6 +1811,21 @@ const en: Record<string, string> = {
   "访问": "Access",
   "管理入口": "Admin pages",
   "按职责进入对应页面": "Open the page for the task you need",
+  "当前编辑": "Currently editing",
+  "作为参考打开": "Open as reference",
+  "正在编辑区": "In the editor",
+  "已在参考区": "Already in reference",
+  "窗口太窄，无法开启分屏参考": "The window is too narrow for reference split view",
+  "这篇笔记正在编辑区": "This note is already in the editor",
+  "这篇笔记已在参考区": "This note is already the reference",
+  "选择一篇最近的笔记作为只读参考；不会改变当前编辑的笔记。": "Choose a recent note as a read-only reference. The note in the editor stays unchanged.",
+  "搜索笔记": "Search notes",
+  "搜索标题、摘要或标签…": "Search title, excerpt or tag…",
+  "正在加载最近笔记…": "Loading recent notes…",
+  "还没有其他笔记，可以先新建一篇。": "No other notes yet. Create one first.",
+  "当前参考": "Current reference",
+  "选择一篇最近的笔记作为只读参考；点击“编辑此篇”即可切换编辑焦点。": "Choose a recent note as a read-only reference. Click “Edit this note” to switch the editing focus.",
+  "选择一篇最近的笔记作为只读参考。": "Choose a recent note as a read-only reference.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

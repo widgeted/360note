@@ -8,12 +8,10 @@ import { useT } from '../../lib/i18n';
 
 export function SplitNotePreview({
   noteId,
-  awaiting,
   onFocus,
   onChoose,
 }: {
   noteId: string | null;
-  awaiting: boolean;
   onFocus: () => void;
   onChoose: () => void;
 }) {
@@ -70,14 +68,7 @@ export function SplitNotePreview({
         )}
       </header>
       <div className="split-preview-body app-scroll">
-        {awaiting ? (
-          <div className="split-preview-empty">
-            <Columns2 size={26} />
-            <strong>{t('选择参考笔记')}</strong>
-            <p>{t('从左侧笔记列表选择一篇笔记；选中后会保持只读，点击“编辑此篇”即可切换编辑焦点。')}</p>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onChoose}>{t('开始选择')}</button>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="split-preview-empty"><span className="spinner" /> {t('正在加载参考笔记…')}</div>
         ) : error ? (
           <div className="split-preview-empty">
@@ -90,7 +81,7 @@ export function SplitNotePreview({
           <div className="split-preview-empty">
             <Columns2 size={26} />
             <strong>{t('还没有参考笔记')}</strong>
-            <p>{t('从左侧笔记列表选择一篇笔记，右侧会显示只读参考。')}</p>
+            <p>{t('选择一篇最近的笔记作为只读参考。')}</p>
             <button type="button" className="btn btn-secondary btn-sm" onClick={onChoose}>{t('选择参考笔记')}</button>
           </div>
         ) : (
