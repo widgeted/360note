@@ -710,6 +710,13 @@ apps/web/src/styles/tokens.css        设计 token
 - 2026-11-13 首次提交 360note.com / 360biji.com 的 /、/about、/privacy、/terms，返回 202。
 - Google Search Console、Baidu、360 仍需账号验证，无法无权限代提交；私有页面与分享页不提交。
 
+## 2026-11-13 · v0.2.5 站点代码与百度验证
+
+- 实例管理→站点：编辑 `<head>` 代码；仅公开页注入；默认含百度验证 meta；审计记录。
+- 服务端注入按请求读取设置；CSP 自动加入内联脚本 sha256 与外部脚本来源。
+- nginx 改为 `try_files $uri @node`，HTML 由 Node 输出；移除 nginx 级 CSP，由 Node 统一设置。
+- PWA：navigateFallback 关闭，导航 NetworkFirst，预缓存排除 index.html，离线回退 offline.html。
+
 ## 2026-11-13 · v0.2.4 移除冗余参考入口
 
 - 已在编辑区/参考区的笔记不再显示“作为参考打开”（不是禁用），只保留收藏/置顶。

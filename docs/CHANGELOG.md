@@ -3,7 +3,24 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.2.5] — 2026-11-13
+
+新增站点验证与统计代码管理，并完成百度站点验证。
+
+### Added
+
+- 实例管理新增“站点”页：查看、编辑、清空站点 `<head>` 代码，支持统计脚本与搜索引擎所有权验证；仅实例管理员可读写，保存后立即生效。
+- 默认内置百度验证代码 `<meta name="baidu-site-verification" content="codeva-zUIgMMzGVb" />`，已作用于 360note.com 与 360biji.com 首页。
+- 代码只注入公开页面（首页、介绍、隐私、条款、登录、注册），不注入 `/app` 笔记页与 `/s/` 分享链接，避免泄露私有路径与分享令牌。
+- 注入的脚本按内容哈希与来源自动写入 CSP，内联统计代码与外部统计脚本均可执行；不需要放宽到 `unsafe-inline`。
+
+### Changed
+
+- 公开页面的 SPA shell 改由服务端输出（nginx 静态文件优先，其余回退到 Node），以便运行时注入站点代码。
+- Service Worker 导航改为 NetworkFirst，并停止预缓存 `index.html`，避免已安装 PWA 继续返回不含验证/统计代码的旧 shell；离线时回退到构建期的 `offline.html`。
+
 ## [0.2.4] — 2026-11-13
+
 
 移除冗余的参考入口。
 

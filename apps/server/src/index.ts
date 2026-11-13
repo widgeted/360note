@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyReply } from 'fastify';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit';
 import compress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { config, ensureDataDirs } from './config.js';
 import { migrate } from './migrate.js';
 import { validateCryptoConfig } from './lib/crypto.js';
@@ -28,9 +29,102 @@ import adminRoutes from './routes/admin.js';
 import accountRoutes from './routes/account.js';
 import templateRoutes from './routes/templates.js';
 import { resumePendingOcr } from './lib/ocr.js';
+import { getSiteHeadCode } from './services/site.js';
 import { recoverInterruptedJobs } from './lib/jobs.js';
 import { cleanupImportUploads, runAutoBackups } from './services/backups.js';
 import { runInstanceAutoBackup, runScheduledRestoreDrill } from './services/instance-backups.js';
+
+const PUBLIC_HEAD_PATHS = new Set([
+  '/',
+  '/index.html',
+  '/about',
+  '/about.html',
+  '/privacy',
+  '/terms',
+  '/login',
+  '/register',
+]);
+
+function shouldInjectHead(url: string): boolean {
+  const pathname = (url.split('?')[0] || '/').replace(/\/+$/, '') || '/';
+  return PUBLIC_HEAD_PATHS.has(pathname);
+}
+
+let shellHtml: string | null = null;
+
+function readShellHtml(): string | null {
+  if (shellHtml !== null) return shellHtml;
+  try {
+    shellHtml = fs.readFileSync(`${config.webDist}/index.html`, 'utf8');
+  } catch {
+    shellHtml = null;
+  }
+  return shellHtml;
+}
+
+function buildDocumentCsp(headCode: string): string {
+  const hashes = new Set<string>();
+  const origins = new Set<string>();
+  const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  for (const match of headCode.matchAll(scriptPattern)) {
+    const attrs = match[1] ?? '';
+    const body = match[2] ?? '';
+    const srcMatch = attrs.match(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    if (srcMatch) {
+      const raw = (srcMatch[1] ?? srcMatch[2] ?? srcMatch[3] ?? '').trim();
+      if (raw) {
+        try {
+          const resolved = new URL(raw.startsWith('//') ? `https:${raw}` : raw);
+          if (resolved.protocol === 'https:' || resolved.protocol === 'http:') origins.add(resolved.origin);
+        } catch {
+          // Malformed src is left for the browser to reject; it must not widen CSP.
+        }
+      }
+      continue;
+    }
+    if (body.trim()) {
+      hashes.add(`'sha256-${crypto.createHash('sha256').update(body, 'utf8').digest('base64')}'`);
+    }
+  }
+  // Analytics snippets usually create their loader with a URL string inside an
+  // inline script, so allowlist every absolute origin mentioned in the code.
+  for (const match of headCode.matchAll(/https?:\/\/[^\s"'<>\\]+/gi)) {
+    try {
+      const resolved = new URL(match[0]);
+      origins.add(resolved.origin);
+    } catch {
+      // Ignore partial URLs.
+    }
+  }
+  const scriptSrc = ["'self'", 'https://static.cloudflareinsights.com', ...hashes, ...origins].join(' ');
+  const connectSrc = ["'self'", 'https://cloudflareinsights.com', 'https://static.cloudflareinsights.com', ...origins].join(' ');
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    `connect-src ${connectSrc}`,
+    "media-src 'self' blob:",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+}
+
+async function sendAppShell(reply: FastifyReply, url: string) {
+  const html = readShellHtml();
+  if (!html) return reply.status(503).send('360note web build not found');
+  const injected = shouldInjectHead(url) ? (await getSiteHeadCode()).trim() : '';
+  const body = injected ? html.replace('</head>', `${injected}\n  </head>`) : html;
+  return reply
+    .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+    .header('Content-Security-Policy', buildDocumentCsp(injected))
+    .type('text/html; charset=utf-8')
+    .send(body);
+}
 
 async function buildServer() {
   const app = Fastify({
@@ -45,22 +139,9 @@ async function buildServer() {
   });
 
   await app.register(helmet, {
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-        fontSrc: ["'self'", 'data:'],
-        connectSrc: ["'self'"],
-        mediaSrc: ["'self'", 'blob:'],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-        upgradeInsecureRequests: config.env === 'production' ? [] : null,
-      },
-    },
+    // HTML responses set their own CSP (including admin-provided verification
+    // and analytics code). Keep the remaining helmet protections.
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     xFrameOptions: { action: 'deny' },
     hsts: config.env === 'production' ? { maxAge: 15552000, includeSubDomains: true, preload: false } : false,
@@ -159,11 +240,10 @@ async function buildServer() {
     if (request.url.startsWith('/assets/') || /\.(?:js|css|woff2?|png|jpe?g|svg|ico|webmanifest|map)$/i.test(request.url)) {
       return reply.status(404).send('Not found');
     }
-    if (fs.existsSync(config.webDist)) {
-      return reply.sendFile('index.html');
-    }
-    return reply.status(503).send('360note web build not found');
+    return sendAppShell(reply, request.url);
   });
+
+  app.get('/index.html', async (request, reply) => sendAppShell(reply, request.url));
 
   if (fs.existsSync(config.webDist)) {
     await app.register(fastifyStatic, {
@@ -171,6 +251,7 @@ async function buildServer() {
       prefix: '/',
       wildcard: false,
       index: false,
+      globIgnore: ['index.html'],
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('index.html') || filePath.endsWith('sw.js') || filePath.endsWith('manifest.webmanifest')) {
           res.header('Cache-Control', 'no-cache, no-store, must-revalidate');

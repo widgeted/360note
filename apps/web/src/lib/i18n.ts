@@ -1826,6 +1826,19 @@ const en: Record<string, string> = {
   "当前参考": "Current reference",
   "选择一篇最近的笔记作为只读参考；点击“编辑此篇”即可切换编辑焦点。": "Choose a recent note as a read-only reference. Click “Edit this note” to switch the editing focus.",
   "选择一篇最近的笔记作为只读参考。": "Choose a recent note as a read-only reference.",
+  "站点": "Site",
+  "站点代码": "Site code",
+  "统计与所有权验证": "Analytics and ownership verification",
+  "注入到公开页面 <head> 的代码": "Code injected into the <head> of public pages",
+  "支持搜索引擎验证 meta、站点统计脚本等。代码会原样插入首页、介绍、隐私、条款、登录和注册页的 <head> 中；不会注入 /app 笔记页和分享链接，避免把私有路径或分享令牌发送给第三方。": "Supports search-engine verification meta tags and analytics scripts. The code is inserted verbatim into the <head> of the home, about, privacy, terms, login and register pages. It is not injected into /app notes or share links, so private paths and share tokens are never sent to third parties.",
+  "正在加载站点代码…": "Loading site code…",
+  "保存代码": "Save code",
+  "恢复内置验证代码": "Restore built-in verification code",
+  "代码超出长度上限": "Code exceeds the length limit",
+  "有未保存的修改。保存后刷新首页查看源代码确认。": "You have unsaved changes. Save, then reload the home page and inspect the source to confirm.",
+  "这段代码由实例管理员维护，普通用户不可见。请只粘贴自己信任的统计或验证代码；脚本会以站点身份在公开页面运行。": "This code is maintained by instance administrators and hidden from other users. Only paste analytics or verification code you trust; scripts run as the site on public pages.",
+  "站点代码已保存": "Site code saved",
+  "实例级运行状态、用户与访问、公开内容、附件存储、备份恢复、审计与站点代码。只有实例管理员可见。": "Instance health, users and access, public content, attachment storage, backup, audit and site code. Visible to instance administrators only.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

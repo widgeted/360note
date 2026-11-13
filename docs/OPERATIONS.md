@@ -166,9 +166,13 @@ chmod 644 /var/www/360note-errors/maintenance.html
 nginx -t && systemctl reload nginx
 ```
 
-> 完整 TLS 配置由 Nginx 直接提供 SPA 静态文件，只有 `/api/` 与 `/health` 反代到 Node。因此 API 重启时登录页不会变成 502；`502/503/504` 统一显示 `maintenance.html`。每次部署修改 `deploy/errors/` 后，记得同步到 `/var/www/360note-errors/`。
+> 完整 TLS 配置下，已存在的静态文件（`/assets/`、图标、`robots.txt`、`sitemap*.xml`、IndexNow key、`sw.js`）由 Nginx 直接返回；其余路径通过 `try_files $uri @node` 回退到 Node。HTML 入口（`/`、`/index.html`）必须由 Node 输出，因为实例管理→站点里的验证/统计代码是运行时注入到 `<head>` 的。只把 `/api/` 与 `/health` 反代、而让 Nginx 直接返回 `index.html`，会导致保存的站点代码不生效。
 >
-> 缓存策略：hashed `/assets/` 长缓存（1 年），`/`、favicon、manifest 使用 `expires -1` 强制重新验证。这样部署后不会继续显示旧 CSS、旧下划线或旧图标。
+> CSP 由 Node 按 HTML 响应生成：基础策略固定，管理员站点代码中的内联脚本加入 `sha256` 哈希，外部脚本来源自动加入 `script-src` 与 `connect-src`。不要在 Nginx 再加一份更严格的文档 CSP，否则会把统计脚本挡住。
+>
+> PWA 导航使用 NetworkFirst，`index.html` 不进入预缓存；离线时回退到构建期生成的 `offline.html`。不要重新启用 `navigateFallback`，否则已安装 PWA 会继续拿旧 shell，看不到最新的验证/统计代码。
+>
+> 缓存策略：hashed `/assets/` 长缓存（1 年），HTML 使用 `no-store`，favicon、manifest 使用 `expires -1` 强制重新验证。这样部署后不会继续显示旧 CSS、旧下划线或旧图标。
 
 > 如果证书路径不同（例如 `/etc/letsencrypt/live/www.360note.com/`），修改 Nginx 配置中的 `ssl_certificate` 路径。首次配置不能引用尚不存在的证书，所以必须先 HTTP-only。
 

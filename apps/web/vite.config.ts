@@ -45,6 +45,14 @@ export default defineConfig({
         });
       },
     },
+    {
+      name: 'offline-shell',
+      writeBundle(options) {
+        const outDir = options.dir ?? path.resolve(__dirname, 'dist');
+        const index = path.join(outDir, 'index.html');
+        if (fs.existsSync(index)) fs.copyFileSync(index, path.join(outDir, 'offline.html'));
+      },
+    },
     react(),
     VitePWA({
       registerType: 'prompt',
@@ -84,21 +92,26 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         skipWaiting: false,
         clientsClaim: true,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [
-          /^\/api\//,
-          /^\/s\//,
-          /^\/sitemap/,
-          /^\/robots\.txt$/,
-          /^\/version\.json$/,
-          /^\/manifest\.webmanifest$/,
-          /^\/health$/,
-          /^\/(?:assets|icons|img)\//,
-          /^\/favicon\.(?:ico|png|svg)$/,
-          /^\/og-image\.png$/,
-        ],
+        // Serve navigations from the network first so the server-side <head>
+        // (verification meta + admin analytics code) is always current. The
+        // precached shell is only a fallback when the network is unavailable.
+        navigateFallback: undefined,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Keep index.html out of the precache: Workbox's precache route treats
+        // it as the directory index and would serve a stale head without the
+        // admin's verification/analytics code. offline.html is a build copy
+        // used only when the network is unavailable.
+        globIgnores: ['**/index.html'],
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-navigations',
+              networkTimeoutSeconds: 3,
+              precacheFallback: { fallbackURL: 'offline.html' }
+            }
+          },
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
             handler: 'NetworkOnly'

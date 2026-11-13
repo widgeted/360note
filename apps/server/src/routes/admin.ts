@@ -6,6 +6,7 @@ import { audit } from '../lib/audit.js';
 import { AppError, errors } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { getAiConfig, getSetting, saveAiConfig, setSetting } from '../services/settings.js';
+import { MAX_SITE_HEAD_CODE, getSiteCodeSettings, saveSiteHeadCode } from '../services/site.js';
 import { config } from '../config.js';
 import { getOffsiteConfig, offsitePublicConfig, saveOffsiteConfig, testOffsite } from '../services/offsite.js';
 import { revokeAllApiTokens } from '../services/sessions.js';
@@ -534,6 +535,31 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (body.instanceBackup) await saveInstanceBackupSettings(body.instanceBackup);
     await audit({ actorId: auth.user.id, action: 'admin.settings.update', meta: { ai: Boolean(body.ai), backup: Boolean(body.backup) }, ip: clientIp(request) });
     return { ok: true };
+  });
+
+  app.get('/api/admin/site-code', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    return getSiteCodeSettings();
+  });
+
+  app.put('/api/admin/site-code', async (request) => {
+    const auth = requireAuth(request);
+    await requireAdmin(auth.user.id);
+    const body = parse(
+      z.object({
+        code: z.string().max(MAX_SITE_HEAD_CODE),
+      }),
+      request.body,
+    );
+    await saveSiteHeadCode(body.code);
+    await audit({
+      actorId: auth.user.id,
+      action: 'admin.site-code.update',
+      meta: { length: body.code.length },
+      ip: clientIp(request),
+    });
+    return getSiteCodeSettings();
   });
 
   app.get('/api/admin/attachment-storage', async (request) => {

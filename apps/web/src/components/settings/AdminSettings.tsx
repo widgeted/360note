@@ -13,6 +13,7 @@ import { OffsiteSettings } from './OffsiteSettings';
 import { useAuthStore } from '../../stores/auth';
 import { LoadFailure } from '../LoadFailure';
 import { AdminAiSettings } from './AdminAiSettings';
+import { AdminSiteSettings } from './AdminSiteSettings';
 
 interface Stats {
   users: number;
@@ -58,6 +59,7 @@ const ADMIN_PAGES = [
   ['backup', '备份'],
   ['audit', '审计'],
   ['ai', 'AI'],
+  ['site', '站点'],
 ] as const;
 
 type AdminPage = (typeof ADMIN_PAGES)[number][0];
@@ -387,7 +389,7 @@ export default function AdminSettings() {
   return (
     <>
       <h1 className="settings-title">{t('实例管理')}</h1>
-      <p className="settings-subtitle">{t('实例级运行状态、用户与访问、公开内容、附件存储、备份恢复与审计。只有实例管理员可见。')}</p>
+      <p className="settings-subtitle">{t('实例级运行状态、用户与访问、公开内容、附件存储、备份恢复、审计与站点代码。只有实例管理员可见。')}</p>
 
       {pageError && <LoadFailure message={pageError} onRetry={() => window.location.reload()} />}
 
@@ -418,6 +420,8 @@ export default function AdminSettings() {
       )}
 
       {page === 'ai' && <AdminAiSettings />}
+
+      {page === 'site' && <AdminSiteSettings />}
 
       {page === 'content' && (
         <section className="settings-section">
