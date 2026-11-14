@@ -9,6 +9,8 @@ import {
   readCachedNote,
   readDraft,
   readOutbox,
+  retryFailedOutbox,
+  markOutboxFailed,
   readWorkspaceCache,
   removeCachedNote,
   removeOutbox,
@@ -50,6 +52,7 @@ interface AppState {
   syncState: SyncState;
   syncMessage: string | null;
   pendingCount: number;
+  failedOutboxCount: number;
   lastSavedAt: number | null;
   sidebarCollapsed: boolean;
   sidebarMobileOpen: boolean;
@@ -89,6 +92,7 @@ interface AppState {
   duplicateNote: (noteId?: string) => Promise<Note | null>;
   restoreVersion: (versionId: number) => Promise<Note | null>;
   flushOutbox: () => Promise<void>;
+  retryFailedSync: () => Promise<void>;
   setSync: (state: SyncState, message?: string | null) => void;
   setOffline: (offline: boolean) => void;
   toggleSidebar: () => void;
@@ -103,6 +107,8 @@ interface AppState {
 }
 
 let flushing = false;
+let noteRequestSeq = 0;
+let listRequestSeq = 0;
 const prefetchedWorkspaces = new Set<string>();
 
 async function prefetchOfflineBundle(workspaceId: string): Promise<void> {
@@ -111,6 +117,12 @@ async function prefetchOfflineBundle(workspaceId: string): Promise<void> {
   try {
     const response = await api.get<{ notes: Note[] }>(`/api/notes/offline-bundle?workspaceId=${workspaceId}&limit=120`);
     for (const note of response.notes) await cacheNote(note);
+    // Warm the service-worker thumbnail cache so offline notes do not show
+    // broken images. Limit the fan-out and fail quietly on flaky networks.
+    const thumbnails = response.notes
+      .flatMap((note) => note.attachments.slice(0, 2).map((attachment) => `/api/attachments/${attachment.id}/content?thumb=1`))
+      .slice(0, 80);
+    await Promise.allSettled(thumbnails.map((url) => fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(5000) })));
   } catch {
     prefetchedWorkspaces.delete(workspaceId);
   }
@@ -184,7 +196,13 @@ function mergeLocalNotes(serverNotes: NoteSummary[], current: NoteSummary[], fil
   return [...missing, ...serverNotes];
 }
 
-const initialCollapsed = localStorage.getItem('nh-sidebar-collapsed') === 'true';
+const initialCollapsed = (() => {
+  try {
+    return localStorage.getItem('nh-sidebar-collapsed') === 'true';
+  } catch {
+    return false;
+  }
+})();
 
 export const useAppStore = create<AppState>((set, get) => ({
   workspaceId: null,
@@ -207,6 +225,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   syncState: 'idle',
   syncMessage: null,
   pendingCount: 0,
+  failedOutboxCount: 0,
   lastSavedAt: null,
   sidebarCollapsed: initialCollapsed,
   sidebarMobileOpen: false,
@@ -252,7 +271,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     }
     const outbox = await readOutbox();
-    set({ pendingCount: outbox.length });
+    set({ pendingCount: outbox.filter((item) => !item.failedAt).length, failedOutboxCount: outbox.filter((item) => item.failedAt).length });
     try {
       const [foldersResponse, tagsResponse, notesResponse] = await Promise.all([
         api.get<{ folders: Folder[] }>(`/api/folders?workspaceId=${workspaceId}`),
@@ -301,6 +320,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshList: async (options) => {
     const { workspaceId, filter, folderId, tagId, query, sort, notes } = get();
     if (!workspaceId) return;
+    const requestSeq = ++listRequestSeq;
     if (!options?.silent) set({ loadingList: !options?.append });
     try {
       let response: { notes: NoteSummary[]; total: number; allTotal: number };
@@ -319,6 +339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (filter === 'tag' && tagId) params.set('tagId', tagId);
         response = await api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(`/api/notes?${params.toString()}`);
       }
+      if (requestSeq !== listRequestSeq) return;
       let serverNotes = response.notes;
       if (options?.append) {
         const existing = new Set(notes.map((note) => note.id));
@@ -343,6 +364,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         allTotal: get().allTotal,
       });
     } catch (error) {
+      if (requestSeq !== listRequestSeq) return;
       if (isNetworkError(error) || !navigator.onLine) {
         let offlineResults: NoteSummary[];
         if (query.trim()) {
@@ -370,6 +392,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadMore: async () => {
     const { workspaceId, filter, folderId, tagId, query, sort, serverOffset, hasMore, loadingList } = get();
     if (!workspaceId || !hasMore || loadingList) return;
+    const requestSeq = ++listRequestSeq;
     set({ loadingList: true });
     try {
       let response: { notes: NoteSummary[]; total: number; allTotal: number };
@@ -383,6 +406,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (filter === 'tag' && tagId) params.set('tagId', tagId);
         response = await api.get<{ notes: NoteSummary[]; total: number; allTotal: number }>(`/api/notes?${params.toString()}`);
       }
+      if (requestSeq !== listRequestSeq) return;
       const existing = new Set(get().notes.map((note) => note.id));
       const appended = response.notes.filter((note) => !existing.has(note.id));
       const notes = [...get().notes, ...appended];
@@ -455,8 +479,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openNote: async (noteId, options) => {
+    const requestSeq = ++noteRequestSeq;
     set({ loadingNote: !options?.silent, sidebarMobileOpen: false });
     const cached = await readCachedNote(noteId);
+    if (requestSeq !== noteRequestSeq) return;
     if (cached) {
       set({ note: cached.note, loadingNote: false });
     }
@@ -470,6 +496,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const shown = get().note;
     try {
       const response = await api.get<{ note: Note }>(`/api/notes/${noteId}`);
+      if (requestSeq !== noteRequestSeq || get().workspaceId !== response.note.workspaceId) return;
       const changed =
         Boolean(shown && shown.id === response.note.id) &&
         (shown!.version !== response.note.version ||
@@ -489,6 +516,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         window.dispatchEvent(new CustomEvent('nh:draft-available', { detail: draft }));
       }
     } catch (error) {
+      if (requestSeq !== noteRequestSeq) return;
       if (isNetworkError(error) || !navigator.onLine) {
         if (cached) {
           set({ note: cached.note, loadingNote: false, offline: true, syncState: 'offline' });
@@ -866,13 +894,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   batchAction: async (action, ids) => {
-    await api.post('/api/notes/batch', { action, ids });
+    const response = await api.post<{ affected: number }>('/api/notes/batch', { action, ids });
     await get().refreshAll();
     if (get().note && ids.includes(get().note!.id) && (action === 'trash' || action === 'delete')) {
       set({ note: null });
     }
     await persistSnapshot(get());
-    toast('success', translate('操作完成'));
+    if (response.affected < ids.length) {
+      toast('warning', translate('部分操作完成'), translate('成功 {done} 项，失败 {failed} 项', { done: response.affected, failed: ids.length - response.affected }));
+    } else {
+      toast('success', translate('操作完成'));
+    }
   },
 
   duplicateNote: async (noteId) => {
@@ -909,11 +941,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const items = await readOutbox();
       if (!items.length) {
-        set({ pendingCount: 0 });
+        set({ pendingCount: 0, failedOutboxCount: 0 });
         return;
       }
       set({ syncState: 'saving', syncMessage: translate('同步中') });
       for (const item of items) {
+        // Failed items are kept for inspection/retry, but must never block the
+        // rest of the queue. This used to leave every later offline edit stuck.
+        if (item.failedAt) continue;
         try {
           if (item.kind === 'create' || isLocalNote(item.noteId)) {
             const response = await api.post<{ note: Note }>('/api/notes', {
@@ -966,35 +1001,52 @@ export const useAppStore = create<AppState>((set, get) => ({
             const remote = (error.details as { current?: Note } | undefined)?.current;
             if (remote && (item.kind !== 'create')) {
               const resolved = await resolveConflict(get, set, item.noteId, item.title, item.contentMd, remote);
-              if (!resolved) break;
+              if (!resolved) {
+                await markOutboxFailed(item.id, translate('冲突内容无法自动合并'));
+                continue;
+              }
               await removeOutbox(item.id);
               continue;
             }
           }
-          set({ syncState: 'error', syncMessage: (error as Error).message });
+          const message = (error as Error).message || translate('同步失败');
+          if (error instanceof ApiError && [400, 403, 404, 410, 422].includes(error.status)) {
+            await markOutboxFailed(item.id, message);
+            set({ syncState: 'error', syncMessage: translate('有 {n} 项无法同步，可重试或导出', { n: (await readOutbox()).filter((entry) => entry.failedAt).length }) });
+            continue;
+          }
+          // Transient server/network errors keep the item pending and stop
+          // this pass; the next online/focus event retries it.
+          set({ syncState: 'error', syncMessage: message });
           break;
         }
       }
       const remaining = await readOutbox();
-      if (!remaining.length) {
-        set({
-          pendingCount: 0,
-          offline: false,
-          syncState: 'saved',
-          syncMessage: null,
-        });
+      const pending = remaining.filter((item) => !item.failedAt);
+      const failed = remaining.filter((item) => item.failedAt);
+      if (!pending.length && !failed.length) {
+        set({ pendingCount: 0, failedOutboxCount: 0, offline: false, syncState: 'saved', syncMessage: null });
         await persistSnapshot(get());
         void get().refreshAll();
       } else {
         set({
-          pendingCount: remaining.length,
-          syncState: 'offline',
-          syncMessage: translate('待同步', { n: remaining.length }),
+          pendingCount: pending.length,
+          failedOutboxCount: failed.length,
+          syncState: failed.length ? 'error' : 'offline',
+          syncMessage: failed.length
+            ? translate('有 {n} 项无法同步，可重试或导出', { n: failed.length })
+            : translate('待同步', { n: pending.length }),
         });
       }
     } finally {
       flushing = false;
     }
+  },
+
+  retryFailedSync: async () => {
+    const count = await retryFailedOutbox();
+    set({ failedOutboxCount: 0, syncState: count ? 'saving' : get().syncState });
+    await get().flushOutbox();
   },
 
   reset: () => set({
@@ -1017,6 +1069,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     syncState: 'idle',
     syncMessage: null,
     pendingCount: 0,
+    failedOutboxCount: 0,
     lastSavedAt: null,
     sidebarMobileOpen: false,
     contextOpen: false,

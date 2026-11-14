@@ -1,8 +1,9 @@
-import archiver from 'archiver';
+import { createZipArchive } from '../lib/zip-archive.js';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { many, one } from '../db.js';
@@ -15,6 +16,46 @@ import { audit } from '../lib/audit.js';
 import type { Note } from '@360note/shared';
 
 const exec = promisify(execFile);
+
+let pdfBinary: string | null | undefined;
+let pdfActive = 0;
+const pdfWaiters: Array<() => void> = [];
+
+function resolvePdfBinary(): string | null {
+  if (pdfBinary !== undefined) return pdfBinary;
+  const candidates = [process.env.CHROMIUM_PATH, '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', 'chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable'].filter(Boolean) as string[];
+  for (const binary of candidates) {
+    if (binary.startsWith('/')) {
+      if (fsSync.existsSync(binary)) { pdfBinary = binary; return binary; }
+      continue;
+    }
+    try {
+      execFileSync('which', [binary], { stdio: 'ignore' });
+      pdfBinary = binary;
+      return binary;
+    } catch {
+      /* try next */
+    }
+  }
+  pdfBinary = null;
+  return null;
+}
+
+export function pdfExportAvailable(): boolean {
+  return Boolean(resolvePdfBinary());
+}
+
+async function withPdfSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (pdfActive >= 1) await new Promise<void>((resolve) => pdfWaiters.push(resolve));
+  else pdfActive += 1;
+  try {
+    return await task();
+  } finally {
+    const next = pdfWaiters.shift();
+    if (next) next();
+    else pdfActive -= 1;
+  }
+}
 
 interface AttachmentFile {
   id: string;
@@ -80,53 +121,49 @@ function frontmatter(input: {
 }
 
 async function pdfFromHtml(html: string, title: string): Promise<Buffer> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-pdf-'));
-  const htmlPath = path.join(dir, 'note.html');
-  const pdfPath = path.join(dir, 'note.pdf');
-  const home = path.join(dir, 'home');
-  const profile = path.join(dir, 'profile');
-  await fs.mkdir(home, { recursive: true });
-  await fs.mkdir(profile, { recursive: true });
-  try {
-    await fs.writeFile(htmlPath, html, 'utf8');
-    const candidates = [process.env.CHROMIUM_PATH, '/usr/bin/chromium', 'chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable'].filter(Boolean) as string[];
-    let lastError: unknown = null;
-    for (const binary of candidates) {
-      try {
-        await exec(
-          binary,
-          [
-            '--headless=new',
-            '--no-sandbox',
-            '--disable-gpu',
-            '--disable-dev-shm-usage',
-            '--no-pdf-header-footer',
-            '--print-to-pdf-no-header',
-            `--user-data-dir=${profile}`,
-            `--print-to-pdf=${pdfPath}`,
-            `file://${htmlPath}`,
-          ],
-          {
-            timeout: 60_000,
-            maxBuffer: 16 * 1024 * 1024,
-            env: {
-              ...process.env,
-              HOME: home,
-              XDG_CONFIG_HOME: path.join(home, '.config'),
-              XDG_CACHE_HOME: path.join(home, '.cache'),
-            },
+  const binary = resolvePdfBinary();
+  if (!binary) throw new Error('No Chromium binary found');
+  return withPdfSlot(async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-pdf-'));
+    const htmlPath = path.join(dir, 'note.html');
+    const pdfPath = path.join(dir, 'note.pdf');
+    const home = path.join(dir, 'home');
+    const profile = path.join(dir, 'profile');
+    try {
+      await fs.mkdir(home, { recursive: true });
+      await fs.mkdir(profile, { recursive: true });
+      await fs.writeFile(htmlPath, html, 'utf8');
+      await exec(
+        binary,
+        [
+          '--headless=new',
+          '--no-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--no-pdf-header-footer',
+          '--print-to-pdf-no-header',
+          `--user-data-dir=${profile}`,
+          `--print-to-pdf=${pdfPath}`,
+          `file://${htmlPath}`,
+        ],
+        {
+          timeout: 60_000,
+          maxBuffer: 16 * 1024 * 1024,
+          env: {
+            ...process.env,
+            HOME: home,
+            XDG_CONFIG_HOME: path.join(home, '.config'),
+            XDG_CACHE_HOME: path.join(home, '.cache'),
           },
-        );
-        const pdf = await fs.readFile(pdfPath);
-        if (pdf.length > 100) return pdf;
-      } catch (error) {
-        lastError = error;
-      }
+        },
+      );
+      const pdf = await fs.readFile(pdfPath);
+      if (pdf.length > 100) return pdf;
+      throw new Error('PDF output is empty');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
-    throw lastError ?? new Error('No Chromium binary found');
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
-  }
+  });
 }
 
 /** Avoid server-side image fetches (SSRF) while rendering a PDF. */
@@ -177,7 +214,7 @@ export async function exportSingleNote(note: Note, format: 'md' | 'html' | 'pdf'
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
     }) + rewritten;
-    const zip = archiver('zip', { zlib: { level: 6 } });
+    const zip = createZipArchive();
     zip.on('warning', (error) => app.log.warn({ error }, 'single note export warning'));
     zip.on('error', (error) => app.log.error({ error }, 'single note export error'));
     zip.pipe(reply.raw);
@@ -310,7 +347,7 @@ export async function exportWorkspace(input: {
   }
 
   const exportName = `360note-${safeFilename(workspace.name)}-${yyyyMMdd()}`;
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = createZipArchive();
   archive.on('warning', (error) => input.app.log.warn({ error }, 'export archive warning'));
   archive.on('error', (error) => input.app.log.error({ error }, 'export archive error'));
   archive.pipe(input.reply.raw);

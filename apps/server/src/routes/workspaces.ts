@@ -10,6 +10,7 @@ import { avatarColor } from '../lib/seed.js';
 import { requireWorkspace, workspaceMemberCount } from '../services/workspaces.js';
 import { notify } from '../services/sessions.js';
 import { deleteAttachment, deleteBackupFile } from '../lib/storage.js';
+import { cleanupNotesMedia } from '../services/media.js';
 import type { DbUser } from '../lib/users.js';
 import { originFromRequest } from '../lib/origin.js';
 import { mailEnabled, normalizeLocale, sendWorkspaceInviteEmail } from '../lib/mailer.js';
@@ -148,8 +149,10 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     );
     if (Number(remaining?.count ?? 0) <= 1) throw errors.badRequest('至少保留一个空间');
     const attachments = await many<{ storage_key: string }>('SELECT storage_key FROM attachments WHERE workspace_id = $1', [id]);
+    const noteIds = await many<{ id: string }>('SELECT id FROM notes WHERE workspace_id = $1', [id]);
     const backups = await many<{ filename: string }>('SELECT filename FROM backups WHERE workspace_id = $1', [id]);
     await audit({ workspaceId: id, actorId: auth.user.id, action: 'workspace.delete', targetType: 'workspace', targetId: id, meta: { name: workspace?.name }, ip: clientIp(request) });
+    await cleanupNotesMedia(noteIds.map((row) => row.id));
     await one('DELETE FROM workspaces WHERE id = $1 RETURNING id', [id]);
     await query("DELETE FROM jobs WHERE payload->>'workspaceId' = $1", [id]);
     await Promise.all([

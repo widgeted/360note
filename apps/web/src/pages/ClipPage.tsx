@@ -75,12 +75,12 @@ export default function ClipPage() {
         </div>
         <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
           <div className="field">
-            <label>{t('标题')}</label>
-            <input className="input" value={title} onChange={(event) => setTitle(event.target.value)} required />
+            <label htmlFor="clip-title">{t('标题')}</label>
+            <input id="clip-title" className="input" value={title} onChange={(event) => setTitle(event.target.value)} required />
           </div>
           <div className="field">
-            <label>{t('内容')}</label>
-            <textarea className="textarea" value={body} onChange={(event) => setBody(event.target.value)} style={{ minHeight: 150 }} rows={7} />
+            <label htmlFor="clip-body">{t('内容')}</label>
+            <textarea id="clip-body" className="textarea" value={body} onChange={(event) => setBody(event.target.value)} style={{ minHeight: 150 }} rows={7} />
           </div>
           {pageUrl && (
             <div className="info-line">

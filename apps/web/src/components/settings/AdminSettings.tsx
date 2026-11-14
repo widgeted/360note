@@ -74,6 +74,8 @@ export default function AdminSettings() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [offsiteUsage, setOffsiteUsage] = useState<OffsiteUsage | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditOffset, setAuditOffset] = useState(0);
@@ -116,7 +118,6 @@ export default function AdminSettings() {
 
   useEffect(() => {
     if (page === 'users') {
-      api.get<{ users: AdminUser[] }>('/api/admin/users').then((res) => setUsers(res.users)).catch((error: Error) => setPageError(error.message));
       void refreshIpBlocks();
     }
     if (page === 'content') {
@@ -127,6 +128,13 @@ export default function AdminSettings() {
     if (page === 'backup') void refreshInstanceBackups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, contentTab]);
+
+  useEffect(() => {
+    if (page !== 'users') return;
+    const timer = window.setTimeout(() => void loadUsers(0), userQuery ? 280 : 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, userQuery]);
 
   async function refreshIpBlocks() {
     const response = await api.get<{ blocks: Array<{ id: string; ip: string; reason: string | null; createdAt: string }> }>('/api/admin/ip-blocks');
@@ -197,7 +205,15 @@ export default function AdminSettings() {
   async function createInstanceBackup() {
     setInstanceBackupBusy(true);
     try {
-      await api.post('/api/admin/instance-backups');
+      const response = await api.post<{ jobId: string }>('/api/admin/instance-backups');
+      let finished = false;
+      for (let attempt = 0; attempt < 600; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const job = await api.get<{ job: { status: string; error: string | null } }>(`/api/jobs/${response.jobId}`);
+        if (job.job.status === 'done') { finished = true; break; }
+        if (job.job.status === 'error') throw new Error(job.job.error ?? t('备份失败'));
+      }
+      if (!finished) throw new Error(t('备份仍在后台运行，请稍后刷新列表。'));
       await Promise.all([refreshInstanceBackups(), refreshOffsiteUsage()]);
       toast('success', t('整站备份已创建'));
     } catch (error) {
@@ -228,6 +244,31 @@ export default function AdminSettings() {
       toast('error', t('恢复演练失败'), (error as Error).message);
     } finally {
       setDrillBusy(false);
+    }
+  }
+
+  async function downloadInstanceBackup(id: string) {
+    if (!window.confirm(t('整站备份包含全库笔记、评论和账户元数据。确认由受控运维流程下载？'))) return;
+    try {
+      const response = await fetch(`/api/admin/instance-backups/${id}/download`, {
+        credentials: 'same-origin',
+        headers: { 'x-360note-break-glass': 'INSTANCE_BACKUP' },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(body?.error?.message || t('下载失败'));
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '360note-instance-backup.3nb';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch (error) {
+      toast('error', t('下载失败'), (error as Error).message);
     }
   }
 
@@ -306,9 +347,24 @@ export default function AdminSettings() {
     }
   }
 
+  async function loadUsers(offset = 0, append = false) {
+    setUsersLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '50', offset: String(offset) });
+      if (userQuery.trim()) params.set('q', userQuery.trim());
+      const response = await api.get<{ users: AdminUser[]; total: number }>(`/api/admin/users?${params.toString()}`);
+      setUsers((current) => append ? [...current, ...response.users.filter((entry) => !current.some((item) => item.id === entry.id))] : response.users);
+      setUsersTotal(response.total);
+      setPageError(null);
+    } catch (error) {
+      setPageError((error as Error).message);
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
   async function refreshUsers() {
-    const response = await api.get<{ users: AdminUser[] }>('/api/admin/users');
-    setUsers(response.users);
+    await loadUsers(0);
   }
 
   async function changeRole(member: AdminUser, role: 'user' | 'admin') {
@@ -332,7 +388,9 @@ export default function AdminSettings() {
   }
 
   function downloadCsv(filename: string, rows: string[][]) {
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    // Prevent spreadsheet formula execution from user-controlled names/emails.
+    const safe = (value: string) => (/^[=+\-@\t\r]/.test(value) ? `'${value}` : value);
+    const csv = rows.map((row) => row.map((cell) => `"${safe(String(cell)).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -372,10 +430,18 @@ export default function AdminSettings() {
     ]);
   }
 
-  function exportUsers() {
+  async function exportUsers() {
+    const all: AdminUser[] = [];
+    for (let offset = 0; offset < 10_000; offset += 100) {
+      const params = new URLSearchParams({ limit: '100', offset: String(offset) });
+      if (userQuery.trim()) params.set('q', userQuery.trim());
+      const response = await api.get<{ users: AdminUser[]; total: number }>(`/api/admin/users?${params.toString()}`);
+      all.push(...response.users);
+      if (all.length >= response.total || response.users.length === 0) break;
+    }
     downloadCsv('360note-users.csv', [
       ['email', 'name', 'role', 'workspaces', 'notes', 'storageBytes', 'sessions', 'lastLogin', 'disabled', 'sharingDisabled'],
-      ...visibleUsers.map((member) => [member.email, member.displayName, member.role, String(member.workspaceCount), String(member.noteCount), String(member.storageBytes), String(member.sessionCount), member.lastLoginAt ?? '', String(Boolean(member.disabledAt)), String(member.sharingDisabled)]),
+      ...all.map((member) => [member.email, member.displayName, member.role, String(member.workspaceCount), String(member.noteCount), String(member.storageBytes), String(member.sessionCount), member.lastLoginAt ?? '', String(Boolean(member.disabledAt)), String(member.sharingDisabled)]),
     ]);
   }
 
@@ -560,7 +626,7 @@ export default function AdminSettings() {
               </span>
               <span style={{ display: 'flex', gap: 4 }}>
                 {backup.offsiteStatus === 'failed' && <button type="button" className="icon-btn icon-btn-sm" onClick={() => void retryInstanceBackupUpload(backup.id)} aria-label={t('重试上传')} title={t('重试上传')}><CloudUpload size={13} /></button>}
-                <a className="icon-btn icon-btn-sm" href={`/api/admin/instance-backups/${backup.id}/download`} aria-label={t('下载')}><Download size={13} /></a>
+                <button type="button" className="icon-btn icon-btn-sm" onClick={() => void downloadInstanceBackup(backup.id)} aria-label={t('下载')} title={t('下载')}><Download size={13} /></button>
                 <button type="button" className="icon-btn icon-btn-sm" onClick={() => void removeInstanceBackup(backup.id)} aria-label={t('删除')}><Trash2 size={13} /></button>
               </span>
             </div>
@@ -571,7 +637,7 @@ export default function AdminSettings() {
       <section className="settings-section" hidden={page !== 'users'}>
         <div className="settings-section-head">
           <span className="settings-section-title">{t('用户')}</span>
-          <span className="settings-section-desc">{visibleUsers.length} / {users.length}</span>
+          <span className="settings-section-desc">{users.length} / {usersTotal}</span>
         </div>
         <div className="setting-inline-form" style={{ marginBottom: 10 }}>
           <div className="field" style={{ flex: 1, minWidth: 180, maxWidth: 320 }}>
@@ -643,7 +709,14 @@ export default function AdminSettings() {
             </tbody>
           </table>
         </div>
-        <p className="setting-note" style={{ marginTop: 8 }}>{t('管理员可以查看账户元数据、空间/笔记/附件数量、会话与审计日志，并可调整角色或强制退出设备。不会提供读取用户笔记正文的后门；正文只在其授权的空间内可访问。')}</p>
+        {users.length < usersTotal && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void loadUsers(users.length, true)} disabled={usersLoading}>
+              {usersLoading ? <span className="spinner" /> : null} {t('加载更多')} · {users.length}/{usersTotal}
+            </button>
+          </div>
+        )}
+        <p className="setting-note" style={{ marginTop: 8 }}>{t('管理员可以查看账户元数据、空间/笔记/附件数量、会话与审计日志，并可调整角色或强制退出设备。不会通过用户/内容接口读取笔记正文；整站灾难恢复备份是受审计的运维例外。')}</p>
       </section>
 
       <section className="settings-section" hidden={page !== 'content' || contentTab !== 'shares'}>

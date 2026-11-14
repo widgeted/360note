@@ -70,6 +70,7 @@ export const config = {
   },
   ocrEnabled: bool(process.env.OCR_ENABLED, false),
   backupRetentionDays: Number(process.env.BACKUP_RETENTION_DAYS || 30),
+  trashRetentionDays: Number(process.env.TRASH_RETENTION_DAYS || 30),
   version: appVersion,
 };
 

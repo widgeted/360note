@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
-import { once } from 'node:events';
 import { config } from '../config.js';
 
 function masterKey(): Buffer {
@@ -46,30 +45,33 @@ export function decryptBuffer(payload: Buffer, aad = '360note'): Buffer {
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }
 
-async function writeAll(stream: fs.WriteStream, chunk: Buffer): Promise<void> {
-  if (!chunk.length) return;
-  if (!stream.write(chunk)) await once(stream, 'drain');
-}
-
 /** Streaming AES-256-GCM: [version=2][iv 12][ciphertext][tag 16]. */
 export async function encryptFile(inputPath: string, outputPath: string, aad = '360note'): Promise<number> {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', KEY(), iv);
   cipher.setAAD(Buffer.from(aad));
-  const write = fs.createWriteStream(outputPath, { mode: 0o600, flags: 'wx' });
+  const tempPath = `${outputPath}.tmp-${crypto.randomUUID()}`;
+  let handle: fsp.FileHandle | null = null;
   try {
-    write.write(Buffer.from([2]));
-    write.write(iv);
+    handle = await fsp.open(tempPath, 'wx', 0o600);
+    await handle.write(Buffer.from([2]));
+    await handle.write(iv);
     for await (const chunk of fs.createReadStream(inputPath, { highWaterMark: 1024 * 1024 })) {
-      await writeAll(write, cipher.update(chunk as Buffer));
+      const output = cipher.update(chunk as Buffer);
+      if (output.length) await handle.write(output);
     }
-    await writeAll(write, cipher.final());
-    write.end(cipher.getAuthTag());
-    await once(write, 'finish');
+    const final = cipher.final();
+    if (final.length) await handle.write(final);
+    await handle.write(cipher.getAuthTag());
+    await handle.close();
+    handle = null;
+    // Atomic replace: an interrupted write never truncates the previous
+    // attachment or backup, and a live restore may overwrite an existing file.
+    await fsp.rename(tempPath, outputPath);
     return (await fsp.stat(outputPath)).size;
   } catch (error) {
-    write.destroy();
-    await fsp.rm(outputPath, { force: true }).catch(() => {});
+    await handle?.close().catch(() => {});
+    await fsp.rm(tempPath, { force: true }).catch(() => {});
     throw error;
   }
 }
@@ -87,7 +89,19 @@ export async function decryptFile(inputPath: string, outputPath: string, aad = '
   }
   if (version === 1) {
     const plain = decryptBuffer(await fsp.readFile(inputPath), aad);
-    await fsp.writeFile(outputPath, plain, { mode: 0o600 });
+    const tempPath = `${outputPath}.tmp-${crypto.randomUUID()}`;
+    let out: fsp.FileHandle | null = null;
+    try {
+      out = await fsp.open(tempPath, 'wx', 0o600);
+      await out.write(plain);
+      await out.close();
+      out = null;
+      await fsp.rename(tempPath, outputPath);
+    } catch (error) {
+      await out?.close().catch(() => {});
+      await fsp.rm(tempPath, { force: true }).catch(() => {});
+      throw error;
+    }
     return;
   }
   if (version !== 2) throw new Error('Unsupported encrypted payload version');
@@ -107,17 +121,22 @@ export async function decryptFile(inputPath: string, outputPath: string, aad = '
   const decipher = crypto.createDecipheriv('aes-256-gcm', KEY(), iv);
   decipher.setAAD(Buffer.from(aad));
   decipher.setAuthTag(tag);
-  const write = fs.createWriteStream(outputPath, { mode: 0o600, flags: 'wx' });
+  const tempPath = `${outputPath}.tmp-${crypto.randomUUID()}`;
+  let out: fsp.FileHandle | null = null;
   try {
+    out = await fsp.open(tempPath, 'wx', 0o600);
     for await (const chunk of fs.createReadStream(inputPath, { start: 13, end: size - 17, highWaterMark: 1024 * 1024 })) {
-      await writeAll(write, decipher.update(chunk as Buffer));
+      const plain = decipher.update(chunk as Buffer);
+      if (plain.length) await out.write(plain);
     }
-    await writeAll(write, decipher.final());
-    write.end();
-    await once(write, 'finish');
+    const final = decipher.final();
+    if (final.length) await out.write(final);
+    await out.close();
+    out = null;
+    await fsp.rename(tempPath, outputPath);
   } catch (error) {
-    write.destroy();
-    await fsp.rm(outputPath, { force: true }).catch(() => {});
+    await out?.close().catch(() => {});
+    await fsp.rm(tempPath, { force: true }).catch(() => {});
     throw error;
   }
 }

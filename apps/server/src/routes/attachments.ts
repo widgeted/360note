@@ -13,7 +13,7 @@ import { requireWorkspace } from '../services/workspaces.js';
 import { queueOcr } from '../lib/ocr.js';
 import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
 import { getAttachmentStorageConfig } from '../lib/object-storage.js';
-import { detectFunctionalImage, generateCoreIxThumbnail, isCoreIxPreviewable } from '../services/media.js';
+import { deleteAttachmentMedia, detectFunctionalImage, generateCoreIxThumbnail, isCoreIxPreviewable } from '../services/media.js';
 
 export default async function attachmentRoutes(app: FastifyInstance) {
   app.post('/api/notes/:id/attachments', async (request, reply) => {
@@ -201,6 +201,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     if (!row) throw errors.notFound('附件不存在');
     const { note } = await getNoteForUser(row.note_id, auth.user.id);
     if (!note.canEdit) throw errors.forbidden();
+    await deleteAttachmentMedia(id);
     await one('DELETE FROM attachments WHERE id = $1 RETURNING id', [id]);
     await deleteAttachment(row.storage_key);
     return { ok: true };

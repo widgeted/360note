@@ -90,6 +90,8 @@ export function EditorPane({
   const conflictNoteId = useAppStore((state) => state.conflictNoteId);
   const clearConflict = useAppStore((state) => state.clearConflict);
   const pendingCount = useAppStore((state) => state.pendingCount);
+  const failedOutboxCount = useAppStore((state) => state.failedOutboxCount);
+  const retryFailedSync = useAppStore((state) => state.retryFailedSync);
   const contextOpen = useAppStore((state) => state.contextOpen);
   const setContextOpen = useAppStore((state) => state.setContextOpen);
   const setContextTab = useAppStore((state) => state.setContextTab);
@@ -417,6 +419,35 @@ export function EditorPane({
   }, [note?.id, workspaceId]);
 
   useEffect(() => {
+    if (!note) return;
+    const persist = () => {
+      if (!dirtyRef.current) return;
+      void saveDraft({
+        noteId: note.id,
+        workspaceId: note.workspaceId,
+        title: titleValueRef.current,
+        contentMd: contentRef.current,
+        baseVersion: baseVersionRef.current,
+        updatedAt: Date.now(),
+      });
+    };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      persist();
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('pagehide', persist);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('nh:flush-before-reload', persist);
+    return () => {
+      window.removeEventListener('pagehide', persist);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('nh:flush-before-reload', persist);
+    };
+  }, [note?.id, note?.workspaceId]);
+
+  useEffect(() => {
     if (!note?.canShare || isLocalNote(note.id)) {
       setHasActiveShare(false);
       return;
@@ -438,8 +469,12 @@ export function EditorPane({
     function onKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        void saveNowRef.current('manual');
-        toast('success', t('已保存'));
+        const current = useAppStore.getState().note;
+        if (!current?.canEdit || current.trashedAt) return;
+        void saveNowRef.current('manual').then(() => {
+          const state = useAppStore.getState();
+          if (state.syncState === 'saved') toast('success', t('已保存'));
+        });
       }
     }
     window.addEventListener('keydown', onKeyDown);
@@ -759,7 +794,13 @@ export function EditorPane({
           ))}
         </div>
         <div className="topbar-actions">
-          <span className="topbar-save">
+          <span
+            className="topbar-save"
+            role="status"
+            aria-live="polite"
+            aria-label={syncState === 'saving' ? t('保存中…') : syncState === 'offline' ? t('离线') : syncState === 'error' ? t('保存失败') : t('已保存')}
+            title={syncState === 'saving' ? t('保存中…') : syncState === 'offline' ? t('离线') : syncState === 'error' ? t('保存失败') : t('已保存')}
+          >
             <span className={cn('save-glyph', syncState === 'saving' && 'saving', (syncState === 'offline' || syncState === 'error') && syncState, syncState === 'error' && 'error')} />
             <span className="save-text">
               {syncState === 'saving'
@@ -844,7 +885,9 @@ export function EditorPane({
                 <div className="menu-label">{t('导出')}</div>
                 <MenuItem icon={<FileText size={14} />} onClick={() => { close(); void exportNote('md'); }}>{t('导出为 Markdown')}</MenuItem>
                 <MenuItem icon={<FileCode2 size={14} />} onClick={() => { close(); void exportNote('html'); }}>{t('导出为 HTML')}</MenuItem>
-                <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportNote('pdf'); }}>{t('导出为 PDF')}</MenuItem>
+                {instance?.pdfExportEnabled && (
+                  <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportNote('pdf'); }}>{t('导出为 PDF')}</MenuItem>
+                )}
                 <div className="menu-separator" />
                 {canShare && <MenuItem icon={<Share2 size={14} />} onClick={() => { close(); setShowShare(true); }}>{t('分享笔记')}</MenuItem>}
                 <MenuItem icon={<Link2 size={14} />} onClick={() => { close(); setShowWiki(true); }}>{t('双向链接')}</MenuItem>
@@ -931,9 +974,9 @@ export function EditorPane({
         <div style={{ padding: '10px 18px 0' }}>
           <div className="banner banner-error" style={{ maxWidth: 900, margin: '0 auto' }}>
             <AlertTriangle size={15} />
-            <div className="banner-body">{t('保存失败')}{syncMessage ? ` · ${syncMessage}` : ''}<div className="setting-note" style={{ marginTop: 2 }}>{t('当前正文和草稿已保存在这台设备，可重试或先复制正文。')}</div></div>
+            <div className="banner-body">{t('保存失败')}{syncMessage ? ` · ${syncMessage}` : ''}<div className="setting-note" style={{ marginTop: 2 }}>{failedOutboxCount ? t('有 {n} 项离线修改无法同步；内容仍保存在本机，可重试。', { n: failedOutboxCount }) : t('当前正文和草稿已保存在这台设备，可重试或先复制正文。')}</div></div>
             <div className="banner-actions">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void saveNowRef.current('manual')}>{t('重试')}</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => failedOutboxCount ? void retryFailedSync() : void saveNowRef.current('manual')}>{t('重试')}</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => void copyText(contentRef.current)}>{t('复制正文')}</button>
             </div>
           </div>
@@ -1089,9 +1132,11 @@ export function EditorPane({
           <button type="button" className="share-permission-option" onClick={() => { setShowExport(false); void exportNote('html'); }}>
             <FileCode2 size={16} /><span><span className="share-permission-name">HTML</span><span className="share-permission-desc">{t('独立网页，图片内嵌。')}</span></span>
           </button>
-          <button type="button" className="share-permission-option" onClick={() => { setShowExport(false); void exportNote('pdf'); }}>
-            <Download size={16} /><span><span className="share-permission-name">PDF</span><span className="share-permission-desc">{t('适合打印与分发。')}</span></span>
-          </button>
+          {instance?.pdfExportEnabled && (
+            <button type="button" className="share-permission-option" onClick={() => { setShowExport(false); void exportNote('pdf'); }}>
+              <Download size={16} /><span><span className="share-permission-name">PDF</span><span className="share-permission-desc">{t('适合打印与分发。')}</span></span>
+            </button>
+          )}
         </div>
       </Modal>
 

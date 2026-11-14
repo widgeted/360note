@@ -72,6 +72,46 @@ export async function ensureMediaDerivative(attachmentId: string): Promise<strin
   return key;
 }
 
+/**
+ * Remove the unencrypted share derivative for an attachment or note. These
+ * objects are intentionally public while a share exists; once the share is
+ * revoked or the attachment is deleted they must not linger in the bucket.
+ */
+export async function deleteAttachmentMedia(attachmentId: string): Promise<void> {
+  const row = await one<{ media_key: string | null }>(
+    'SELECT media_key FROM attachments WHERE id = $1',
+    [attachmentId],
+  );
+  if (!row?.media_key) return;
+  await deleteObject(row.media_key, 'attachment').catch(() => {});
+  await query('UPDATE attachments SET media_key = NULL WHERE id = $1', [attachmentId]).catch(() => {});
+}
+
+export async function cleanupNoteMedia(noteId: string, onlyIfUnshared = false): Promise<void> {
+  if (onlyIfUnshared) {
+    const active = await one<{ count: string }>(
+      `SELECT count(*)::text AS count FROM share_links
+       WHERE note_id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
+      [noteId],
+    );
+    if (Number(active?.count ?? 0) > 0) return;
+  }
+  const rows = await many<{ media_key: string | null }>(
+    'SELECT media_key FROM attachments WHERE note_id = $1 AND media_key IS NOT NULL',
+    [noteId],
+  );
+  for (const row of rows) {
+    if (row.media_key) await deleteObject(row.media_key, 'attachment').catch(() => {});
+  }
+  if (rows.length) {
+    await query('UPDATE attachments SET media_key = NULL WHERE note_id = $1', [noteId]).catch(() => {});
+  }
+}
+
+export async function cleanupNotesMedia(noteIds: string[], onlyIfUnshared = false): Promise<void> {
+  for (const id of noteIds) await cleanupNoteMedia(id, onlyIfUnshared);
+}
+
 export function isCoreIxPreviewable(mime: string, filename = ''): boolean {
   const lower = filename.toLowerCase();
   return (

@@ -58,13 +58,13 @@ IndexNow 主要被 Bing、Yandex、Seznam、Naver 等采用。**Google 不参与
 
 公开页面内容或 sitemap 更新后运行 `npm run seo:indexnow`。私有页面和分享页不要加入提交列表。
 
-## 站点验证与统计代码（v0.2.5）
+## 站点验证与统计代码（v0.2.6）
 
 - 位置：实例管理 → 站点（`/app/settings/admin/site`），仅实例管理员可读写。
 - 默认内置百度验证：`<meta name="baidu-site-verification" content="codeva-zUIgMMzGVb" />`。
-- 注入范围：`/`、`/about`、`/privacy`、`/terms`、`/login`、`/register` 的 `<head>`；不注入 `/app` 与 `/s/`。
+- 注入范围：`/`、`/about`、`/privacy`、`/terms` 的 `<head>`；不注入 `/login`、`/register`、`/app` 与 `/s/`，避免在密码页执行第三方脚本。
 - 保存后立即生效，无需重新构建；HTML 响应为 `no-store`，便于验证平台抓取。
 - 服务端会根据代码内容生成 CSP：内联脚本加入 `sha256` 哈希，外部脚本来源自动加入 `script-src` 与 `connect-src`。
 - 部署要求：nginx 对非静态路径回退到 Node（`try_files $uri @node`），否则运行时注入不会出现在首页；CSP 由 Node 统一设置。
-- PWA 导航使用 NetworkFirst，`index.html` 不进入预缓存；离线时回退到 `offline.html`。
+- PWA 导航使用 NetworkFirst，`index.html` 不进入预缓存；离线时回退到 `offline.html`。分享页两域名均输出 `noindex`。
 - 百度验证通过后可在百度搜索资源平台点击“完成验证”；Google/Bing 等其他平台可复用同一输入框粘贴各自的 meta 或脚本。

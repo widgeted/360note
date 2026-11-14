@@ -36,8 +36,16 @@ function cachedAccountTheme(): ThemePreference | null {
 }
 
 export function initializeTheme(): void {
-  const saved = cachedAccountTheme() ?? (localStorage.getItem(THEME_KEY) as ThemePreference | null) ?? 'system';
-  applyTheme(saved, localStorage.getItem(MOTION_KEY) === 'true');
+  let storedTheme: ThemePreference | null = null;
+  let storedMotion = false;
+  try {
+    storedTheme = localStorage.getItem(THEME_KEY) as ThemePreference | null;
+    storedMotion = localStorage.getItem(MOTION_KEY) === 'true';
+  } catch {
+    /* storage can be unavailable in hardened/private contexts */
+  }
+  const saved = cachedAccountTheme() ?? storedTheme ?? 'system';
+  applyTheme(saved, storedMotion);
   window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
     if ((localStorage.getItem(THEME_KEY) as ThemePreference | null) === 'system') applyTheme('system');
   });
@@ -61,11 +69,19 @@ function syncCachedAccountPrefs(preference: ThemePreference, reduceMotion?: bool
 }
 
 export function storeTheme(preference: ThemePreference, reduceMotion?: boolean): void {
-  localStorage.setItem(THEME_KEY, preference);
+  try {
+    localStorage.setItem(THEME_KEY, preference);
+  } catch {
+    /* theme still applies for this render */
+  }
   syncCachedAccountPrefs(preference, reduceMotion);
   applyTheme(preference, reduceMotion);
 }
 
 export function getStoredTheme(): ThemePreference {
-  return (localStorage.getItem(THEME_KEY) as ThemePreference | null) ?? 'system';
+  try {
+    return (localStorage.getItem(THEME_KEY) as ThemePreference | null) ?? 'system';
+  } catch {
+    return 'system';
+  }
 }

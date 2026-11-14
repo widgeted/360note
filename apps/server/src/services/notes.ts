@@ -1,10 +1,12 @@
 import type { Attachment, FolderPathItem, Note, NoteSummary, Role, TagRef } from '@360note/shared';
 import crypto from 'node:crypto';
 import { many, one, transaction, type Queryable } from '../db.js';
+import { config } from '../config.js';
 import { errors } from '../lib/errors.js';
 import { excerpt as makeExcerpt, extractWikiLinks, stripTitleHeading, wordCount } from '../lib/text.js';
 import { requireWorkspace } from './workspaces.js';
 import { attachmentStorageKey, deleteAttachment, readAttachment, saveAttachment } from '../lib/storage.js';
+import { cleanupNoteMedia, cleanupNotesMedia } from './media.js';
 
 interface NoteRow {
   id: string;
@@ -85,8 +87,10 @@ export function mapSummary(row: NoteRow): NoteSummary {
   };
 }
 
-const SUMMARY_SELECT = `
-  n.*,
+const SUMMARY_FIELDS = `
+  n.id, n.workspace_id, n.folder_id, n.title, n.excerpt, n.version,
+  n.is_favorite, n.is_pinned, n.encrypted, n.created_by, n.updated_by,
+  n.created_at, n.updated_at, n.last_opened_at, n.trashed_at,
   COALESCE((
     SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY lower(t.name))
     FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = n.id
@@ -94,9 +98,14 @@ const SUMMARY_SELECT = `
   (SELECT count(*)::text FROM attachments a WHERE a.note_id = n.id AND a.deleted_at IS NULL) AS attachment_count
 `;
 
+/** List/search rows never need the full note body. */
+const SUMMARY_SELECT = SUMMARY_FIELDS;
+/** Single-note reads still need content_md and the encryption columns. */
+const NOTE_SELECT = `n.*,${SUMMARY_FIELDS.replace(/^\s*n\.id, n\.workspace_id, n\.folder_id, n\.title, n\.excerpt, n\.version,\s*n\.is_favorite, n\.is_pinned, n\.encrypted, n\.created_by, n\.updated_by,\s*n\.created_at, n\.updated_at, n\.last_opened_at, n\.trashed_at,/, '')}`;
+
 export async function getNoteRow(noteId: string, client?: Queryable, forUpdate = false): Promise<NoteRow | null> {
   return one<NoteRow>(
-    `SELECT ${SUMMARY_SELECT} FROM notes n WHERE n.id = $1 AND n.deleted_at IS NULL${forUpdate ? ' FOR UPDATE OF n' : ''}`,
+    `SELECT ${NOTE_SELECT} FROM notes n WHERE n.id = $1 AND n.deleted_at IS NULL${forUpdate ? ' FOR UPDATE OF n' : ''}`,
     [noteId],
     client,
   );
@@ -233,7 +242,7 @@ export async function listingNotes(input: {
 export async function getRecentFullNotes(workspaceId: string, userId: string, limit = 120): Promise<Note[]> {
   const role = await requireWorkspace(userId, workspaceId, 'read');
   const rows = await many<NoteRow>(
-    `SELECT ${SUMMARY_SELECT} FROM notes n
+    `SELECT ${NOTE_SELECT} FROM notes n
      WHERE n.workspace_id = $1 AND n.deleted_at IS NULL AND n.trashed_at IS NULL
      ORDER BY n.updated_at DESC LIMIT $2`,
     [workspaceId, Math.min(Math.max(limit, 1), 300)],
@@ -611,6 +620,7 @@ export async function deleteNotePermanently(noteId: string, userId: string): Pro
     'SELECT storage_key FROM attachments WHERE note_id = $1',
     [noteId],
   );
+  await cleanupNoteMedia(noteId);
   await one('DELETE FROM notes WHERE id = $1 RETURNING id', [noteId]);
   return attachments.map((attachment) => attachment.storage_key);
 }
@@ -622,6 +632,11 @@ export async function emptyTrash(workspaceId: string, userId: string): Promise<s
      WHERE n.workspace_id = $1 AND n.trashed_at IS NOT NULL`,
     [workspaceId],
   );
+  const trashedNoteIds = await many<{ id: string }>(
+    'SELECT id FROM notes WHERE workspace_id = $1 AND trashed_at IS NOT NULL',
+    [workspaceId],
+  );
+  await cleanupNotesMedia(trashedNoteIds.map((row) => row.id));
   await one('DELETE FROM notes WHERE workspace_id = $1 AND trashed_at IS NOT NULL RETURNING id', [workspaceId]);
   await one(
     `UPDATE folders SET parent_id = NULL
@@ -772,6 +787,39 @@ export async function duplicateNote(noteId: string, userId: string): Promise<Not
     throw error;
   }
   return (await getNoteForUser(created.id, userId)).note;
+}
+
+/**
+ * Empty trash entries after the documented retention window. This is a
+ * destructive cleanup, so it is explicit, logged by the caller and removes
+ * attachments only after their notes are gone.
+ */
+export async function purgeExpiredTrash(): Promise<{ notes: number; folders: number; attachments: number }> {
+  const cutoff = new Date(Date.now() - Math.max(1, config.trashRetentionDays) * 24 * 60 * 60 * 1000);
+  const noteRows = await many<{ id: string }>(
+    'SELECT id FROM notes WHERE trashed_at IS NOT NULL AND trashed_at < $1',
+    [cutoff],
+  );
+  const noteIds = noteRows.map((row) => row.id);
+  const attachmentRows = noteIds.length
+    ? await many<{ storage_key: string }>(
+        `SELECT storage_key FROM attachments WHERE note_id = ANY($1::uuid[])`,
+        [noteIds],
+      )
+    : [];
+  if (noteIds.length) {
+    await cleanupNotesMedia(noteIds);
+    await one('DELETE FROM notes WHERE id = ANY($1::uuid[]) RETURNING id', [noteIds]);
+  }
+  const folderRows = await many<{ id: string }>(
+    'SELECT id FROM folders WHERE trashed_at IS NOT NULL AND trashed_at < $1 AND parent_id IS NULL',
+    [cutoff],
+  );
+  if (folderRows.length) {
+    await one('DELETE FROM folders WHERE id = ANY($1::uuid[]) RETURNING id', [folderRows.map((row) => row.id)]);
+  }
+  await Promise.all(attachmentRows.map((row) => deleteAttachment(row.storage_key).catch(() => {})));
+  return { notes: noteIds.length, folders: folderRows.length, attachments: attachmentRows.length };
 }
 
 export async function updateLastOpened(noteId: string, userId: string): Promise<void> {

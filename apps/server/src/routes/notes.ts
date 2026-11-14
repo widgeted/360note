@@ -380,7 +380,9 @@ export default async function noteRoutes(app: FastifyInstance) {
     return { affected };
   });
 
-  app.get('/api/notes/:id/export', async (request, reply) => {
+  app.get('/api/notes/:id/export', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const { format } = parse(z.object({ format: z.enum(['md', 'html', 'pdf']).default('md') }), request.query);

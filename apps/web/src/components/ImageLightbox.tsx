@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, PencilLine, X } from 'lucide-react';
 import { translate } from '../lib/i18n';
+import { useFocusTrap } from '../lib/useFocusTrap';
 
 interface PreviewImage {
   src: string;
@@ -12,6 +13,8 @@ interface PreviewImage {
 
 export function ImageLightbox() {
   const [image, setImage] = useState<PreviewImage | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, Boolean(image), () => setImage(null));
 
   useEffect(() => {
     function onOpen(event: Event) {

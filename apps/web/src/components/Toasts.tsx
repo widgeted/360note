@@ -11,7 +11,12 @@ export function ToastViewport() {
   return createPortal(
     <div className="toast-viewport" role="region" aria-label={translate('通知')}>
       {toasts.map((toast) => (
-        <div key={toast.id} className={cn('toast', toast.type)} role="status">
+        <div
+          key={toast.id}
+          className={cn('toast', toast.type)}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+        >
           <span className="toast-icon">
             {toast.type === 'success' ? (
               <CheckCircle2 size={15} />

@@ -18,6 +18,7 @@ import {
 import type { PublicShare } from '@360note/shared';
 import { api, ApiError } from '../lib/api';
 import { getLocale, useT } from '../lib/i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { copyText, formatFullDate, formatPrintDate, formatRelative } from '../lib/utils';
 import { renderMarkdown, stripDuplicateTitle } from '../lib/markdown';
 import { cn } from '../lib/utils';
@@ -43,6 +44,7 @@ export default function SharePage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  useDocumentTitle(share?.note.title ?? t('分享笔记'), { noindex: true });
 
   async function load() {
     if (!token) return;
@@ -238,6 +240,7 @@ export default function SharePage() {
                 className="input public-edit-title"
                 value={editTitle}
                 onChange={(event) => setEditTitle(event.target.value)}
+                aria-label={t('标题')}
               />
               <div className="banner banner-info public-edit-banner">
                 <Edit3 size={15} />
@@ -247,6 +250,7 @@ export default function SharePage() {
                 className="markdown-source public-edit-source"
                 value={editContent}
                 onChange={(event) => setEditContent(event.target.value)}
+                aria-label={t('正文')}
               />
               {editError && <div className="form-error public-edit-error"><AlertCircle size={14} /> {editError}</div>}
               <div className="public-edit-actions">

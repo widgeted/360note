@@ -406,7 +406,7 @@ export default function SecuritySettings() {
             </div>
             <div className="field">
               <label>{t('无法扫描？手动输入密钥')}</label>
-              <div className="share-link-box"><input readOnly value={setup.secret} onFocus={(event) => event.target.select()} /><button type="button" className="icon-btn icon-btn-sm" onClick={() => void copy(setup.secret, 'secret')}>{copied === 'secret' ? <Check size={13} /> : <Copy size={13} />}</button></div>
+              <div className="share-link-box"><input readOnly value={setup.secret} onFocus={(event) => event.target.select()} /><button type="button" className="icon-btn icon-btn-sm" onClick={() => void copy(setup.secret, 'secret')} aria-label={t('复制密钥')} title={t('复制密钥')}>{copied === 'secret' ? <Check size={13} /> : <Copy size={13} />}</button></div>
             </div>
             <div className="field">
               <label>{t('验证码')}</label>

@@ -62,7 +62,7 @@ export function AdminSiteSettings() {
           <div className="setting-row-main">
             <div className="setting-row-title">{t('注入到公开页面 <head> 的代码')}</div>
             <div className="setting-row-desc">
-              {t('支持搜索引擎验证 meta、站点统计脚本等。代码会原样插入首页、介绍、隐私、条款、登录和注册页的 <head> 中；不会注入 /app 笔记页和分享链接，避免把私有路径或分享令牌发送给第三方。')}
+              {t('支持搜索引擎验证 meta 和公开页统计脚本。代码只插入首页、介绍、隐私和条款页的 <head>；登录、注册、/app 笔记页和分享链接都不加载，避免在密码页执行第三方脚本或泄露私有路径。')}
             </div>
           </div>
         </div>

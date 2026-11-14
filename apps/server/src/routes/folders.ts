@@ -6,6 +6,7 @@ import { errors } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { requireWorkspace } from '../services/workspaces.js';
 import { deleteAttachment } from '../lib/storage.js';
+import { cleanupNotesMedia } from '../services/media.js';
 
 async function assertNoCycle(folderId: string, parentId: string, workspaceId: string): Promise<void> {
   if (folderId === parentId) throw errors.badRequest('文件夹不能移动到自身');
@@ -233,18 +234,37 @@ export default async function folderRoutes(app: FastifyInstance) {
   app.post('/api/folders/:id/restore', async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    const folder = await one<{ workspace_id: string }>('SELECT workspace_id FROM folders WHERE id = $1', [id]);
+    const folder = await one<{ workspace_id: string; trashed_at: Date | null }>(
+      'SELECT workspace_id, trashed_at FROM folders WHERE id = $1',
+      [id],
+    );
     if (!folder) throw errors.notFound('文件夹不存在');
     await requireWorkspace(auth.user.id, folder.workspace_id, 'write');
+    const trashedAt = folder.trashed_at ?? new Date();
     await transaction(async (client) => {
+      // Restore the whole ancestor chain; otherwise a restored child folder is
+      // invisible because its parent is still in the trash.
       await client.query(
-        `WITH RECURSIVE descendants AS (
-           SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
-           UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+        `WITH RECURSIVE ancestors AS (
+           SELECT id, parent_id FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION ALL
+           SELECT f.id, f.parent_id FROM folders f JOIN ancestors a ON f.id = a.parent_id
            WHERE f.workspace_id = $2
          )
-         UPDATE folders SET trashed_at = NULL WHERE id IN (SELECT id FROM descendants)`,
+         UPDATE folders SET trashed_at = NULL WHERE id IN (SELECT id FROM ancestors)`,
         [id, folder.workspace_id],
+      );
+      // Only restore descendants that were trashed with this folder. A child
+      // folder or note deleted separately before the parent must stay deleted.
+      await client.query(
+        `WITH RECURSIVE descendants AS (
+           SELECT id, trashed_at FROM folders WHERE id = $1 AND workspace_id = $2
+           UNION SELECT f.id, f.trashed_at FROM folders f JOIN descendants d ON f.parent_id = d.id
+           WHERE f.workspace_id = $2
+         )
+         UPDATE folders SET trashed_at = NULL
+         WHERE id IN (SELECT id FROM descendants WHERE id = $1 OR trashed_at >= $3)`,
+        [id, folder.workspace_id, trashedAt],
       );
       await client.query(
         `WITH RECURSIVE descendants AS (
@@ -252,8 +272,10 @@ export default async function folderRoutes(app: FastifyInstance) {
            UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
            WHERE f.workspace_id = $2
          )
-         UPDATE notes SET trashed_at = NULL WHERE folder_id IN (SELECT id FROM descendants)`,
-        [id, folder.workspace_id],
+         UPDATE notes SET trashed_at = NULL
+         WHERE folder_id IN (SELECT id FROM descendants)
+           AND trashed_at IS NOT NULL AND trashed_at >= $3`,
+        [id, folder.workspace_id, trashedAt],
       );
     });
     return { ok: true };
@@ -276,6 +298,16 @@ export default async function folderRoutes(app: FastifyInstance) {
        WHERE n.folder_id IN (SELECT id FROM descendants)`,
       [id, folder.workspace_id],
     );
+    const noteIds = await many<{ id: string }>(
+      `WITH RECURSIVE descendants AS (
+         SELECT id FROM folders WHERE id = $1 AND workspace_id = $2
+         UNION SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+         WHERE f.workspace_id = $2
+       )
+       SELECT id FROM notes WHERE folder_id IN (SELECT id FROM descendants)`,
+      [id, folder.workspace_id],
+    );
+    await cleanupNotesMedia(noteIds.map((row) => row.id));
     await transaction(async (client) => {
       await client.query(
         `WITH RECURSIVE descendants AS (

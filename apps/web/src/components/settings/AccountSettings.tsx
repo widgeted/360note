@@ -151,7 +151,15 @@ export default function AccountSettings() {
   async function exportData() {
     setExporting(true);
     try {
-      await api.post('/api/me/export');
+      const response = await api.post<{ jobId: string }>('/api/me/export');
+      let finished = false;
+      for (let attempt = 0; attempt < 300; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const job = await api.get<{ job: { status: string; error: string | null } }>(`/api/jobs/${response.jobId}`);
+        if (job.job.status === 'done') { finished = true; break; }
+        if (job.job.status === 'error') throw new Error(job.job.error ?? t('导出失败'));
+      }
+      if (!finished) throw new Error(t('导出仍在后台运行，请稍后查看邮箱。'));
       toast('success', t('导出链接已发送到你的邮箱'));
     } catch (error) {
       toast('error', t('导出失败'), (error as Error).message);

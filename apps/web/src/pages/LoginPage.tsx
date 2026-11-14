@@ -4,6 +4,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound } from 'lucid
 import { useAuthStore } from '../stores/auth';
 import { useT } from '../lib/i18n';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { hasPendingLocalData } from '../lib/offline';
 import { AuthLayout } from './AuthLayout';
 
 export default function LoginPage() {
@@ -27,6 +28,17 @@ export default function LoginPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    let sameCachedAccount = false;
+    try {
+      const cached = JSON.parse(localStorage.getItem('nh-auth-cache') ?? 'null') as { user?: { email?: string } } | null;
+      sameCachedAccount = cached?.user?.email?.toLowerCase() === email.trim().toLowerCase();
+    } catch {
+      /* storage can be unavailable */
+    }
+    if (!sameCachedAccount && await hasPendingLocalData()) {
+      const proceed = window.confirm(t('本机还有未同步的离线修改或草稿。继续登录其他账号会清除这些数据，且无法恢复。建议先回到原账号完成同步或导出。确定继续？'));
+      if (!proceed) return;
+    }
     setLoading(true);
     try {
       const result = await login(email, password);
@@ -179,7 +191,7 @@ export default function LoginPage() {
         {t('还没有账户？')} <Link to={`/register${next !== '/app' ? `?next=${encodeURIComponent(next)}` : ''}`}>{t('创建一个')}</Link>
       </p>
       <p className="auth-legal">
-        {t('我们只发送账户与安全相关邮件，不使用第三方分析。继续即表示你同意')}{' '}
+        {t('我们只发送账户与安全相关邮件；登录页不加载第三方分析脚本。继续即表示你同意')}{' '}
         <Link to="/terms">{t('服务条款')}</Link> {t('和')} <Link to="/privacy">{t('隐私政策')}</Link>。
       </p>
     </AuthLayout>

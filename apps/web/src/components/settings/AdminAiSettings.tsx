@@ -76,18 +76,18 @@ export function AdminAiSettings() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="field">
-            <label>{t('服务地址')}</label>
-            <input className="input mono" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" />
+            <label htmlFor="admin-ai-base-url">{t('服务地址')}</label>
+            <input id="admin-ai-base-url" className="input mono" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" />
             <span className="field-hint">{t('OpenAI 兼容的 /chat/completions 接口地址。')}</span>
           </div>
           <div className="field">
-            <label>{t('模型')}</label>
-            <input className="input mono" value={model} onChange={(event) => setModel(event.target.value)} placeholder="gpt-4.1-mini" />
+            <label htmlFor="admin-ai-model">{t('模型')}</label>
+            <input id="admin-ai-model" className="input mono" value={model} onChange={(event) => setModel(event.target.value)} placeholder="gpt-4.1-mini" />
           </div>
           <div className="field">
-            <label>{t('API Key')}</label>
+            <label htmlFor="admin-ai-key">{t('API Key')}</label>
             <div style={{ position: 'relative' }}>
-              <input className="input mono" type={showKey ? 'text' : 'password'} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings?.ai.hasApiKey ? t('已保存 Key（留空保持不变）') : 'sk-…'} autoComplete="off" style={{ paddingRight: 38 }} />
+              <input id="admin-ai-key" className="input mono" type={showKey ? 'text' : 'password'} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings?.ai.hasApiKey ? t('已保存 Key（留空保持不变）') : 'sk-…'} autoComplete="off" style={{ paddingRight: 38 }} />
               <button type="button" className="icon-btn icon-btn-sm" onClick={() => setShowKey((value) => !value)} style={{ position: 'absolute', right: 6, top: 7 }} aria-label={showKey ? t('隐藏') : t('显示')}>
                 {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
               </button>

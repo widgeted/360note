@@ -2281,7 +2281,7 @@ kbd {
   padding: 2px 7px;
   border-radius: 5px;
   background: var(--amber-soft);
-  color: var(--amber);
+  color: var(--amber-strong);
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;

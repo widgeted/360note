@@ -38,6 +38,15 @@ describe('crypto', () => {
       await fs.writeFile(legacyPath, encryptBuffer(plain.subarray(0, 8192), 'test:file'));
       await decryptFile(legacyPath, legacyOut, 'test:file');
       expect((await fs.readFile(legacyOut)).equals(plain.subarray(0, 8192))).toBe(true);
+
+      // Restores may overwrite an attachment that still exists; the write must
+      // be atomic and must not terminate the process on EEXIST/ENOSPC.
+      const overwrite = path.join(dir, 'overwrite.bin');
+      await fs.writeFile(overwrite, 'old contents');
+      await encryptFile(plainPath, overwrite, 'test:file');
+      await decryptFile(overwrite, overwrite, 'test:file');
+      expect((await fs.readFile(overwrite)).equals(plain)).toBe(true);
+      await expect(encryptFile(plainPath, path.join(dir, 'missing', 'x.bin'), 'test:file')).rejects.toThrow();
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

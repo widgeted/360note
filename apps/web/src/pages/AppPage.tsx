@@ -20,6 +20,7 @@ import { applyCustomTemplate, type CustomTemplate } from '../lib/templates';
 import { cn } from '../lib/utils';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { toast } from '../stores/toast';
+import { isLocalNote } from '../stores/app';
 
 export default function AppPage() {
   const t = useT();
@@ -52,8 +53,15 @@ export default function AppPage() {
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const canSplit = useMediaQuery('(min-width: 1280px)');
-  const [splitEnabled, setSplitEnabled] = useState(() => canSplit && localStorage.getItem('nh-split-enabled') === '1');
-  const [splitOtherId, setSplitOtherId] = useState<string | null>(() => localStorage.getItem('nh-split-other'));
+  const [splitEnabled, setSplitEnabled] = useState(() => {
+    try {
+      return canSplit && localStorage.getItem('nh-split-enabled') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [splitOtherId, setSplitOtherId] = useState<string | null>(null);
+  const splitWorkspaceRef = useRef<string | null>(null);
   const [splitActivePane, setSplitActivePane] = useState<0 | 1>(0);
   const [referencePickerOpen, setReferencePickerOpen] = useState(false);
   const flushSplitRef = useRef<(() => Promise<void>) | null>(null);
@@ -111,7 +119,8 @@ export default function AppPage() {
 
   useEffect(() => {
     if (!workspaces.length) return;
-    const stored = localStorage.getItem('nh-workspace');
+    let stored: string | null = null;
+    try { stored = localStorage.getItem('nh-workspace'); } catch { /* private mode */ }
     const valid =
       workspaces.find((workspace) => workspace.id === stored) ??
       workspaces.find((workspace) => workspace.kind === 'personal') ??
@@ -129,10 +138,35 @@ export default function AppPage() {
   }, [note?.id, requestedPanel, setContextTab]);
 
   useEffect(() => {
-    localStorage.setItem('nh-split-enabled', splitEnabled ? '1' : '0');
-    if (splitOtherId) localStorage.setItem('nh-split-other', splitOtherId);
-    else localStorage.removeItem('nh-split-other');
-  }, [splitEnabled, splitOtherId]);
+    if (!workspaceId || splitWorkspaceRef.current !== workspaceId) return;
+    try {
+      localStorage.setItem('nh-split-enabled', splitEnabled ? '1' : '0');
+      if (splitOtherId) localStorage.setItem(`nh-split-other:${workspaceId}`, splitOtherId);
+      else localStorage.removeItem(`nh-split-other:${workspaceId}`);
+    } catch {
+      /* storage may be unavailable */
+    }
+  }, [splitEnabled, splitOtherId, workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    if (splitWorkspaceRef.current && splitWorkspaceRef.current !== workspaceId) {
+      // Reference notes are workspace-scoped. Never carry one across spaces.
+      setSplitOtherId(null);
+      setSplitEnabled(false);
+      setSplitActivePane(0);
+      
+    }
+    splitWorkspaceRef.current = workspaceId;
+    let stored: string | null = null;
+    try {
+      localStorage.setItem('nh-split-enabled', splitEnabled ? '1' : '0');
+      stored = localStorage.getItem(`nh-split-other:${workspaceId}`);
+    } catch {
+      /* private mode */
+    }
+    if (stored) setSplitOtherId((current) => current ?? stored);
+  }, [workspaceId]);
 
   useEffect(() => {
     if (initialSplitCheckDone.current) return;
@@ -218,6 +252,10 @@ export default function AppPage() {
       toast('warning', t('窗口太窄，无法开启分屏参考'));
       return;
     }
+    if (isLocalNote(selectedId)) {
+      toast('info', t('离线笔记同步后才能作为参考'));
+      return;
+    }
     if (selectedId === noteId) {
       toast('info', t('这篇笔记正在编辑区'));
       return;
@@ -237,6 +275,10 @@ export default function AppPage() {
   function openAsReference(selectedId: string) {
     if (!canSplit) {
       toast('warning', t('窗口太窄，无法开启分屏参考'));
+      return;
+    }
+    if (isLocalNote(selectedId)) {
+      toast('info', t('离线笔记同步后才能作为参考'));
       return;
     }
     if (selectedId === noteId) {

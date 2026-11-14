@@ -17,6 +17,7 @@ import { createSession, listSessions, notify, revokeAllApiTokens, revokeAllSessi
 import { createNote } from '../services/notes.js';
 import { consumeEmailCode, issueEmailCode } from '../services/email-codes.js';
 import { normalizeLocale, sendEmailChangedEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../lib/mailer.js';
+import { pdfExportAvailable } from '../services/export.js';
 
 const loginSchema = z.object({ email: emailSchema, password: z.string().min(1).max(200) });
 const DUMMY_HASH = 'scrypt$32768$8$1$gRxMaJTRQkB0QqlmAreJig==$4AG/OI/xhWzP1TphsbW8eyTGejxShutVOdeL7HTTnOoXnnmiP3rNeyD8ww7J6QPn1bkbUvNFkkKv66iTEmSxpQ==';
@@ -96,6 +97,7 @@ function authPayload(user: DbUser, workspaces: Awaited<ReturnType<typeof workspa
       registrationMode: config.registrationMode,
       aiEnabled: config.ai.enabled,
       ocrEnabled: config.ocrEnabled,
+      pdfExportEnabled: pdfExportAvailable(),
       maxUploadBytes: config.maxUploadBytes,
       publicOrigin: config.publicOrigin,
     },

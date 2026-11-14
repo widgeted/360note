@@ -30,8 +30,11 @@ import accountRoutes from './routes/account.js';
 import templateRoutes from './routes/templates.js';
 import { resumePendingOcr } from './lib/ocr.js';
 import { getSiteHeadCode } from './services/site.js';
+import { pdfExportAvailable } from './services/export.js';
 import { recoverInterruptedJobs } from './lib/jobs.js';
 import { cleanupImportUploads, runAutoBackups } from './services/backups.js';
+import { purgeExpiredTrash } from './services/notes.js';
+import { cleanupOperationalData } from './services/maintenance.js';
 import { runInstanceAutoBackup, runScheduledRestoreDrill } from './services/instance-backups.js';
 
 const PUBLIC_HEAD_PATHS = new Set([
@@ -41,8 +44,6 @@ const PUBLIC_HEAD_PATHS = new Set([
   '/about.html',
   '/privacy',
   '/terms',
-  '/login',
-  '/register',
 ]);
 
 function shouldInjectHead(url: string): boolean {
@@ -114,16 +115,49 @@ function buildDocumentCsp(headCode: string): string {
   ].join('; ');
 }
 
-async function sendAppShell(reply: FastifyReply, url: string) {
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function localizeShell(html: string, url: string, hostValue: string | undefined): string {
+  const host = (hostValue ?? '').split(',')[0].trim().toLowerCase();
+  const chinese = host.endsWith('360biji.com') || host === 'localhost' || host === '127.0.0.1';
+  const locale = chinese ? 'zh-CN' : 'en';
+  const title = chinese ? '360笔记 — 把想法留下，把知识连起来' : '360note — Keep ideas, connect knowledge';
+  const description = chinese
+    ? '360笔记：一个安静、快速、本地优先的笔记空间。记录想法，建立联系，发布作品。'
+    : '360note: a calm, fast, local-first notebook for ideas, knowledge and publishing.';
+  const origin = chinese ? 'https://360biji.com' : 'https://360note.com';
+  const path = url.split('?')[0].split('#')[0] || '/';
+  const canonical = `${origin}${path === '/' ? '/' : path.replace(/\/+$/, '')}`;
+  const manifest = chinese ? '/manifest-zh.webmanifest' : '/manifest-en.webmanifest';
+  let output = html
+    .replace(/<html lang="[^"]*"/i, `<html lang="${locale}"`)
+    .replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`)
+    .replace(/(<meta name="description" content=")[^"]*(")/i, `$1${escapeHtml(description)}$2`)
+    .replace(/(<meta property="og:title" content=")[^"]*(")/i, `$1${escapeHtml(title)}$2`)
+    .replace(/(<meta property="og:description" content=")[^"]*(")/i, `$1${escapeHtml(description)}$2`)
+    .replace(/(<meta property="og:url" content=")[^"]*(")/i, `$1${escapeHtml(canonical)}$2`)
+    .replace(/(<meta name="twitter:title" content=")[^"]*(")/i, `$1${escapeHtml(title)}$2`)
+    .replace(/(<meta name="twitter:description" content=")[^"]*(")/i, `$1${escapeHtml(description)}$2`)
+    .replace(/(<meta name="apple-mobile-web-app-title" content=")[^"]*(")/i, `$1${chinese ? '360笔记' : '360note'}$2`)
+    .replace('</head>', `  <link rel="canonical" data-nh-seo="true" href="${escapeHtml(canonical)}" />\n  <link rel="alternate" data-nh-seo="true" hreflang="zh-CN" href="https://360biji.com${path}" />\n  <link rel="alternate" data-nh-seo="true" hreflang="en" href="https://360note.com${path}" />\n  <link rel="alternate" data-nh-seo="true" hreflang="x-default" href="https://360note.com${path}" />\n  <link rel="manifest" href="${manifest}" />\n  </head>`);
+  return output.replace('<link rel="manifest" href="/manifest.webmanifest">', '');
+}
+
+async function sendAppShell(reply: FastifyReply, url: string, host?: string) {
   const html = readShellHtml();
   if (!html) return reply.status(503).send('360note web build not found');
+  const localized = localizeShell(html, url, host);
   const injected = shouldInjectHead(url) ? (await getSiteHeadCode()).trim() : '';
-  const body = injected ? html.replace('</head>', `${injected}\n  </head>`) : html;
-  return reply
+  const body = injected ? localized.replace('</head>', `${injected}\n  </head>`) : localized;
+  const response = reply
     .header('Cache-Control', 'no-cache, no-store, must-revalidate')
-    .header('Content-Security-Policy', buildDocumentCsp(injected))
-    .type('text/html; charset=utf-8')
-    .send(body);
+    .header('Content-Security-Policy', buildDocumentCsp(injected));
+  // Share pages are capabilities, not public marketing pages. Keep them out
+  // of search indexes on both domains even when Nginx serves the shell.
+  if (url.split('?')[0].startsWith('/s/')) response.header('X-Robots-Tag', 'noindex');
+  return response.type('text/html; charset=utf-8').send(body);
 }
 
 async function buildServer() {
@@ -196,6 +230,7 @@ async function buildServer() {
     registrationMode: config.registrationMode,
     aiEnabled: config.ai.enabled,
     ocrEnabled: config.ocrEnabled,
+    pdfExportEnabled: pdfExportAvailable(),
     maxUploadBytes: config.maxUploadBytes,
     publicOrigin: config.publicOrigin,
     brand: '360note',
@@ -240,10 +275,10 @@ async function buildServer() {
     if (request.url.startsWith('/assets/') || /\.(?:js|css|woff2?|png|jpe?g|svg|ico|webmanifest|map)$/i.test(request.url)) {
       return reply.status(404).send('Not found');
     }
-    return sendAppShell(reply, request.url);
+    return sendAppShell(reply, request.url, (request.headers['x-forwarded-host'] as string | undefined) ?? request.headers.host);
   });
 
-  app.get('/index.html', async (request, reply) => sendAppShell(reply, request.url));
+  app.get('/index.html', async (request, reply) => sendAppShell(reply, request.url, (request.headers['x-forwarded-host'] as string | undefined) ?? request.headers.host));
 
   if (fs.existsSync(config.webDist)) {
     await app.register(fastifyStatic, {
@@ -305,6 +340,24 @@ async function start() {
   setInterval(() => {
     void cleanupImportUploads();
   }, 6 * 60 * 60 * 1000).unref();
+  const purgeTrash = () => {
+    void purgeExpiredTrash()
+      .then((result) => {
+        if (result.notes || result.folders || result.attachments) {
+          app.log.info(result, 'expired trash purged');
+        }
+      })
+      .catch((error) => app.log.error({ error }, 'trash purge failed'));
+  };
+  purgeTrash();
+  setInterval(purgeTrash, 6 * 60 * 60 * 1000).unref();
+  const cleanupOperational = () => {
+    void cleanupOperationalData()
+      .then((result) => app.log.info(result, 'operational data cleaned'))
+      .catch((error) => app.log.error({ error }, 'operational cleanup failed'));
+  };
+  cleanupOperational();
+  setInterval(cleanupOperational, 24 * 60 * 60 * 1000).unref();
   setInterval(() => {
     void runScheduledRestoreDrill().catch((error) => app.log.error({ error }, 'scheduled restore drill failed'));
   }, 60 * 60 * 1000).unref();

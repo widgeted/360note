@@ -7,7 +7,7 @@
 - 中文版：<https://360biji.com>
 - English: <https://360note.com>
 - 仓库：<https://github.com/widgeted/360note>
-- 版本：0.2.5
+- 版本：0.2.6
 
 两个域名共用同一套账户、笔记、附件与团队空间；域名只决定界面与邮件语言。
 
@@ -20,6 +20,7 @@
 - **整理**：文件夹、标签、收藏/置顶、全文搜索（标题/正文/标签/附件名/OCR）、双向链接。
 - **多端**：桌面三栏、移动单屏、可安装 PWA；快速捕获、网页剪藏、模板、快捷键。
 - **分享与协作**：只读、评论、可编辑分享链接，支持密码与有效期；团队空间提供 owner / admin / editor / viewer 角色、邀请、审计与所有权转移。
+- **实例站点代码**：实例管理 → 站点，仅在公开营销页注入搜索引擎验证/统计代码；登录、注册、应用和分享页不执行第三方脚本。
 - **安全**：TLS、scrypt、2FA、登录设备、恢复密钥、审计；附件与备份 AES-256-GCM 加密。当前**不提供 E2EE**，服务器可读正文以支持搜索、分享与备份。
 - **数据可携带**：单篇 Markdown/HTML/PDF；全库 Markdown + 附件/HTML/JSON；导入 Markdown/HTML/Evernote/Notion/CSV/JSON。
 - **备份**：自动/手动/恢复前备份、下载/上传、恢复预览、合并/替换与时间点恢复、可选 S3 兼容异地备份。
@@ -81,7 +82,7 @@ curl -fsS https://360note.com/health
 
 生产形态：
 
-- Nginx 终止 TLS 并直接提供 `apps/web/dist` 静态文件；`/api/` 与 `/health` 反向代理到 `127.0.0.1:8787`。
+- Nginx 终止 TLS，已存在的静态文件（assets、图标、robots、sitemap、IndexNow key）直接读取 `apps/web/dist`；HTML 入口与 SPA 路由通过 `try_files $uri @node` 交给 Node 输出，以便按域名本地化 `<head>` 并注入实例管理员配置的验证/统计代码。`/api/` 与 `/health` 反向代理到 `127.0.0.1:8787`。
 - systemd 以 `note360` 用户运行 API。
 - PostgreSQL 本地数据库 `note360`。
 - 数据在 `/var/lib/360note`（0700）。

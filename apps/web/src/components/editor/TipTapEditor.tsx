@@ -726,6 +726,9 @@ export function TipTapEditor({
         attributes: {
           class: 'prose',
           spellcheck: spellcheck ? 'true' : 'false',
+          role: 'textbox',
+          'aria-multiline': 'true',
+          'aria-label': t('正文'),
         },
       },
     });

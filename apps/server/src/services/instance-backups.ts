@@ -1,5 +1,5 @@
 import AdmZip from 'adm-zip';
-import archiver from 'archiver';
+import { createZipArchive } from '../lib/zip-archive.js';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
@@ -111,7 +111,7 @@ export async function createInstanceBackup(userId: string): Promise<{ id: string
     }
     const archivePath = path.join(tempDir, 'archive.zip');
     const output = fsSync.createWriteStream(archivePath, { mode: 0o600, flags: 'wx' });
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = createZipArchive();
     const finished = new Promise<void>((resolve, reject) => {
       output.on('close', () => resolve());
       output.on('error', reject);

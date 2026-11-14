@@ -11,6 +11,7 @@ import './styles/pages.css';
 import './styles/landing.css';
 import './styles/responsive.css';
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { initializeTheme } from './lib/theme';
 import { getLocale } from './lib/i18n';
 
@@ -28,10 +29,20 @@ initializeTheme();
 const chinese = getLocale() === 'zh-CN';
 document.title = chinese ? '360笔记 — 把想法留下，把知识连起来' : '360note — Keep ideas, connect knowledge';
 
+window.addEventListener('unhandledrejection', (event) => {
+  // Keep a diagnostic trail without hiding the error from devtools.
+  console.error('[ui] unhandled promise rejection', event.reason);
+});
+window.addEventListener('error', (event) => {
+  if (event.error) console.error('[ui] uncaught error', event.error);
+});
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

@@ -104,6 +104,16 @@ export default defineConfig({
         globIgnores: ['**/index.html'],
         runtimeCaching: [
           {
+            // Thumbnails are small and make offline reading work. Never cache
+            // full attachments or API JSON in the service worker.
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/attachments/') && url.searchParams.get('thumb') === '1',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'attachment-thumbnails',
+              expiration: { maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 }
+            }
+          },
+          {
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
             options: {
@@ -137,6 +147,15 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined;
+          // Keep React out of the editor chunk. Otherwise the entry imports
+          // the editor vendor just to get React, and every landing-page visitor
+          // downloads TipTap/ProseMirror/highlight before the first paint.
+          if (
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/scheduler/') ||
+            id.includes('/node_modules/zustand/')
+          ) return 'react-vendor';
           if (id.includes('@tiptap')) return 'tiptap';
           if (id.includes('prosemirror')) return 'prosemirror';
           if (id.includes('lowlight') || id.includes('highlight.js')) return 'highlight';

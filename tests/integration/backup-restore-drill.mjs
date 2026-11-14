@@ -112,7 +112,10 @@ async function main() {
     body: { email, displayName: 'Drill user', password, emailCode: '333333' },
   });
   assert.equal(registered.status, 200, registered.text);
-  const cookie = registered.headers.get('set-cookie').split(';')[0];
+  const setCookies = typeof registered.headers.getSetCookie === 'function'
+    ? registered.headers.getSetCookie()
+    : [registered.headers.get('set-cookie') ?? ''];
+  const cookie = (setCookies.find((value) => value.includes('nh_session')) ?? setCookies[0] ?? '').split(';')[0];
   const workspace = registered.json.workspaces.find((entry) => entry.kind === 'personal');
   assert.ok(workspace?.id);
 
@@ -152,6 +155,34 @@ async function main() {
   assert.equal(download.status, 200);
   const archive = Buffer.from(await download.arrayBuffer());
   assert.ok(archive.length > 100, 'downloaded archive is empty');
+
+  // Replace over a live workspace with an existing attachment. This is the
+  // exact path that used to fail with EEXIST before atomic file replacement.
+  const liveForm = new FormData();
+  liveForm.append('file', new Blob([archive], { type: 'application/zip' }), 'drill-live.3nb');
+  const liveUploadResponse = await fetch(`${base}/api/workspaces/${workspace.id}/backups/upload`, {
+    method: 'POST',
+    headers: { cookie, 'x-360note-csrf': '1' },
+    body: liveForm,
+  });
+  const liveUpload = await liveUploadResponse.json();
+  assert.equal(liveUploadResponse.status, 200, JSON.stringify(liveUpload));
+  const liveRestore = await req(`/api/backups/uploads/${liveUpload.uploadId}/restore`, {
+    method: 'POST',
+    cookie,
+    body: { mode: 'replace' },
+  });
+  assert.equal(liveRestore.status, 200, liveRestore.text);
+  const liveJob = await waitForJob(cookie, liveRestore.json.jobId);
+  assert.equal(liveJob.status, 'done', JSON.stringify(liveJob));
+  const liveNote = await req(`/api/notes/${noteId}`, { cookie });
+  assert.equal(liveNote.status, 200);
+  const liveAttachment = liveNote.json.note.attachments?.find((entry) => entry.filename === 'marker.txt');
+  assert.ok(liveAttachment?.id);
+  const liveContent = await fetch(`${base}/api/attachments/${liveAttachment.id}/content`, { headers: { cookie } });
+  assert.equal(liveContent.status, 200);
+  assert.equal(await liveContent.text(), 'attachment-restore-marker');
+  console.log('PASS  live workspace replace restore keeps existing attachments readable');
 
   const trashed = await req(`/api/notes/${noteId}`, { method: 'DELETE', cookie });
   assert.equal(trashed.status, 200, trashed.text);

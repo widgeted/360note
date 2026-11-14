@@ -11,6 +11,8 @@ import {
   Link2,
   Link2Off,
   LockKeyhole,
+  Eye as EyeIcon,
+  EyeOff,
   MessageCircle,
   Plus,
   ShieldAlert,
@@ -30,12 +32,14 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
   const [permission, setPermission] = useState<SharePermission>('view');
   const [advanced, setAdvanced] = useState(false);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [expiry, setExpiry] = useState('never');
   const [customDate, setCustomDate] = useState('');
   const [creating, setCreating] = useState(false);
   const [newShare, setNewShare] = useState<ShareLink | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [revokeId, setRevokeId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -46,11 +50,12 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
     setCustomDate('');
     setAdvanced(false);
     setRevokeId(null);
+    setLoadError(null);
     setLoading(true);
     api
       .get<{ shares: ShareLink[] }>(`/api/notes/${note.id}/shares`)
       .then((response) => setShares(response.shares))
-      .catch(() => {})
+      .catch((error: Error) => setLoadError(error.message))
       .finally(() => setLoading(false));
   }, [open, note.id]);
 
@@ -110,7 +115,10 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
     }
   }
 
-  const activeShares = shares.filter((share) => !share.revokedAt);
+  const activeShares = shares.filter((share) => {
+    if (share.revokedAt) return false;
+    return !share.expiresAt || new Date(share.expiresAt).getTime() > Date.now();
+  });
   const customExpiryValid = expiry !== 'custom' || Boolean(customDate && new Date(customDate).getTime() > Date.now());
 
   return (
@@ -168,8 +176,24 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
           {advanced && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }} className="share-advanced">
               <div className="field">
-                <label>{t('链接密码（可选）')}</label>
-                <input className="input" type="text" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t('留空则不需要密码')} autoComplete="off" />
+                <label htmlFor="share-password">{t('链接密码（可选）')}</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="share-password"
+                    className="input"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder={t('至少 8 位，留空则不需要密码')}
+                    autoComplete="new-password"
+                    minLength={8}
+                    style={{ paddingRight: 38 }}
+                  />
+                  <button type="button" className="icon-btn icon-btn-sm" onClick={() => setShowPassword((value) => !value)} style={{ position: 'absolute', right: 5, top: 5 }} aria-label={showPassword ? t('隐藏密码') : t('显示密码')}>
+                    {showPassword ? <EyeOff size={13} /> : <EyeIcon size={13} />}
+                  </button>
+                </div>
+                {password && password.length < 8 && <span className="field-hint">{t('密码至少 8 位')}</span>}
               </div>
               <div className="field">
                 <label>{t('过期时间')}</label>
@@ -188,7 +212,7 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
-            <button type="button" className="btn btn-primary" onClick={create} disabled={creating || !customExpiryValid}>
+            <button type="button" className="btn btn-primary" onClick={create} disabled={creating || !customExpiryValid || Boolean(password && password.length < 8)}>
               {creating ? <span className="spinner" /> : <Plus size={14} />}
               {t('创建分享链接')}
             </button>
@@ -218,6 +242,8 @@ export function ShareDialog({ note, open, onClose }: { note: Note; open: boolean
             </div>
             {loading ? (
               <div className="loading-row"><span className="spinner" /> {t('加载中…')}</div>
+            ) : loadError ? (
+              <div className="form-error">{loadError}</div>
             ) : shares.length === 0 ? (
               <div className="context-empty">{t('还没有分享链接。选择权限后点击“创建分享链接”。')}</div>
             ) : (

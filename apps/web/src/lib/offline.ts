@@ -1,4 +1,4 @@
-import { clear, del, get, set } from 'idb-keyval';
+import { clear, del, get, keys, set } from 'idb-keyval';
 import type { Folder, Note, NoteSummary, Tag } from '@360note/shared';
 
 const PREFIX = 'nh:v1:';
@@ -34,6 +34,8 @@ export interface Draft {
   contentMd: string;
   baseVersion: number;
   updatedAt: number;
+  failedAt?: number;
+  lastError?: string;
 }
 
 export interface OutboxItem extends Draft {
@@ -124,6 +126,17 @@ export async function clearDraft(noteId: string): Promise<void> {
   }
 }
 
+export async function hasPendingLocalData(): Promise<boolean> {
+  try {
+    const outbox = await readOutbox();
+    if (outbox.length > 0) return true;
+    const allKeys = await keys();
+    return allKeys.some((key) => typeof key === 'string' && key.startsWith(`${PREFIX}draft:`));
+  } catch {
+    return false;
+  }
+}
+
 export async function readOutbox(): Promise<OutboxItem[]> {
   try {
     return (await get<OutboxItem[]>(`${PREFIX}outbox`)) ?? [];
@@ -143,11 +156,31 @@ export async function enqueueOutbox(item: OutboxItem): Promise<void> {
         ...item,
         baseVersion: Math.min(items[existingIndex].baseVersion, item.baseVersion),
         createdAt: items[existingIndex].createdAt,
+        failedAt: undefined,
+        lastError: undefined,
       };
     } else {
       items.push(item);
     }
     await set(`${PREFIX}outbox`, items);
+  });
+}
+
+export async function markOutboxFailed(id: string, error: string): Promise<void> {
+  await withOutboxLock(async () => {
+    const items = await readOutbox();
+    await set(`${PREFIX}outbox`, items.map((entry) => entry.id === id
+      ? { ...entry, attempts: entry.attempts + 1, failedAt: Date.now(), lastError: error.slice(0, 500) }
+      : entry));
+  });
+}
+
+export async function retryFailedOutbox(): Promise<number> {
+  return withOutboxLock(async () => {
+    const items = await readOutbox();
+    const failed = items.filter((entry) => entry.failedAt);
+    await set(`${PREFIX}outbox`, items.map((entry) => entry.failedAt ? { ...entry, failedAt: undefined, lastError: undefined, attempts: 0 } : entry));
+    return failed.length;
   });
 }
 
@@ -236,10 +269,18 @@ export async function clearSensitiveLocalData(): Promise<void> {
     /* IndexedDB may be unavailable in private mode */
   }
   try {
-    const keysToRemove: string[] = ['nh-auth-cache', 'nh-workspace', 'nh-guest-name'];
+    if ('caches' in window) {
+      const names = await caches.keys();
+      await Promise.all(names.filter((name) => name === 'attachment-thumbnails' || name === 'html-navigations').map((name) => caches.delete(name)));
+    }
+  } catch {
+    /* CacheStorage may be unavailable */
+  }
+  try {
+    const keysToRemove: string[] = ['nh-auth-cache', 'nh-workspace', 'nh-guest-name', 'nh-split-enabled', 'nh-split-other'];
     for (let index = localStorage.length - 1; index >= 0; index -= 1) {
       const key = localStorage.key(index);
-      if (key?.startsWith('nh-editor-mode:')) keysToRemove.push(key);
+      if (key?.startsWith('nh-editor-mode:') || key?.startsWith('nh-split-other:')) keysToRemove.push(key);
     }
     for (const key of keysToRemove) localStorage.removeItem(key);
   } catch {

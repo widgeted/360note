@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-11-14 · 全站质量审查修复（0.2.6）
+
+### 背景
+
+一次全仓质量审查覆盖服务端 81 文件、Web 89 文件、public 资源、48 测试脚本、49 文档与 deploy 配置，按 P0/P1/P2/P3 分级后要求根因修复、复用既有组件、列表必须分页。执行顺序：安全/数据 → 离线/一致性 → UI → 性能/工程 → 文档/回归。
+
+### 关键结论与修复
+
+- 备份是最高风险面。原文可被实例管理员通过对象存储浏览下载；恢复也会越过空间成员权限。现在工作区备份只对所属空间管理员开放，整站备份需 `x-360note-break-glass: INSTANCE_BACKUP` 并审计。
+- `encryptFile` 用 `fs.createWriteStream` 时没有 `error` 监听，`EEXIST/ENOSPC` 会变成未捕获异常杀死进程。改为 FileHandle + 临时文件 + 原子 rename；活工作区覆盖恢复测试已加入集成脚本。
+- `archiver@8` 是纯 ESM，默认导出不存在；用 `createZipArchive()` 适配层集中处理，避免四个服务文件各写一份兼容代码。
+- 检索/列表只需要摘要字段；把 `n.*` 整体查询拆成 `SUMMARY_FIELDS` 与 `NOTE_SELECT`，避免每行都传正文。
+- 离线 outbox 的永久失败项以前会阻塞整个队列。现在标记 `failedAt` 跳过并保留重试；账号切换/注册前检测本地草稿。
+- 移动断点 900px 对 1024/1280 三栏太窄，提前到 1439px；工具栏改为“核心 + 更多格式”，390px 无溢出。
+- 站点代码注入范围收窄到营销页，登录/注册不再执行第三方脚本；分享页双域名 `noindex`，note.com `/s/` 由 Nginx 加 CSP。
+- 长任务 job 化：实例备份、用户导出返回 `jobId`，前端轮询；避免同步 HTTP 超时。
+- PWA 缩略图离线缓存 + 预取；`index.html` 不预缓存，导航 NetworkFirst。
+
+### 生产变更
+
+- Chromium 安装在 `/var/lib/360note/chromium/chrome-linux64/chrome`，`/etc/360note/360note.env` 已设 `CHROMIUM_PATH`；PDF 实测 200。
+- Nginx：静态文件优先，HTML 走 `try_files $uri @node`；`manifest-(en|zh).webmanifest` 返回 `application/manifest+json`；note.com `/s/` 增加 CSP/noindex。配置备份在 `/root/*.conf.bak-*`。
+- 站点代码默认内置百度验证 meta；注入页面已排除 `/login`、`/register`。
+- 新建 `TRASH_RETENTION_DAYS=30` 配置。
+
+### 验证
+
+- typecheck、服务端 13 单测、前端 6 单测、build 通过。
+- 备份恢复集成：创建/预览/下载/删除、上传恢复附件、活工作区替换恢复、job 幂等全部 PASS。
+- 生产实测：`/health`、双域名 head/manifest、分享 noindex+CSP、PDF、管理员用户分页/搜索、工作区备份下载 403、整站备份 break-glass 403/200。
+- 剩余 3 个生产 moderate 依赖告警来自 archiver 上游，无 high/critical。
+
+### 未完成/需人工验证
+
+- 真机 iOS/Android 键盘遮挡、1 万篇压测、真实 SMTP 与大库备份。
+- 生产版本号曾长期保持 0.2.5，本次统一 bump 到 0.2.6。
+
+---
+
 ## 2026-11-07 · 项目起点与架构定稿
 
 ### 背景

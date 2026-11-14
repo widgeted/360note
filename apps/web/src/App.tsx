@@ -28,12 +28,12 @@ function Splash() {
         minHeight: '100dvh',
         display: 'grid',
         placeItems: 'center',
-        background: 'var(--ink-950)',
-        color: 'var(--sidebar-muted)',
+        background: 'var(--paper-100)',
+        color: 'var(--text-secondary)',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-        <LogoLockup inverse />
+        <LogoLockup />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
           <span className="spinner" />
           {getLocale() === 'zh-CN' ? '正在加载 360笔记…' : 'Loading 360note…'}
@@ -124,6 +124,7 @@ export default function App() {
       void state.refreshList({ silent: true });
       void state.refreshFolders();
       void state.refreshTags();
+      if (state.pendingCount || state.failedOutboxCount) void state.flushOutbox();
     };
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refresh();

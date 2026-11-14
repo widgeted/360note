@@ -406,7 +406,7 @@ a.btn {
 .badge-amber {
   background: var(--amber-soft);
   border-color: transparent;
-  color: var(--amber);
+  color: var(--amber-strong);
 }
 
 .badge-red {

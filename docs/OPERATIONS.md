@@ -271,6 +271,7 @@ curl -fsS https://360note.com/health
 
 - 应用内调度：每天约 03:15，最多每 6 小时检查一次；每工作区。
 - 保留：14 份自动 + 30 天（`BACKUP_RETENTION_DAYS`）。
+- 回收站：默认 30 天自动清理（`TRASH_RETENTION_DAYS`，服务启动后每 6 小时检查一次）。
 - 备份文件：`/var/lib/360note/backups/*.3nb`，AES-256-GCM 加密。
 - 备份包含：notes/folders/tags/versions/comments/attachments。不含分享链接/API token/密码。
 - **默认在同一服务器**：管理员可在 实例管理→存储管理 配置 S3 兼容存储；仍建议定期下载。

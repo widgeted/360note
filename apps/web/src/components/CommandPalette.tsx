@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
@@ -36,6 +36,7 @@ import { getStoredTheme, storeTheme } from '../lib/theme';
 import { useIsMobile } from '../lib/useMediaQuery';
 import { formatNoteDate, shortcutLabel } from '../lib/utils';
 import { toast } from '../stores/toast';
+import { useFocusTrap } from '../lib/useFocusTrap';
 
 interface PaletteCommand {
   id: string;
@@ -65,6 +66,8 @@ export function CommandPalette() {
   const [query, setQueryValue] = useState('');
   const [results, setResults] = useState<NoteSummary[]>([]);
   const [searching, setSearching] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open, () => setOpen(false));
 
   useEffect(() => {
     if (!open) {
@@ -343,7 +346,7 @@ export function CommandPalette() {
         if (event.target === event.currentTarget) close();
       }}
     >
-      <Command className="cmdk" label={t('命令面板')} loop shouldFilter={false}>
+      <Command ref={panelRef} className="cmdk" label={t('命令面板')} role="dialog" aria-modal="true" aria-label={t('命令面板')} loop shouldFilter={false}>
         <div className="cmdk-input-row">
           <Search size={16} />
           <Command.Input

@@ -748,7 +748,9 @@ export function OffsiteSettings({ mode = 'all' }: { mode?: 'all' | 'attachment' 
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => void verifyObject(object.key)}>{t('校验')}</button>
-                      <a className="icon-btn icon-btn-sm" href={`/api/admin/offsite/objects/download?key=${encodeURIComponent(object.key)}`} title={t('下载')} aria-label={t('下载')}><Download size={13} /></a>
+                      {object.kind !== 'workspace-backup' && object.kind !== 'instance-backup' && (
+                        <a className="icon-btn icon-btn-sm" href={`/api/admin/offsite/objects/download?key=${encodeURIComponent(object.key)}`} title={t('下载')} aria-label={t('下载')}><Download size={13} /></a>
+                      )}
                       {object.kind === 'workspace-backup' && (
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRestoreKey(object.key)} disabled={restoring === object.key}>
                           {restoring === object.key ? <span className="spinner" /> : null} {t('恢复为副本')}
@@ -762,7 +764,7 @@ export function OffsiteSettings({ mode = 'all' }: { mode?: 'all' | 'attachment' 
             </tbody>
           </table>
         </div>
-        <p className="setting-note" style={{ marginTop: 8 }}>{t('整站备份只支持校验和下载，数据库级恢复请按运维手册执行。')}</p>
+        <p className="setting-note" style={{ marginTop: 8 }}>{t('备份归档包含笔记正文，不能在实例对象浏览中下载；工作区备份由空间管理员在“数据与备份”中下载或恢复。整站备份按运维手册处理。')}</p>
       </div>}
       <ConfirmDialog
         open={Boolean(restoreKey)}

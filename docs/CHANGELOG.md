@@ -3,6 +3,49 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.2.6] — 2026-11-14
+
+全站质量审查后的根因修复：安全边界、备份恢复可靠性、离网一致性、列表分页、移动布局、首屏性能与可访问性。所有页面统一复用既有组件与 token，未新增页面级样式分叉。
+
+### Security
+
+- **备份越权**：实例对象存储浏览不再允许下载 `.3nb` / `.nhbackup` 工作区备份正文；只有备份所属空间的管理员能在“数据与备份”中下载或恢复。整站备份下载改为显式 break-glass 请求头并写入审计。
+- **恢复边界**：从对象存储恢复工作区备份时，请求者必须同时是该空间的 `manage` 成员，避免实例管理员绕过空间权限。
+- **分享**：密码最低 8 位并使用 `password` 输入 + 显示切换；移除 URL 查询令牌（仅 cookie）；公开页只暴露正文实际引用的附件；撤销/删除分享时清理未加密媒体副本；两域名分享页 `noindex`，note.com `/s/` 增加 CSP。
+- **渲染**：DOMPurify 禁止 `style` 属性，避免公开分享页被固定定位内容伪装 UI。
+- **依赖**：`sharp` 升至 `0.35.5`，`archiver` 升至 `8.0.0`（新增 ESM 适配层）；生产 high/critical 为 0，剩余 3 个 moderate（`archiver`/`readdir-glob`/`minimatch` 上游）。
+
+### Fixed
+
+- **备份恢复崩溃**：`encryptFile` / `decryptFile` 改为 FileHandle + 临时文件 + 原子 `rename`，并显式处理写文件错误；覆盖已有附件或目标目录不可写不再触发未捕获异常终止进程。
+- **回收站**：按 `TRASH_RETENTION_DAYS`（默认 30 天）自动清理；文件夹恢复会恢复祖先链，且不会复活单独提前删除的笔记/子文件夹。
+- **级联清理**：删除笔记、清空回收站、删除空间、注销账户、删除文件夹、删除附件、撤销/删除分享时同步清理对象存储中的媒体副本。
+- **离线同步**：永久失败项进入失败队列，不再阻塞后续 outbox；新增失败计数与“重试”入口。账号切换/注册前检测未同步数据并提示。`beforeunload`/`pagehide`/PWA 更新前保存草稿。
+- **竞态**：打开笔记与刷新列表加入请求序号，快速切换不会用旧响应覆盖新状态；切换工作区不串用参考笔记。
+- **导航**：移动端侧栏断点从 900px 提前到 1439px，1024/1280 三栏不再过窄；关闭时 `inert`。
+- **导出**：PDF 队列单并发 + 路由限流 10/min；未安装 Chromium 时服务端下发 `pdfExportEnabled=false`，前端隐藏入口。
+
+### Changed
+
+- **列表**：笔记/搜索/后台用户列表只查询摘要字段，正文仅单篇读取；管理员用户列表改为服务端 `limit/offset/q` + 加载更多，CSV 导出分页取全量并防公式注入。公开链接/评论沿用分页。
+- **后台任务**：实例备份与用户数据导出改为后台 job，避免同步请求超时；前端轮询 job 状态并反馈。
+- **站点代码**：只注入首页、介绍、隐私、条款；登录、注册、应用和分享页不再执行第三方脚本。SEO/隐私文案同步。
+- **主题/SEO/PWA**：新增 `/theme-init.js` 首屏主题；服务端按 Host 本地化 `lang`/标题/描述/OG/canonical/hreflang；按域名生成中英文 manifest 并由 Nginx 返回 `application/manifest+json`；PWA 缩略图 CacheFirst 与离线预取。
+- **性能**：React 独立分包，营销页不再为取 React 而预加载 TipTap/ProseMirror/highlight。
+- **可访问性**：工具栏改为“核心按钮 + 更多格式”菜单；表单 label/`htmlFor`、contenteditable `role=textbox`、命令面板与图片预览焦点陷阱、错误 Toast `alert` 且停留更久、保存状态 `aria-live`、警告徽标对比度提升、设置导航短标签。
+- **运维清理**：新增运营数据定期清理（登录尝试、过期会话、已完成 job、已读通知、一年前审计、过期邮箱验证码）。
+
+### Added
+
+- 全局 `ErrorBoundary` 与未捕获异常诊断日志。
+- CI：`.github/workflows/ci.yml` 执行 `npm ci`、typecheck、test、build 与生产依赖 high/critical 审计。
+- 测试：crypto 覆盖覆盖写入与写入失败；备份集成演练覆盖“活工作区含附件替换恢复”。
+
+### Verified
+
+- `npm run typecheck`、服务端 13 项单测、前端 6 项单测、`npm run build` 通过。
+- 生产 `/health` 0.2.6；双域名 head/SEO/manifest MIME、分享 noindex + CSP、PDF 200、管理员用户分页/搜索、工作区备份越权 403、整站备份 break-glass、备份恢复集成全部 PASS。
+
 ## [0.2.5] — 2026-11-13
 
 新增站点验证与统计代码管理，并完成百度站点验证。

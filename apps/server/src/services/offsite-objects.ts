@@ -7,6 +7,7 @@ import { decryptBuffer } from '../lib/crypto.js';
 import { getObject } from '../lib/object-storage.js';
 import { errors } from '../lib/errors.js';
 import { inspectBackupFile, restoreBackup } from './backups.js';
+import { requireWorkspace } from './workspaces.js';
 
 function assertKey(key: string): string {
   const clean = key.replace(/^s3:/, '').replace(/^\/+/, '');
@@ -63,6 +64,7 @@ export async function restoreOffsiteWorkspaceBackup(input: {
   key: string;
   mode: 'merge' | 'replace';
   jobId: string;
+  actorId: string;
 }): Promise<{ workspaceId: string; workspaceName: string; result: Record<string, unknown> }> {
   const clean = assertKey(input.key);
   if (!/^backup-.*\.(3nb|nhbackup)$/i.test(clean)) {
@@ -80,6 +82,10 @@ export async function restoreOffsiteWorkspaceBackup(input: {
       [info.workspaceId],
     );
     if (!workspace || workspace.deleted_at) throw errors.badRequest('备份所属工作区已不存在');
+    // Restoring is destructive. The requesting instance admin must also be a
+    // manager of the target workspace; object-storage recovery is not a
+    // backdoor around workspace membership.
+    await requireWorkspace(input.actorId, info.workspaceId, 'manage');
     const owner = await one<{ user_id: string }>(
       `SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND role = 'owner' LIMIT 1`,
       [info.workspaceId],

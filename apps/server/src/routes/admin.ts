@@ -13,7 +13,7 @@ import { revokeAllApiTokens } from '../services/sessions.js';
 import { getNoteForUser } from '../services/notes.js';
 import { attachmentStoragePublicConfig, getObject, getAttachmentStorageConfig, listObjectEntries, saveAttachmentStorageConfig, setAttachmentStorageTestResult, testObjectStorage } from '../lib/object-storage.js';
 import { readBackup } from '../lib/storage.js';
-import { decryptBuffer, decryptString, sha256 } from '../lib/crypto.js';
+import { decryptString, sha256 } from '../lib/crypto.js';
 import { createInstanceBackup, deleteInstanceBackup, downloadInstanceBackup, getInstanceBackupSettings, listInstanceBackups, runInstanceRestoreDrill, saveInstanceBackupSettings, uploadInstanceBackupToOffsite } from '../services/instance-backups.js';
 import { restoreOffsiteWorkspaceBackup, verifyOffsiteObject } from '../services/offsite-objects.js';
 import { createJob, runJob } from '../lib/jobs.js';
@@ -105,6 +105,18 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/api/admin/users', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
+    const params = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+        q: z.string().trim().max(200).default(''),
+      }),
+      request.query,
+    );
+    const where = `u.deleted_at IS NULL${params.q ? ` AND (u.email ILIKE $1 OR u.display_name ILIKE $1 OR u.role ILIKE $1)` : ''}`;
+    const queryParams = params.q ? [`%${params.q.replace(/[%_]/g, (value) => `\\${value}`)}%`, params.limit, params.offset] : [params.limit, params.offset];
+    const limitParam = params.q ? '$2' : '$1';
+    const offsetParam = params.q ? '$3' : '$2';
     const rows = await many<{
       id: string;
       email: string;
@@ -129,9 +141,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         (SELECT COALESCE(sum(a.size_bytes),0) FROM attachments a JOIN workspace_members m ON m.workspace_id = a.workspace_id
           WHERE m.user_id = u.id AND a.deleted_at IS NULL)::text AS storage_bytes,
         (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now())::text AS session_count
-       FROM users u WHERE u.deleted_at IS NULL ORDER BY u.created_at DESC LIMIT 500`,
+       FROM users u WHERE ${where} ORDER BY u.created_at DESC LIMIT ${limitParam} OFFSET ${offsetParam}`,
+      queryParams,
     );
+    const total = await one<{ count: string }>(`SELECT count(*)::text AS count FROM users u WHERE ${where}`, params.q ? [`%${params.q.replace(/[%_]/g, (value) => `\\${value}`)}%`] : []);
     return {
+      total: Number(total?.count ?? 0),
+      limit: params.limit,
+      offset: params.offset,
       users: rows.map((row) => ({
         id: row.id,
         email: row.email,
@@ -400,14 +417,18 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.post('/api/admin/instance-backups', async (request) => {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
-    try {
-      const backup = await createInstanceBackup(auth.user.id);
-      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create', targetType: 'instance_backup', targetId: backup.id, meta: { size: backup.size }, ip: clientIp(request) });
-      return { backup };
-    } catch (error) {
-      await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create.failed', meta: { error: (error as Error).message.slice(0, 500) }, ip: clientIp(request) });
-      throw error;
-    }
+    const jobId = await createJob('instance-backup', {}, auth.user.id);
+    runJob(jobId, async () => {
+      try {
+        const backup = await createInstanceBackup(auth.user.id);
+        await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create', targetType: 'instance_backup', targetId: backup.id, meta: { size: backup.size }, ip: clientIp(request) });
+        return { stage: 'done', backup };
+      } catch (error) {
+        await audit({ actorId: auth.user.id, action: 'admin.instance_backup.create.failed', meta: { error: (error as Error).message.slice(0, 500), jobId }, ip: clientIp(request) });
+        throw error;
+      }
+    });
+    return { jobId };
   });
 
   app.post('/api/admin/instance-backups/drill', async (request) => {
@@ -435,9 +456,15 @@ export default async function adminRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     await requireAdmin(auth.user.id);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    // A whole-instance backup contains every user's note bodies. Keep it as an
+    // explicit break-glass action instead of a one-click download.
+    if (request.headers['x-360note-break-glass'] !== 'INSTANCE_BACKUP') {
+      throw errors.forbidden('整站备份包含全库数据，请确认风险后使用受控下载');
+    }
     const row = await one<{ filename: string }>('SELECT filename FROM instance_backups WHERE id = $1', [id]);
     if (!row) throw errors.notFound('实例备份不存在');
     const data = await downloadInstanceBackup(row.filename);
+    await audit({ actorId: auth.user.id, action: 'admin.instance_backup.download', targetType: 'instance_backup', targetId: id, ip: clientIp(request) });
     return reply
       .header('Content-Type', 'application/zip')
       .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`)
@@ -718,8 +745,13 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { key } = parse(z.object({ key: z.string().min(1).max(1000) }), request.query);
     const clean = key.replace(/^s3:/, '').replace(/^\/+/, '');
     if (!clean || clean.includes('..') || clean.startsWith('/')) throw errors.badRequest('对象键无效');
+    // Workspace backups contain note bodies. An instance admin must not be
+    // able to browse them through the object-storage inspection screen; the
+    // owning workspace downloads and restores its own backup instead.
+    if (/\.(3nb|nhbackup)$/i.test(clean)) {
+      throw errors.forbidden('备份归档不能通过实例对象存储浏览下载；请由备份所属空间在数据与备份中操作');
+    }
     let data = await getObject(`s3:${clean}`);
-    if (/\.(3nb|nhbackup)$/i.test(clean)) data = decryptBuffer(data, '360note:backup');
     await audit({ actorId: auth.user.id, action: 'admin.offsite.object.download', meta: { key: clean, bytes: data.length }, ip: clientIp(request) });
     return reply
       .header('Content-Type', 'application/octet-stream')
@@ -749,7 +781,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const jobId = await createJob('offsite-restore', { key: body.key, mode: body.mode }, auth.user.id);
     runJob(jobId, async () => {
       try {
-        const result = await restoreOffsiteWorkspaceBackup({ key: body.key, mode: body.mode, jobId });
+        const result = await restoreOffsiteWorkspaceBackup({ key: body.key, mode: body.mode, jobId, actorId: auth.user.id });
         await audit({ actorId: auth.user.id, action: 'admin.offsite.object.restore', meta: { ok: true, key: body.key, mode: body.mode, jobId, workspaceId: result.workspaceId }, ip: clientIp(request) });
         return result;
       } catch (error) {

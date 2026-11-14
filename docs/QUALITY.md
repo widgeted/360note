@@ -1,6 +1,6 @@
 # 360note 质量规范
 
-> 版本 0.1 · 2026-11-07  
+> 版本 0.2 · 2026-11-14  
 > 质量不是“测试通过”，而是：用户敢把内容交给你；出错时能发现、能恢复、能解释。
 
 ---
@@ -43,7 +43,7 @@
 ### 1.4 可用性
 
 - 核心流程不依赖鼠标；键盘可完成新建/搜索/打开/保存/关闭弹窗。
-- 移动端 390px 无横向溢出；触控目标 ≥ 40px；底部安全区适配。
+- 移动端 390px 无横向溢出；普通触控目标 ≥ 40px，密集编辑器工具栏 ≥ 32px 且必须有可发现的溢出入口；底部安全区适配。
 - 全站中英文混排可读；日期/数字本地化；不出现“undefined/NaN”。
 - 状态有文字/图标，不只靠颜色；错误信息给出下一步。
 - 空状态有行动；加载状态不闪烁；骨架/Spinner 二选一，不叠加。
@@ -380,7 +380,7 @@
 - `tests/manual/note-refresh-regression.mjs`：从列表重新打开同一篇笔记时，编辑器必须显示服务端最新版本。
 - `tests/manual/image-thumbnail-regression.mjs`：编辑器/分享页默认加载 WebP 缩略图，Markdown 保留原图 URL，点击缩略图才加载原图预览，缩略图体积小于原图。
 - `tests/manual/context-drawer-regression.mjs`：移动端右侧信息抽屉只占内容宽度，左侧保留模糊的笔记可见区域，默认打开“信息”而不是自动展开版本历史。
-- `tests/manual/toolbar-mobile-regression.mjs`：移动端格式工具栏单行横向滚动、无折叠“…”菜单、34px 触控目标、末尾清除格式为红色。
+- `tests/manual/toolbar-mobile-regression.mjs`：移动端格式工具栏单行横向滚动、低频格式进入“更多”菜单、34px 密集控件。
 - `tests/manual/note-stability-regression.mjs`：收藏/置顶/标签等元数据更新不消耗笔记版本；编辑中修改元数据后保存不出现冲突或“其他设备”提示。
 - `tests/manual/admin-restrictions-regression.mjs`：禁止分享、停用/启用账号、注册 IP 限制与日志分页；结束后恢复账号并删除临时数据。
 - `tests/manual/cache-isolation-test.mjs`：普通登出保留同账户缓存；切换账户清除上一账户缓存；显式“退出并清除本机数据”清空 IndexedDB 与 auth/workspace 键。

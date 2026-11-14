@@ -12,6 +12,48 @@
   }
 }
 
+@media (max-width: 1439px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  /* Below a comfortable three-pane width the navigation becomes a drawer.
+     Keeping the sidebar in the flow at 1024px left only 474px for the editor. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(86vw, 316px);
+    transform: translateX(-102%);
+    transition: transform 260ms var(--ease);
+    z-index: 60;
+    border-right: 1px solid var(--sidebar-line);
+    box-shadow: none;
+  }
+
+  .app-root.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: rgba(5, 8, 21, 0.42);
+    backdrop-filter: blur(2px);
+    animation: fade-in var(--dur) ease both;
+  }
+
+  .mobile-menu-btn {
+    display: grid !important;
+  }
+
+  .sidebar-collapse {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   :root {
     --sidebar-width: 0px;
@@ -507,43 +549,6 @@
     display: none;
   }
 
-  .settings-nav {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 4px;
-    align-items: center;
-    max-height: none;
-    padding: calc(9px + var(--header-height)) 12px 9px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    border-bottom: 1px solid var(--line-soft);
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x pinch-zoom;
-    overscroll-behavior: contain;
-  }
-
-  .settings-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings-nav-group {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 3px;
-    margin: 0;
-  }
-
-  .settings-nav-item {
-    width: auto;
-    height: 34px;
-    flex: none;
-    justify-content: center;
-    padding: 0 10px;
-    white-space: nowrap;
-  }
-
   .settings-inner {
     padding: 24px 18px calc(48px + env(safe-area-inset-bottom));
   }
@@ -720,8 +725,17 @@
 
   .settings-nav-item {
     width: 100%;
+    min-width: 0;
     height: 34px;
     justify-content: flex-start;
     padding: 0 9px;
+    overflow: hidden;
+  }
+
+  .settings-nav-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

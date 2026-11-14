@@ -528,7 +528,7 @@ function NoteItem({
         {note.isFavorite && !note.isPinned && <Star size={11} className="note-item-star" />}
         <div className="note-item-title">{note.title || t('未命名笔记')}</div>
       </div>
-      {note.excerpt && <div className="note-item-excerpt">{note.excerpt}</div>}
+      {(note.snippet || note.excerpt) && <div className="note-item-excerpt">{note.snippet || note.excerpt}</div>}
       <div className="note-item-meta">
         <span className="note-item-date">{formatNoteDate(note.updatedAt)}</span>
         {note.tags.length > 0 && (

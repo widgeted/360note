@@ -38,14 +38,14 @@ const SECTIONS = [
   { id: 'appearance', icon: Palette, label: '外观', group: '个人' },
   { id: 'editor', icon: Keyboard, label: '编辑器', group: '个人' },
   { id: 'security', icon: ShieldCheck, label: '安全', group: '个人' },
-  { id: 'data', icon: CloudDownload, label: '数据与备份', group: '数据' },
-  { id: 'comments', icon: MessageCircle, label: '评论管理', group: '数据' },
+  { id: 'data', icon: CloudDownload, label: '数据与备份', short: '数据', group: '数据' },
+  { id: 'comments', icon: MessageCircle, label: '评论管理', short: '评论', group: '数据' },
   { id: 'templates', icon: LayoutTemplate, label: '模板', group: '数据' },
   { id: 'team', icon: Users, label: '空间', group: '数据' },
-  { id: 'api', icon: Code2, label: 'API 与集成', group: '数据' },
-  { id: 'ai', icon: Bot, label: 'AI 与隐私', group: '高级' },
+  { id: 'api', icon: Code2, label: 'API 与集成', short: 'API', group: '数据' },
+  { id: 'ai', icon: Bot, label: 'AI 与隐私', short: 'AI', group: '高级' },
   { id: 'about', icon: null, label: '关于', group: '高级' },
-  { id: 'admin', icon: ServerCog, label: '实例管理', group: '高级', adminOnly: true },
+  { id: 'admin', icon: ServerCog, label: '实例管理', short: '管理', group: '高级', adminOnly: true },
 ] as const;
 
 export default function SettingsPage({ section }: { section: string }) {
@@ -107,9 +107,10 @@ export default function SettingsPage({ section }: { section: string }) {
                     type="button"
                     className={cn('settings-nav-item', current === entry.id && 'active')}
                     onClick={() => navigate(`/app/settings/${entry.id}`, { state: location.state })}
+                    title={t(entry.label)}
                   >
                     {Icon ? <Icon size={14} /> : <span style={{ width: 14, display: 'grid', placeItems: 'center', fontSize: 13 }}>ⓘ</span>}
-                    {t(entry.label)}
+                    <span className="settings-nav-text">{t('short' in entry ? entry.short : entry.label)}</span>
                   </button>
                 );
               })}

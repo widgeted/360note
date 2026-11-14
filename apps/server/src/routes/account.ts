@@ -7,7 +7,9 @@ import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/passwords.js';
 import { parse } from '../lib/validate.js';
 import { deleteAttachment, deleteBackupFile } from '../lib/storage.js';
+import { cleanupNotesMedia } from '../services/media.js';
 import { createUserExport } from '../services/user-export.js';
+import { createJob, runJob } from '../lib/jobs.js';
 import { deleteOffsiteBackup } from '../services/offsite.js';
 
 export default async function accountRoutes(app: FastifyInstance) {
@@ -15,33 +17,37 @@ export default async function accountRoutes(app: FastifyInstance) {
     config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
   }, async (request) => {
     const auth = requireAuth(request);
-    try {
-      const result = await createUserExport({
-        userId: auth.user.id,
-        email: auth.user.email,
-        displayName: auth.user.display_name,
-        prefs: auth.user.prefs,
-      });
-      await audit({
-        actorId: auth.user.id,
-        action: 'account.export',
-        targetType: 'user',
-        targetId: auth.user.id,
-        meta: { ok: true },
-        ip: clientIp(request),
-      });
-      return result;
-    } catch (error) {
-      await audit({
-        actorId: auth.user.id,
-        action: 'account.export.failed',
-        targetType: 'user',
-        targetId: auth.user.id,
-        meta: { ok: false, error: (error as Error).message.slice(0, 500) },
-        ip: clientIp(request),
-      });
-      throw error;
-    }
+    const jobId = await createJob('user-export', {}, auth.user.id);
+    runJob(jobId, async () => {
+      try {
+        const result = await createUserExport({
+          userId: auth.user.id,
+          email: auth.user.email,
+          displayName: auth.user.display_name,
+          prefs: auth.user.prefs,
+        });
+        await audit({
+          actorId: auth.user.id,
+          action: 'account.export',
+          targetType: 'user',
+          targetId: auth.user.id,
+          meta: { ok: true, jobId },
+          ip: clientIp(request),
+        });
+        return result as unknown as Record<string, unknown>;
+      } catch (error) {
+        await audit({
+          actorId: auth.user.id,
+          action: 'account.export.failed',
+          targetType: 'user',
+          targetId: auth.user.id,
+          meta: { ok: false, error: (error as Error).message.slice(0, 500), jobId },
+          ip: clientIp(request),
+        });
+        throw error;
+      }
+    });
+    return { jobId };
   });
 
   app.delete('/api/me', async (request, reply) => {
@@ -67,6 +73,9 @@ export default async function accountRoutes(app: FastifyInstance) {
           [ownedIds],
         )
       : [];
+    const ownedNoteIds = ownedIds.length
+      ? await many<{ id: string }>('SELECT id FROM notes WHERE workspace_id = ANY($1::uuid[])', [ownedIds])
+      : [];
     const backupFiles = ownedIds.length
       ? await many<{ filename: string }>(
           `SELECT filename FROM backups WHERE workspace_id = ANY($1::uuid[])`,
@@ -76,6 +85,7 @@ export default async function accountRoutes(app: FastifyInstance) {
 
     // Preserve shared team content: only the account, not other members' notes, should disappear.
     const exportFiles = await many<{ filename: string }>('SELECT filename FROM user_export_links WHERE user_id = $1', [auth.user.id]);
+    await cleanupNotesMedia(ownedNoteIds.map((row) => row.id));
     await transaction(async (client) => {
       // Preserve the human-readable author before the FK nulls user_id.
       await client.query(

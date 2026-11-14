@@ -11,6 +11,7 @@ export interface InstanceInfo {
   registrationMode: 'open' | 'invite';
   aiEnabled: boolean;
   ocrEnabled: boolean;
+  pdfExportEnabled?: boolean;
   maxUploadBytes: number;
   publicOrigin: string;
 }

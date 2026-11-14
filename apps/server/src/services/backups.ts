@@ -1,4 +1,4 @@
-import archiver from 'archiver';
+import { createZipArchive } from '../lib/zip-archive.js';
 import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -322,7 +322,7 @@ function backupManifest(document: BackupDocument): Buffer {
 export async function createBackupArchive(workspaceId: string, outputPath: string): Promise<{ document: BackupDocument; name: string }> {
   const { workspace, document, attachmentRows } = await collectBackupDocument(workspaceId);
   const output = fsSync.createWriteStream(outputPath, { mode: 0o600, flags: 'wx' });
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = createZipArchive();
   const finished = new Promise<void>((resolve, reject) => {
     output.on('close', () => resolve());
     output.on('error', reject);

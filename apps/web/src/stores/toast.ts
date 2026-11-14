@@ -24,7 +24,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
     if (toast.duration !== 0) {
       setTimeout(() => {
         set({ toasts: get().toasts.filter((entry) => entry.id !== id) });
-      }, toast.duration ?? 3800);
+      }, toast.duration ?? (toast.type === 'error' ? 6500 : 3800));
     }
   },
   dismiss: (id) => set({ toasts: get().toasts.filter((toast) => toast.id !== id) }),

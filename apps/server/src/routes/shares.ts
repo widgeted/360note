@@ -11,7 +11,7 @@ import { hashPassword, verifyPassword } from '../lib/passwords.js';
 import { getNoteForUser } from '../services/notes.js';
 import { updateNote } from '../services/notes.js';
 import { notify } from '../services/sessions.js';
-import { getProcessedShareImage, scheduleImageAnalysis } from '../services/media.js';
+import { cleanupNoteMedia, getProcessedShareImage, scheduleImageAnalysis } from '../services/media.js';
 import { audit } from '../lib/audit.js';
 import { readAttachment, sendFileHeaders } from '../lib/storage.js';
 import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
@@ -51,8 +51,8 @@ function setShareCookie(reply: FastifyReply, token: string): void {
 function accessTokenFrom(request: FastifyRequest): string | null {
   const header = request.headers['x-share-access'];
   if (typeof header === 'string' && header) return header;
-  const queryValue = (request.query as Record<string, unknown> | undefined)?.access;
-  if (typeof queryValue === 'string' && queryValue) return queryValue;
+  // Do not accept ?access=: capability tokens in URLs leak into logs, Referer
+  // headers and browser history. The cookie is the supported transport.
   return request.cookies[SHARE_COOKIE] ?? null;
 }
 
@@ -94,7 +94,11 @@ function rewriteAttachmentUrls(content: string, token: string): string {
   );
 }
 
-async function publicAttachments(noteId: string) {
+async function publicAttachments(noteId: string, content: string) {
+  const referenced = new Set(
+    [...content.matchAll(/\/attachments\/([0-9a-fA-F-]{36})\/(?:content|preview)/g)].map((match) => match[1].toLowerCase()),
+  );
+  if (!referenced.size) return [];
   return many<{
     id: string;
     note_id: string;
@@ -110,7 +114,7 @@ async function publicAttachments(noteId: string) {
     `SELECT id, note_id, filename, mime, size_bytes, width, height, image_tags, has_thumbnail, created_at
      FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
     [noteId],
-  );
+  ).then((rows) => rows.filter((row) => referenced.has(row.id.toLowerCase())));
 }
 
 export default async function shareRoutes(app: FastifyInstance) {
@@ -131,7 +135,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     const body = parse(
       z.object({
         permission: z.enum(['view', 'comment', 'edit']).default('view'),
-        password: z.string().min(4).max(100).optional().nullable(),
+        password: z.string().min(8).max(100).optional().nullable(),
         expiresAt: z.string().datetime().optional().nullable(),
       }),
       request.body,
@@ -216,7 +220,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     const body = parse(
       z.object({
         permission: z.enum(['view', 'comment', 'edit']).optional(),
-        password: z.string().min(4).max(100).nullable().optional(),
+        password: z.string().min(8).max(100).nullable().optional(),
         expiresAt: z.string().datetime().nullable().optional(),
         revoked: z.boolean().optional(),
       }),
@@ -239,6 +243,7 @@ export default async function shareRoutes(app: FastifyInstance) {
         body.revoked === true,
       ],
     );
+    if (body.revoked) await cleanupNoteMedia(share.note_id, true);
     await audit({ workspaceId: note.workspaceId, actorId: auth.user.id, action: 'share.update', targetType: 'share', targetId: id, ip: clientIp(request) });
     return { ok: true };
   });
@@ -251,6 +256,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     const { note } = await getNoteForUser(share.note_id, auth.user.id);
     if (!note.canShare) throw errors.forbidden();
     await one('UPDATE share_links SET revoked_at = now() WHERE id = $1 RETURNING id', [id]);
+    await cleanupNoteMedia(share.note_id, true);
     await audit({ workspaceId: note.workspaceId, actorId: auth.user.id, action: 'share.revoke', targetType: 'share', targetId: id, ip: clientIp(request) });
     return { ok: true };
   });
@@ -264,6 +270,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     if (!note.canShare) throw errors.forbidden();
     if (!share.revoked_at) throw errors.badRequest('请先撤销分享再删除记录');
     await one('DELETE FROM share_links WHERE id = $1 RETURNING id', [id]);
+    await cleanupNoteMedia(share.note_id, true);
     await audit({ workspaceId: note.workspaceId, actorId: auth.user.id, action: 'share.delete', targetType: 'share', targetId: id, ip: clientIp(request) });
     return { ok: true };
   });
@@ -322,7 +329,7 @@ export default async function shareRoutes(app: FastifyInstance) {
     scheduleImageAnalysis(note.id);
     const workspace = await one<{ name: string }>('SELECT name FROM workspaces WHERE id = $1', [note.workspace_id]);
     const author = await one<{ display_name: string }>('SELECT display_name FROM users WHERE id = $1', [note.created_by]);
-    const attachments = await publicAttachments(note.id);
+    const attachments = await publicAttachments(note.id, note.content_md);
     let comments: unknown[] = [];
     if (share.permission !== 'view') {
       const rows = await many<{

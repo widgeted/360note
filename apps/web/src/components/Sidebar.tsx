@@ -30,6 +30,7 @@ import { useAuthStore } from '../stores/auth';
 import { getLocale, useT } from '../lib/i18n';
 import { getStoredTheme, storeTheme } from '../lib/theme';
 import { cn } from '../lib/utils';
+import { useIsMobile } from '../lib/useMediaQuery';
 import { Avatar } from './Avatar';
 import { LogoLockup } from './Logo';
 import { Dropdown, MenuItem } from './Dropdown';
@@ -107,6 +108,7 @@ function InlineNameInput({
 
 export function Sidebar() {
   const t = useT();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((state) => state.user);

@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth';
 import { getLocale, useT } from '../lib/i18n';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { api } from '../lib/api';
+import { hasPendingLocalData } from '../lib/offline';
 import { copyText, emailValid, passwordStrength } from '../lib/utils';
 import { AuthLayout } from './AuthLayout';
 
@@ -76,6 +77,10 @@ export default function RegisterPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    if (await hasPendingLocalData()) {
+      const proceed = window.confirm(t('本机还有未同步的离线修改或草稿。创建新账号会清除这些数据，且无法恢复。建议先回到原账号完成同步或导出。确定继续？'));
+      if (!proceed) return;
+    }
     if (!emailValid(email)) {
       setError(t('请输入有效的邮箱地址'));
       return;

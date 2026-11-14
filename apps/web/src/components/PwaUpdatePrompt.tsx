@@ -111,6 +111,9 @@ export function PwaUpdatePrompt() {
     if (!waiting) return;
     setRefreshing(true);
     refreshingRef.current = true;
+    // Give the editor a synchronous chance to persist its latest draft before
+    // the new worker activates and the page reloads.
+    window.dispatchEvent(new Event('nh:flush-before-reload'));
     waiting.postMessage({ type: 'SKIP_WAITING' });
     // If a browser does not emit controllerchange, reload once so the user is
     // never left with a spinner and no visible result.

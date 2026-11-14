@@ -1,4 +1,4 @@
-import archiver from 'archiver';
+import { createZipArchive } from '../lib/zip-archive.js';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import os from 'node:os';
@@ -50,7 +50,7 @@ export async function createUserExport(input: {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-user-export-'));
   const archivePath = path.join(tempDir, 'export.zip');
   const output = fsSync.createWriteStream(archivePath, { mode: 0o600, flags: 'wx' });
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = createZipArchive();
   const finished = new Promise<void>((resolve, reject) => {
     output.on('close', () => resolve());
     output.on('error', reject);

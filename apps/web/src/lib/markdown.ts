@@ -128,6 +128,9 @@ function sanitize(html: string): string {
   return DOMPurify.sanitize(html, {
     ADD_ATTR: ['target', 'rel', 'data-type', 'data-checked', 'checked', 'disabled', 'data-note-title'],
     ADD_TAGS: ['mark', 'u', 'figure', 'figcaption'],
+    // Notes may be shared publicly. Inline style would allow fixed overlays
+    // that impersonate UI on a share page; layout belongs to our classes.
+    FORBID_ATTR: ['style'],
     ALLOW_DATA_ATTR: true,
   });
 }
