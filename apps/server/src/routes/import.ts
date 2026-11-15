@@ -8,7 +8,7 @@ import { requireAuth } from '../auth.js';
 import { errors } from '../lib/errors.js';
 import { withWorkspaceLock } from '../lib/workspace-lock.js';
 import { parse } from '../lib/validate.js';
-import { requireWorkspace } from '../services/workspaces.js';
+import { requireWorkspace, workspaceKind } from '../services/workspaces.js';
 import { createJob, getJob, runJob, updateJob } from '../lib/jobs.js';
 import { previewFromParsed, parseImport } from '../lib/import-parser.js';
 import { cleanupJobDir, safeFilename, tempJobDir } from '../lib/storage.js';
@@ -21,6 +21,7 @@ export default async function importRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { workspaceId } = parse(z.object({ workspaceId: z.string().uuid() }), request.query);
     await requireWorkspace(auth.user.id, workspaceId, 'write');
+    if ((await workspaceKind(workspaceId)) === 'vault') throw errors.forbidden('加密空间不支持导入');
     const jobId = await createJob('import-preview', { workspaceId, stage: 'uploading' }, auth.user.id);
     const jobDir = tempJobDir(jobId);
     await fs.mkdir(jobDir, { recursive: true, mode: 0o700 });
@@ -95,6 +96,7 @@ export default async function importRoutes(app: FastifyInstance) {
     const payload = previewJob.payload as { workspaceId: string };
     if (!payload.workspaceId) throw errors.badRequest('导入任务缺少工作区');
     await requireWorkspace(auth.user.id, payload.workspaceId, 'write');
+    if ((await workspaceKind(payload.workspaceId)) === 'vault') throw errors.forbidden('加密空间不支持导入');
     const jobDir = tempJobDir(jobId);
     let parsed;
     try {

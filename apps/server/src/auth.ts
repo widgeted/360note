@@ -5,6 +5,7 @@ import { one, query } from './db.js';
 import { randomToken, sha256 } from './lib/crypto.js';
 import { errors } from './lib/errors.js';
 import type { AuthContext, DbSession, DbUser } from './lib/users.js';
+import { setRequestIdentity } from './lib/request-context.js';
 
 const COOKIE_NAME = config.env === 'production' ? '__Host-nh_session' : 'nh_session';
 const DEVICE_COOKIE_NAME = config.env === 'production' ? '__Host-nh_device' : 'nh_device';
@@ -60,6 +61,7 @@ async function resolveBearer(request: FastifyRequest): Promise<AuthContext | nul
   const user = await one<DbUser>('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL', [row.user_id]);
   if (!user) return null;
   void query('UPDATE api_tokens SET last_used_at = now() WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval \'1 minute\')', [row.id]).catch(() => {});
+  setRequestIdentity({ userId: user.id });
   return { user, session: null, tokenId: row.id, tokenScopes: row.scopes ?? [] };
 }
 
@@ -78,6 +80,7 @@ async function resolveSession(request: FastifyRequest): Promise<AuthContext | nu
     `UPDATE sessions SET last_seen_at = now() WHERE id = $1 AND last_seen_at < now() - interval '5 minutes'`,
     [row.id],
   ).catch(() => {});
+  setRequestIdentity({ sessionId: row.id, userId: user.id });
   return { user, session: row };
 }
 
@@ -102,6 +105,10 @@ export default fp(async function authPlugin(app: FastifyInstance) {
     } catch (error) {
       app.log.error({ error }, 'failed to resolve authentication');
       request.auth = null;
+    }
+    const vaultHeader = request.headers['x-360note-vault'];
+    if (typeof vaultHeader === 'string' && vaultHeader.length <= 200) {
+      setRequestIdentity({ vaultToken: vaultHeader });
     }
 
     // Bearer tokens are deliberately limited to the notes API. They cannot

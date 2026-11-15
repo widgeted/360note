@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { clientIp, requireAuth } from '../auth.js';
 import { parse } from '../lib/validate.js';
+import { errors } from '../lib/errors.js';
+import { workspaceKind } from '../services/workspaces.js';
 import { exportSingleNote, exportWorkspace } from '../services/export.js';
 
 export default async function exportRoutes(app: FastifyInstance) {
@@ -14,6 +16,9 @@ export default async function exportRoutes(app: FastifyInstance) {
       }),
       request.query,
     );
+    if ((await workspaceKind(params.workspaceId)) === 'vault') {
+      throw errors.forbidden('加密空间内容不可导出');
+    }
     await exportWorkspace({
       workspaceId: params.workspaceId,
       userId: auth.user.id,

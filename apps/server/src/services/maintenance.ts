@@ -13,8 +13,9 @@ export async function cleanupOperationalData(): Promise<Record<string, number>> 
     one<{ count: string }>(`WITH deleted AS (DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < now() - interval '180 days' RETURNING 1) SELECT count(*)::text AS count FROM deleted`),
     one<{ count: string }>(`WITH deleted AS (DELETE FROM audit_logs WHERE created_at < now() - interval '365 days' RETURNING 1) SELECT count(*)::text AS count FROM deleted`),
     one<{ count: string }>(`WITH deleted AS (DELETE FROM email_codes WHERE created_at < now() - interval '24 hours' RETURNING 1) SELECT count(*)::text AS count FROM deleted`),
+    one<{ count: string }>(`WITH deleted AS (DELETE FROM workspace_unlocks WHERE expires_at < now() - interval '1 day' RETURNING 1) SELECT count(*)::text AS count FROM deleted`),
   ]);
-  ['loginAttempts', 'sessions', 'jobs', 'notifications', 'auditLogs', 'emailCodes'].forEach((key, index) => {
+  ['loginAttempts', 'sessions', 'jobs', 'notifications', 'auditLogs', 'emailCodes', 'vaultUnlocks'].forEach((key, index) => {
     result[key] = Number(counts[index]?.count ?? 0);
   });
   return result;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, CloudDownload, Download, FileCode2, FileJson, FileText, Trash2, UploadCloud } from 'lucide-react';
+import { AlertTriangle, CloudDownload, Download, FileCode2, FileJson, FileText, LockKeyhole, Trash2, UploadCloud } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
 import { useAppStore } from '../../stores/app';
 import { useT } from '../../lib/i18n';
@@ -20,6 +20,7 @@ export default function DataSettings() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
   const canManage = workspace?.role === 'owner' || workspace?.role === 'admin';
+  const isVault = workspace?.kind === 'vault';
 
   useEffect(() => {
     if (params.get('import') === '1') setImportOpen(true);
@@ -61,11 +62,19 @@ export default function DataSettings() {
         {t('你的数据属于你。这里的操作低频、重要，而且都可以撤销或验证。同步不是备份：同步会把误删传播到所有设备，备份不会。')}
       </p>
 
-      <div className="banner banner-info" style={{ marginBottom: 26 }}>
-        <CloudDownload size={15} />
-        <div>{t('建议保留自动备份，并定期下载或配置异地存储。备份包含附件，导出使用开放格式，可随时重建。')}</div>
-      </div>
+      {isVault ? (
+        <div className="banner banner-warning" style={{ marginBottom: 26 }}>
+          <LockKeyhole size={15} />
+          <div>{t('加密空间不支持导出、导入或备份。内容只能通过空间密码在应用内访问；请妥善保存恢复密钥。')}</div>
+        </div>
+      ) : (
+        <div className="banner banner-info" style={{ marginBottom: 26 }}>
+          <CloudDownload size={15} />
+          <div>{t('建议保留自动备份，并定期下载或配置异地存储。备份包含附件，导出使用开放格式，可随时重建。')}</div>
+        </div>
+      )}
 
+      {!isVault && (<>
       <section className="settings-section">
         <div className="settings-section-head">
           <span className="settings-section-title">{t('导出整个空间')}</span>
@@ -119,7 +128,7 @@ export default function DataSettings() {
         </div>
         <BackupPanel workspaceId={workspaceId} canManage={canManage} />
       </section>
-
+      </>)}
 
       <section className="settings-section">
         <div className="settings-section-head">
@@ -127,7 +136,9 @@ export default function DataSettings() {
           <span className="settings-section-desc">{t('仅保存在此设备')}</span>
         </div>
         <p className="setting-note">
-          {t('为支持弱网和离线编辑，笔记正文、草稿和待同步队列会以未加密形式暂存在浏览器 IndexedDB 中。退出登录不会删除它们，方便同一账号下次继续；切换账号时会自动清除上一个账号的数据。')}
+          {isVault
+            ? t('加密空间不会把正文、草稿或附件写入浏览器 IndexedDB。刷新、关闭标签页或 15 分钟无操作后，需要重新输入空间密码。')
+            : t('为支持弱网和离线编辑，笔记正文、草稿和待同步队列会以未加密形式暂存在浏览器 IndexedDB 中。退出登录不会删除它们，方便同一账号下次继续；切换账号时会自动清除上一个账号的数据。')}
         </p>
         <p className="setting-note">
           {t('在共用电脑上，请使用账户菜单中的“退出并清除本机数据”，或在下方立即清除。清除后未同步的编辑将无法恢复。')}

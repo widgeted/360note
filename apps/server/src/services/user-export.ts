@@ -33,7 +33,7 @@ export async function createUserExport(input: {
 
   const workspaces = await many<{ id: string; name: string }>(
     `SELECT w.id, w.name FROM workspaces w JOIN workspace_members m ON m.workspace_id = w.id
-     WHERE m.user_id = $1 AND w.owner_id = $1 AND w.deleted_at IS NULL ORDER BY w.created_at`,
+     WHERE m.user_id = $1 AND w.owner_id = $1 AND w.deleted_at IS NULL AND w.kind <> 'vault' ORDER BY w.created_at`,
     [input.userId],
   );
   if (!workspaces.length) throw errors.badRequest('没有可导出的自有空间');

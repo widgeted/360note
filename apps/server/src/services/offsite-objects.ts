@@ -77,11 +77,12 @@ export async function restoreOffsiteWorkspaceBackup(input: {
   try {
     await fs.writeFile(archivePath, decrypted, { mode: 0o600 });
     const info = await inspectBackupFile(archivePath);
-    const workspace = await one<{ id: string; deleted_at: Date | null }>(
-      'SELECT id, deleted_at FROM workspaces WHERE id = $1',
+    const workspace = await one<{ id: string; deleted_at: Date | null; kind: string }>(
+      'SELECT id, deleted_at, kind FROM workspaces WHERE id = $1',
       [info.workspaceId],
     );
     if (!workspace || workspace.deleted_at) throw errors.badRequest('备份所属工作区已不存在');
+    if (workspace.kind === 'vault') throw errors.forbidden('加密空间不支持备份恢复');
     // Restoring is destructive. The requesting instance admin must also be a
     // manager of the target workspace; object-storage recovery is not a
     // backdoor around workspace membership.

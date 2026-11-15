@@ -3006,3 +3006,155 @@ a.btn {
     min-width: 640px;
   }
 }
+
+/* Full-screen lock surface for password-derived encrypted spaces. */
+.vault-lock-screen {
+  position: fixed;
+  inset: 0;
+  /* Below the shared modal layer (80) so confirms can appear on top, but above
+     the app sidebar and editor. */
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 46%),
+    var(--paper-100);
+  overflow-y: auto;
+}
+
+.vault-lock-card {
+  width: 100%;
+  max-width: 430px;
+  padding: 34px 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+.vault-lock-mark {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+}
+
+.vault-lock-kicker {
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.vault-lock-title {
+  margin: 5px 0 10px;
+  font-size: 25px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.vault-lock-text {
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.vault-lock-card .field + .field {
+  margin-top: 14px;
+}
+
+.vault-lock-submit {
+  width: 100%;
+  height: 42px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.vault-lock-link,
+.vault-lock-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vault-lock-link:hover,
+.vault-lock-switch:hover {
+  color: var(--blue-strong);
+}
+
+.vault-lock-switch {
+  width: 100%;
+  justify-content: center;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.vault-lock-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--amber-strong);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.vault-lock-warning svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.vault-recovery-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.vault-recovery-key code {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .vault-lock-card {
+    padding: 26px 20px 22px;
+  }
+}
+
+.vault-lock-danger {
+  display: block;
+  margin: 14px auto 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vault-lock-danger:hover {
+  color: var(--red);
+}

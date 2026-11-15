@@ -13,7 +13,8 @@ export default async function commentRoutes(app: FastifyInstance) {
   app.get('/api/notes/:id/comments', async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    await getNoteForUser(id, auth.user.id);
+    const { note: commentNote } = await getNoteForUser(id, auth.user.id);
+    if (commentNote.vault) throw errors.forbidden('加密空间不支持评论');
     const rows = await many<{
       id: string;
       note_id: string;
@@ -48,6 +49,7 @@ export default async function commentRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const { note } = await getNoteForUser(id, auth.user.id);
+    if (note.vault) throw errors.forbidden('加密空间不支持评论');
     const body = parse(z.object({ body: z.string().trim().min(1).max(5000) }), request.body);
     await requireWorkspace(auth.user.id, note.workspaceId, 'read');
     const row = await one<{ id: string; created_at: Date; updated_at: Date }>(

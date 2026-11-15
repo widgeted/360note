@@ -9,11 +9,13 @@ import { errors } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { attachmentStorageKey, checksum, deleteAttachment, isDisplayableImage, readAttachment, safeFilename, saveAttachment, sendFileHeaders, sniffMime } from '../lib/storage.js';
 import { getNoteForUser } from '../services/notes.js';
-import { requireWorkspace } from '../services/workspaces.js';
+import { requireWorkspace, workspaceKind } from '../services/workspaces.js';
 import { queueOcr } from '../lib/ocr.js';
 import { ensureAttachmentThumbnail } from '../lib/thumbnails.js';
 import { getAttachmentStorageConfig } from '../lib/object-storage.js';
 import { deleteAttachmentMedia, detectFunctionalImage, generateCoreIxThumbnail, isCoreIxPreviewable } from '../services/media.js';
+import { activeVaultKey } from '../lib/vault-session.js';
+import { decryptVaultText, encryptVaultText, vaultFilenameAad } from '../lib/vault-crypto.js';
 
 export default async function attachmentRoutes(app: FastifyInstance) {
   app.post('/api/notes/:id/attachments', async (request, reply) => {
@@ -32,8 +34,11 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     if (!buffer.length) throw errors.badRequest('文件为空');
     const mime = sniffMime(buffer, part.filename, part.mimetype);
     const filename = safeFilename(part.filename);
+    const vault = Boolean(note.vault);
+    const vaultKey = vault ? activeVaultKey(note.workspaceId) : null;
+    if (vault && !vaultKey) throw errors.locked('加密空间已锁定，请输入空间密码');
     const attachmentStorage = await getAttachmentStorageConfig();
-    const functionalDetection = Boolean(attachmentStorage.detectFunctionalImages) && config.ocrEnabled && isDisplayableImage(mime);
+    const functionalDetection = !vault && Boolean(attachmentStorage.detectFunctionalImages) && config.ocrEnabled && isDisplayableImage(mime);
     let width: number | null = null;
     let height: number | null = null;
     if (mime.startsWith('image/')) {
@@ -52,9 +57,12 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     const attachmentId = crypto.randomUUID();
     const localKey = attachmentStorageKey(note.workspaceId, attachmentId);
     const digest = checksum(buffer);
-    const storageKey = await saveAttachment(localKey, buffer);
+    const storageKey = await saveAttachment(localKey, buffer, undefined, vaultKey ?? undefined);
+    const storedFilename = vault
+      ? encryptVaultText(vaultKey!, filename, vaultFilenameAad(note.workspaceId, attachmentId))
+      : filename;
     let hasThumbnail = false;
-    if (isDisplayableImage(mime)) {
+    if (!vault && isDisplayableImage(mime)) {
       // Generate before responding so the first render of the inserted image
       // does not race an asynchronous thumbnail upload to object storage.
       const thumbnail = await ensureAttachmentThumbnail(storageKey, mime, buffer);
@@ -78,7 +86,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         attachmentId,
         note.workspaceId,
         id,
-        filename,
+        storedFilename,
         mime,
         buffer.length,
         digest,
@@ -86,30 +94,30 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         width,
         height,
         auth.user.id,
-        config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
+        !vault && config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
         hasThumbnail,
       ],
     );
-    if (!hasThumbnail && isCoreIxPreviewable(mime, filename)) {
+    if (!vault && !hasThumbnail && isCoreIxPreviewable(mime, filename)) {
       hasThumbnail = await generateCoreIxThumbnail(attachmentId, storageKey, mime, filename);
     }
-    if (config.ocrEnabled && !functionalDetection) void queueOcr(attachmentId, storageKey, mime, app.log);
-    if (functionalDetection) void detectFunctionalImage(attachmentId, storageKey, mime, app.log);
+    if (!vault && config.ocrEnabled && !functionalDetection) void queueOcr(attachmentId, storageKey, mime, app.log);
+    if (!vault && functionalDetection) void detectFunctionalImage(attachmentId, storageKey, mime, app.log);
     return reply.status(201).send({
       attachment: {
         id: row!.id,
         noteId: row!.note_id,
-        filename: row!.filename,
+        filename,
         mime: row!.mime,
         size: Number(row!.size_bytes),
         width: row!.width,
         height: row!.height,
-        ocrStatus: config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
+        ocrStatus: !vault && config.ocrEnabled && !functionalDetection ? 'pending' : 'none',
         imageTags: [],
         hasThumbnail,
         createdAt: row!.created_at.toISOString(),
         url: `/api/attachments/${row!.id}/content`,
-        thumbnailUrl: hasThumbnail || isDisplayableImage(row!.mime) ? `/api/attachments/${row!.id}/content?thumb=1` : null,
+        thumbnailUrl: vault ? null : (hasThumbnail || isDisplayableImage(row!.mime) ? `/api/attachments/${row!.id}/content?thumb=1` : null),
       },
     });
   });
@@ -137,10 +145,16 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     );
     if (!row || row.note_deleted) throw errors.notFound('附件不存在');
     await requireWorkspace(auth.user.id, row.workspace_id, 'read');
+    const vault = (await workspaceKind(row.workspace_id)) === 'vault';
+    const vaultKey = vault ? activeVaultKey(row.workspace_id) : null;
+    if (vault && !vaultKey) throw errors.locked('加密空间已锁定，请输入空间密码');
+    const filename = vault && vaultKey
+      ? decryptVaultText(vaultKey, row.filename, vaultFilenameAad(row.workspace_id, row.id))
+      : row.filename;
     let data: Buffer | null = null;
     let responseMime = row.mime;
     let etag = row.sha256;
-    if (thumb === '1') {
+    if (!vault && thumb === '1') {
       const thumbnail = await ensureAttachmentThumbnail(row.storage_key, row.mime);
       if (thumbnail) {
         data = thumbnail;
@@ -148,14 +162,14 @@ export default async function attachmentRoutes(app: FastifyInstance) {
         etag = `${row.sha256}-thumb`;
       }
     }
-    if (!data) data = await readAttachment(row.storage_key);
+    if (!data) data = await readAttachment(row.storage_key, vaultKey ?? undefined);
     const ifNone = request.headers['if-none-match'];
-    if (ifNone && ifNone.includes(etag)) return reply.status(304).send();
+    if (!vault && ifNone && ifNone.includes(etag)) return reply.status(304).send();
     return reply
-      .headers(sendFileHeaders(row.filename, responseMime, etag))
+      .headers(sendFileHeaders(filename, responseMime, etag))
       .header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'")
       .header('Cross-Origin-Resource-Policy', 'same-origin')
-      .header('Cache-Control', 'private, max-age=86400')
+      .header('Cache-Control', vault ? 'no-store' : 'private, max-age=86400')
       .send(data);
   });
 
@@ -176,11 +190,16 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     }>('SELECT id, workspace_id, note_id, filename, mime, size_bytes, width, height, ocr_status, created_at FROM attachments WHERE id = $1 AND deleted_at IS NULL', [id]);
     if (!row) throw errors.notFound('附件不存在');
     await requireWorkspace(auth.user.id, row.workspace_id, 'read');
+    const vault = (await workspaceKind(row.workspace_id)) === 'vault';
+    const vaultKey = vault ? activeVaultKey(row.workspace_id) : null;
+    const filename = vault && vaultKey
+      ? decryptVaultText(vaultKey, row.filename, vaultFilenameAad(row.workspace_id, row.id))
+      : row.filename;
     return {
       attachment: {
         id: row.id,
         noteId: row.note_id,
-        filename: row.filename,
+        filename,
         mime: row.mime,
         size: Number(row.size_bytes),
         width: row.width,
@@ -217,14 +236,22 @@ export default async function attachmentRoutes(app: FastifyInstance) {
   app.get('/api/attachments/:id/preview', async (request, reply) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    const row = await one<{ workspace_id: string; filename: string; mime: string; storage_key: string; sha256: string }>(
-      'SELECT workspace_id, filename, mime, storage_key, sha256 FROM attachments WHERE id = $1 AND deleted_at IS NULL',
+    const row = await one<{ id: string; workspace_id: string; filename: string; mime: string; storage_key: string; sha256: string }>(
+      'SELECT id, workspace_id, filename, mime, storage_key, sha256 FROM attachments WHERE id = $1 AND deleted_at IS NULL',
       [id],
     );
     if (!row) throw errors.notFound();
     await requireWorkspace(auth.user.id, row.workspace_id, 'read');
     if (!isDisplayableImage(row.mime)) throw errors.notFound();
-    const data = await readAttachment(row.storage_key);
-    return reply.headers(sendFileHeaders(row.filename, row.mime, row.sha256)).send(data);
+    const vault = (await workspaceKind(row.workspace_id)) === 'vault';
+    const vaultKey = vault ? activeVaultKey(row.workspace_id) : null;
+    const filename = vault && vaultKey
+      ? decryptVaultText(vaultKey, row.filename, vaultFilenameAad(row.workspace_id, row.id))
+      : row.filename;
+    const data = await readAttachment(row.storage_key, vaultKey ?? undefined);
+    return reply
+      .headers(sendFileHeaders(filename, row.mime, row.sha256))
+      .header('Cache-Control', vault ? 'no-store' : 'private, max-age=3600')
+      .send(data);
   });
 }

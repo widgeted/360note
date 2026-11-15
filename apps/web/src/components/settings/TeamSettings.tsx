@@ -8,10 +8,14 @@ import {
   LogOut,
   MailPlus,
   Shield,
+  ShieldAlert,
   Trash2,
   UserMinus,
   UserRound,
+  UserLock,
   Users,
+  KeyRound,
+  LockKeyhole,
 } from 'lucide-react';
 import type { AuditEntry, Invitation, User, WorkspaceMember } from '@360note/shared';
 import { api } from '../../lib/api';
@@ -24,6 +28,7 @@ import { Avatar } from '../Avatar';
 import { ConfirmDialog, Modal } from '../Modal';
 import { toast } from '../../stores/toast';
 import { LoadFailure } from '../LoadFailure';
+import { useVaultStore } from '../../stores/vault';
 
 const ROLES = ['admin', 'editor', 'viewer'] as const;
 
@@ -55,11 +60,22 @@ export default function TeamSettings() {
   const [ownerTarget, setOwnerTarget] = useState<WorkspaceMember | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [createName, setCreateName] = useState('');
-  const [createKind, setCreateKind] = useState<'personal' | 'team'>('team');
+  const [createKind, setCreateKind] = useState<'personal' | 'team' | 'vault'>('team');
   const [createIcon, setCreateIcon] = useState('👥');
   const [createColor, setCreateColor] = useState('#17865b');
   const [createOpen, setCreateOpen] = useState(searchParams.get('create') === '1');
   const [creating, setCreating] = useState(false);
+  const [vaultPassword, setVaultPassword] = useState('');
+  const [vaultPasswordConfirm, setVaultPasswordConfirm] = useState('');
+  const [recoveryDialog, setRecoveryDialog] = useState<string | null>(null);
+  const [recoveryAfterCreate, setRecoveryAfterCreate] = useState(false);
+  const [vaultCurrentPassword, setVaultCurrentPassword] = useState('');
+  const [vaultNewPassword, setVaultNewPassword] = useState('');
+  const [vaultNewPasswordConfirm, setVaultNewPasswordConfirm] = useState('');
+  const [vaultRecoveryPassword, setVaultRecoveryPassword] = useState('');
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const [vaultPasswordOpen, setVaultPasswordOpen] = useState(false);
+  const [vaultRecoveryOpen, setVaultRecoveryOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -192,18 +208,33 @@ export default function TeamSettings() {
     if (!createName.trim()) return;
     setCreating(true);
     try {
-      const response = await api.post<{ workspace: { id: string; name: string } }>('/api/workspaces', {
+      const response = await api.post<{ workspace: { id: string; name: string }; recoveryKey?: string; vaultToken?: string }>('/api/workspaces', {
         name: createName.trim(),
         kind: createKind,
-        icon: createIcon || (createKind === 'team' ? '👥' : '📔'),
+        icon: createIcon || (createKind === 'team' ? '👥' : createKind === 'vault' ? '🔒' : '📔'),
         color: createColor,
+        ...(createKind === 'vault' ? { vaultPassword } : {}),
       });
       await refreshAuth();
       localStorage.setItem('nh-workspace', response.workspace.id);
-      await initialize(response.workspace.id);
+      if (createKind === 'vault') {
+        if (response.vaultToken) useVaultStore.getState().setToken(response.workspace.id, response.vaultToken);
+        useAppStore.getState().selectWorkspace(response.workspace.id);
+        await initialize(response.workspace.id, { vault: true });
+        closeCreate();
+        if (response.recoveryKey) {
+          // Keep the settings page mounted until the user saves the one-time key.
+          setRecoveryAfterCreate(true);
+          setRecoveryDialog(response.recoveryKey);
+          toast('success', t('加密空间已创建'));
+          return;
+        }
+      } else {
+        await initialize(response.workspace.id);
+      }
       closeCreate();
       navigate('/app');
-      toast('success', createKind === 'personal' ? t('个人空间已创建') : t('团队空间已创建'));
+      toast('success', createKind === 'personal' ? t('个人空间已创建') : createKind === 'vault' ? t('加密空间已创建') : t('团队空间已创建'));
     } catch (error) {
       toast('error', t('创建失败'), (error as Error).message);
     } finally {
@@ -217,6 +248,8 @@ export default function TeamSettings() {
     setCreateKind('team');
     setCreateIcon('👥');
     setCreateColor('#17865b');
+    setVaultPassword('');
+    setVaultPasswordConfirm('');
     if (searchParams.get('create') === '1') {
       const next = new URLSearchParams(searchParams);
       next.delete('create');
@@ -250,10 +283,52 @@ export default function TeamSettings() {
 
   async function switchSpace(id: string) {
     if (id === workspaceId) return;
+    if (workspace?.kind === 'vault') await useVaultStore.getState().lock(workspace.id);
     localStorage.setItem('nh-workspace', id);
-    await initialize(id);
+    useAppStore.getState().selectWorkspace(id);
     await refreshAuth();
     navigate('/app');
+  }
+
+  async function changeVaultPassword() {
+    if (vaultNewPassword !== vaultNewPasswordConfirm) {
+      toast('error', t('两次输入的密码不一致'));
+      return;
+    }
+    setVaultBusy(true);
+    try {
+      await useVaultStore.getState().changePassword(workspaceId!, vaultCurrentPassword, vaultNewPassword);
+      setVaultPasswordOpen(false);
+      setVaultCurrentPassword('');
+      setVaultNewPassword('');
+      setVaultNewPasswordConfirm('');
+      toast('success', t('空间密码已更新'));
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
+    } finally {
+      setVaultBusy(false);
+    }
+  }
+
+  async function regenerateVaultRecovery() {
+    setVaultBusy(true);
+    try {
+      const key = await useVaultStore.getState().regenerateRecovery(workspaceId!, vaultRecoveryPassword);
+      setVaultRecoveryPassword('');
+      setVaultRecoveryOpen(false);
+      setRecoveryAfterCreate(false);
+      setRecoveryDialog(key);
+    } catch (error) {
+      toast('error', t('操作失败'), (error as Error).message);
+    } finally {
+      setVaultBusy(false);
+    }
+  }
+
+  async function lockVaultNow() {
+    if (!workspaceId) return;
+    await useVaultStore.getState().lock(workspaceId);
+    window.dispatchEvent(new Event('nh:vault-locked'));
   }
 
   function copy(value: string, id: string) {
@@ -286,18 +361,18 @@ export default function TeamSettings() {
                   color: entry.color ?? 'var(--blue)',
                 }}
               >
-                {entry.icon ?? '📔'}
+                {entry.kind === 'vault' ? <UserLock size={13} /> : entry.icon ?? '📔'}
               </span>
               <div className="space-overview-main">
                 <div className="space-overview-title">
                   <span className="space-overview-name">{entry.name}</span>
-                  <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : t('个人空间')} aria-label={entry.kind === 'team' ? t('团队空间') : t('个人空间')}>
-                    {entry.kind === 'team' ? <Users size={12} /> : <UserRound size={12} />}
+                  <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : entry.kind === 'vault' ? t('加密空间') : t('个人空间')} aria-label={entry.kind === 'team' ? t('团队空间') : entry.kind === 'vault' ? t('加密空间') : t('个人空间')}>
+                    {entry.kind === 'team' ? <Users size={12} /> : entry.kind === 'vault' ? <UserLock size={12} /> : <UserRound size={12} />}
                   </span>
                   {entry.id === workspaceId && <span className="badge badge-green">{t('当前')}</span>}
                 </div>
                 <div className="space-overview-meta">
-                  {entry.kind === 'team' ? t('成员 {n} 人', { n: entry.memberCount ?? 1 }) : t('只有你可以访问')} · {roleLabel(t, entry.role)}
+                  {entry.kind === 'team' ? t('成员 {n} 人', { n: entry.memberCount ?? 1 }) : entry.kind === 'vault' ? t('密码保护，只有你可以访问') : t('只有你可以访问')} · {roleLabel(t, entry.role)}
                 </div>
               </div>
               {entry.id !== workspaceId && (
@@ -309,14 +384,14 @@ export default function TeamSettings() {
           ))}
         </div>
         <p className="setting-note" style={{ marginTop: 10 }}>
-          {t('个人空间可以创建多个，只有你可见，可重命名；团队空间也支持创建多个，并带有成员、角色、邀请与审计。')}
+          {t('个人空间只有你可见；团队空间用于协作；加密空间使用独立密码派生密钥，内容不可分享、评论、双链或导出。')}
         </p>
       </section>
 
       <section className="settings-section">
         <div className="settings-section-head">
           <span className="settings-section-title">{t('当前空间')}</span>
-          <span className="settings-section-desc">{workspace?.kind === 'team' ? t('团队空间') : t('个人空间')}</span>
+          <span className="settings-section-desc">{workspace?.kind === 'team' ? t('团队空间') : workspace?.kind === 'vault' ? t('加密空间') : t('个人空间')}</span>
         </div>
         <div className="setting-card">
           <div className="setting-inline-form">
@@ -346,23 +421,67 @@ export default function TeamSettings() {
             <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 13, color: 'var(--text-tertiary)' }}>
-            <Users size={12} />{' '}
-            {getLocale() === 'en'
-              ? `${workspace?.memberCount ?? members.length} member${(workspace?.memberCount ?? members.length) === 1 ? '' : 's'}`
-              : t('{n} 位成员', { n: workspace?.memberCount ?? members.length })}
+            {workspace?.kind === 'vault' ? <UserLock size={12} /> : <Users size={12} />}{' '}
+            {workspace?.kind === 'vault'
+              ? t('仅所有者')
+              : getLocale() === 'en'
+                ? `${workspace?.memberCount ?? members.length} member${(workspace?.memberCount ?? members.length) === 1 ? '' : 's'}`
+                : t('{n} 位成员', { n: workspace?.memberCount ?? members.length })}
             <span className="dot" />
             {t('你的角色：{role}', { role: roleLabel(t, workspace?.role ?? '') })}
-            {workspace?.kind === 'personal' ? <><span className="dot" />{t('只有你可以访问')}</> : <><span className="dot" />{t('可邀请成员协作')}</>}
+            {workspace?.kind === 'personal' ? <><span className="dot" />{t('只有你可以访问')}</> : workspace?.kind === 'vault' ? <><span className="dot" />{t('密码派生加密')}</> : <><span className="dot" />{t('可邀请成员协作')}</>}
           </div>
           <p className="setting-note" style={{ marginTop: 10 }}>
             {workspace?.kind === 'personal'
               ? t('个人空间是只有你可见的私有空间，不能邀请成员；它可以重命名，也可以在有多个空间时删除。')
-              : t('团队空间用于多人协作，支持成员角色、邀请链接与审计日志，可转移所有权或删除。')}
+              : workspace?.kind === 'vault'
+                ? t('加密空间使用空间密码派生密钥加密正文与附件；不支持成员、邀请、分享、评论、双链、导出或备份。15 分钟无操作后自动锁定。')
+                : t('团队空间用于多人协作，支持成员角色、邀请链接与审计日志，可转移所有权或删除。')}
           </p>
         </div>
       </section>
 
-      {workspace?.kind === 'personal' ? (
+      {workspace?.kind === 'vault' && (
+        <>
+          <section className="settings-section">
+            <div className="settings-section-head">
+              <span className="settings-section-title">{t('空间安全')}</span>
+              <span className="settings-section-desc">{t('密码派生加密')}</span>
+            </div>
+            <div className="setting-card">
+              <div className="setting-row">
+                <div className="setting-row-main">
+                  <div className="setting-row-title">{t('修改空间密码')}</div>
+                  <div className="setting-row-desc">{t('修改后其他设备会立即锁定；正文不需要重新加密。')}</div>
+                </div>
+                <div className="setting-row-control">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVaultPasswordOpen(true)}><KeyRound size={13} /> {t('修改密码')}</button>
+                </div>
+              </div>
+              <div className="setting-row">
+                <div className="setting-row-main">
+                  <div className="setting-row-title">{t('重新生成恢复密钥')}</div>
+                  <div className="setting-row-desc">{t('旧恢复密钥会立即失效。新密钥只显示一次。')}</div>
+                </div>
+                <div className="setting-row-control">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVaultRecoveryOpen(true)} disabled={vaultBusy}><KeyRound size={13} /> {t('重新生成')}</button>
+                </div>
+              </div>
+              <div className="setting-row">
+                <div className="setting-row-main">
+                  <div className="setting-row-title">{t('立即锁定')}</div>
+                  <div className="setting-row-desc">{t('清除本标签页的内存密钥，再次进入需要重新输入空间密码。')}</div>
+                </div>
+                <div className="setting-row-control">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => void lockVaultNow()}><LockKeyhole size={13} /> {t('锁定')}</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {workspace?.kind !== 'vault' && (workspace?.kind === 'personal' ? (
         <section className="settings-section">
           <div className="settings-section-head"><span className="settings-section-title">{t('需要协作？')}</span></div>
           <div className="banner banner-info">
@@ -476,7 +595,7 @@ export default function TeamSettings() {
             </section>
           )}
         </>
-      )}
+      ))}
 
       {workspace?.kind === 'team' && (
         <section className="settings-section">
@@ -514,14 +633,14 @@ export default function TeamSettings() {
         open={createOpen}
         onClose={closeCreate}
         title={t('创建空间')}
-        description={t('个人空间只有你可见；团队空间用于多人协作。创建后可以随时切换。')}
+        description={t('个人空间只有你可见；团队空间用于多人协作；加密空间使用独立密码派生密钥。创建后可以随时切换。')}
         size="sm"
         footer={
           <>
             <button type="button" className="btn btn-secondary btn-sm" onClick={closeCreate}>{t('取消')}</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={createWorkspace} disabled={creating || !createName.trim()}>
-              {creating ? <span className="spinner" /> : createKind === 'personal' ? <UserRound size={13} /> : <Users size={13} />}
-              {createKind === 'personal' ? t('创建个人空间') : t('创建团队空间')}
+            <button type="button" className="btn btn-primary btn-sm" onClick={createWorkspace} disabled={creating || !createName.trim() || (createKind === 'vault' && (vaultPassword.length < 10 || vaultPassword !== vaultPasswordConfirm))}>
+              {creating ? <span className="spinner" /> : createKind === 'personal' ? <UserRound size={13} /> : createKind === 'vault' ? <UserLock size={13} /> : <Users size={13} />}
+              {createKind === 'personal' ? t('创建个人空间') : createKind === 'vault' ? t('创建加密空间') : t('创建团队空间')}
             </button>
           </>
         }
@@ -530,6 +649,7 @@ export default function TeamSettings() {
           {([
             { value: 'personal' as const, icon: <UserRound size={15} />, name: t('个人空间'), desc: t('只有你可见的私有空间，可重命名。') },
             { value: 'team' as const, icon: <Users size={15} />, name: t('团队空间'), desc: t('可邀请成员、分配角色并查看审计。') },
+            { value: 'vault' as const, icon: <UserLock size={15} />, name: t('加密空间'), desc: t('独立密码派生密钥；不可分享、评论、双链或导出。') },
           ]).map((option) => (
             <button
               key={option.value}
@@ -537,7 +657,7 @@ export default function TeamSettings() {
               className={`share-permission-option ${createKind === option.value ? 'selected' : ''}`}
               onClick={() => {
                 setCreateKind(option.value);
-                setCreateIcon(option.value === 'team' ? '👥' : '📔');
+                setCreateIcon(option.value === 'team' ? '👥' : option.value === 'vault' ? '🔒' : '📔');
               }}
             >
               <span className="share-permission-radio" />
@@ -551,12 +671,12 @@ export default function TeamSettings() {
         </div>
         <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} />
         <div className="field" style={{ marginTop: 14 }}>
-          <label>{createKind === 'personal' ? t('个人空间名称') : t('团队空间名称')}</label>
+          <label>{createKind === 'personal' ? t('个人空间名称') : createKind === 'vault' ? t('加密空间名称') : t('团队空间名称')}</label>
           <input
             className="input"
             value={createName}
             onChange={(event) => setCreateName(event.target.value)}
-            placeholder={createKind === 'personal' ? t('例如：阅读与写作') : t('例如：产品团队')}
+            placeholder={createKind === 'personal' ? t('例如：阅读与写作') : createKind === 'vault' ? t('例如：私人日记') : t('例如：产品团队')}
             maxLength={80}
             autoFocus
             onKeyDown={(event) => {
@@ -567,9 +687,26 @@ export default function TeamSettings() {
             }}
           />
           <span className="field-hint">
-            {createKind === 'personal' ? t('只有你可以访问；之后也可以创建更多个人或团队空间。') : t('你将成为空间所有者，之后可以邀请成员。')}
+            {createKind === 'personal' ? t('只有你可以访问；之后也可以创建更多个人或团队空间。') : createKind === 'vault' ? t('只有你可以访问；忘记密码和恢复密钥后内容无法恢复。') : t('你将成为空间所有者，之后可以邀请成员。')}
           </span>
         </div>
+        {createKind === 'vault' && (
+          <>
+            <div className="field" style={{ marginTop: 14 }}>
+              <label htmlFor="create-vault-password">{t('空间密码')}</label>
+              <input id="create-vault-password" className="input" type="password" value={vaultPassword} onChange={(event) => setVaultPassword(event.target.value)} autoComplete="new-password" minLength={10} />
+              <span className="field-hint">{t('至少 10 个字符；不能与账号密码相同。创建后会生成一次性恢复密钥。')}</span>
+            </div>
+            <div className="field" style={{ marginTop: 14 }}>
+              <label htmlFor="create-vault-confirm">{t('确认空间密码')}</label>
+              <input id="create-vault-confirm" className="input" type="password" value={vaultPasswordConfirm} onChange={(event) => setVaultPasswordConfirm(event.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="banner banner-warning" style={{ marginTop: 14 }}>
+              <ShieldAlert size={15} />
+              <div>{t('空间密码和恢复密钥都无法由服务器找回。请把恢复密钥保存在密码管理器或离线位置。')}</div>
+            </div>
+          </>
+        )}
       </Modal>
 
       <Modal
@@ -633,6 +770,86 @@ export default function TeamSettings() {
         confirmLabel={t('转移所有权')}
         danger
       />
+
+      <Modal
+        open={vaultPasswordOpen}
+        onClose={() => setVaultPasswordOpen(false)}
+        title={t('修改空间密码')}
+        description={t('修改后其他设备会立即锁定，正文和附件仍使用同一数据密钥。')}
+        size="sm"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVaultPasswordOpen(false)}>{t('取消')}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => void changeVaultPassword()} disabled={vaultBusy || !vaultCurrentPassword || vaultNewPassword.length < 10 || vaultNewPassword !== vaultNewPasswordConfirm}>
+              {vaultBusy ? <span className="spinner" /> : <KeyRound size={13} />} {t('更新密码')}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label htmlFor="vault-current-password">{t('当前空间密码')}</label>
+          <input id="vault-current-password" className="input" type="password" value={vaultCurrentPassword} onChange={(event) => setVaultCurrentPassword(event.target.value)} autoComplete="current-password" />
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label htmlFor="vault-next-password">{t('新的空间密码')}</label>
+          <input id="vault-next-password" className="input" type="password" value={vaultNewPassword} onChange={(event) => setVaultNewPassword(event.target.value)} autoComplete="new-password" />
+          <span className="field-hint">{t('至少 10 个字符。')}</span>
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label htmlFor="vault-next-confirm">{t('确认新密码')}</label>
+          <input id="vault-next-confirm" className="input" type="password" value={vaultNewPasswordConfirm} onChange={(event) => setVaultNewPasswordConfirm(event.target.value)} autoComplete="new-password" />
+        </div>
+        {vaultNewPassword && vaultNewPassword !== vaultNewPasswordConfirm && <div className="form-error" style={{ marginTop: 10 }}>{t('两次输入的密码不一致')}</div>}
+      </Modal>
+
+      <Modal
+        open={vaultRecoveryOpen}
+        onClose={() => setVaultRecoveryOpen(false)}
+        title={t('重新生成恢复密钥')}
+        description={t('需要验证当前空间密码。旧恢复密钥会立即失效。')}
+        size="sm"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVaultRecoveryOpen(false)}>{t('取消')}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => void regenerateVaultRecovery()} disabled={vaultBusy || !vaultRecoveryPassword}>
+              {vaultBusy ? <span className="spinner" /> : <KeyRound size={13} />} {t('生成新密钥')}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label htmlFor="vault-recovery-password">{t('当前空间密码')}</label>
+          <input id="vault-recovery-password" className="input" type="password" value={vaultRecoveryPassword} onChange={(event) => setVaultRecoveryPassword(event.target.value)} autoComplete="current-password" />
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(recoveryDialog)}
+        onClose={() => { setRecoveryDialog(null); if (recoveryAfterCreate) navigate('/app'); }}
+        title={t('保存恢复密钥')}
+        description={t('这是唯一一次显示。忘记空间密码时，它是恢复内容的唯一方式。')}
+        size="sm"
+        footer={
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => { setRecoveryDialog(null); if (recoveryAfterCreate) navigate('/app'); }}>
+            <Check size={13} /> {t('我已保存')}
+          </button>
+        }
+      >
+        {recoveryDialog && (
+          <>
+            <div className="vault-recovery-key">
+              <code>{recoveryDialog}</code>
+              <button type="button" className="icon-btn icon-btn-sm" onClick={() => copy(recoveryDialog, 'vault-recovery')} aria-label={t('复制恢复密钥')} title={t('复制恢复密钥')}>
+                {copied === 'vault-recovery' ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+            <div className="banner banner-warning" style={{ marginTop: 14 }}>
+              <ShieldAlert size={15} />
+              <div>{t('恢复密钥和空间密码都无法由 360note 找回。两者都丢失时，加密空间的内容无法恢复。')}</div>
+            </div>
+          </>
+        )}
+      </Modal>
     </>
   );
 }

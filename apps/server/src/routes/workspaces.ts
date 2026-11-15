@@ -3,11 +3,11 @@ import { z } from 'zod';
 import { many, one, query, transaction } from '../db.js';
 import { clientIp, requireAuth } from '../auth.js';
 import { audit } from '../lib/audit.js';
-import { decryptString, encryptString, randomToken, sha256 } from '../lib/crypto.js';
+import { decryptString, encryptString, randomToken, safeEqual, sha256 } from '../lib/crypto.js';
 import { errors } from '../lib/errors.js';
 import { emailSchema, parse } from '../lib/validate.js';
 import { avatarColor } from '../lib/seed.js';
-import { requireWorkspace, workspaceMemberCount } from '../services/workspaces.js';
+import { requireWorkspace, workspaceKind, workspaceMemberCount } from '../services/workspaces.js';
 import { notify } from '../services/sessions.js';
 import { deleteAttachment, deleteBackupFile } from '../lib/storage.js';
 import { cleanupNotesMedia } from '../services/media.js';
@@ -15,6 +15,20 @@ import type { DbUser } from '../lib/users.js';
 import { originFromRequest } from '../lib/origin.js';
 import { mailEnabled, normalizeLocale, sendWorkspaceInviteEmail } from '../lib/mailer.js';
 import { deleteOffsiteBackup } from '../services/offsite.js';
+import { passwordIssues } from '../lib/passwords.js';
+import {
+  deriveVaultKek,
+  generateVaultRecoveryKey,
+  randomVaultKey,
+  randomVaultSalt,
+  recoveryKek,
+  recoveryKeyHash,
+  unwrapVaultKey,
+  vaultKeyAad,
+  vaultRecoveryAad,
+  wrapVaultKey,
+} from '../lib/vault-crypto.js';
+import { activeVaultKey, clearVaultKey, clearWorkspaceVaultKeys, parseVaultHeader, setVaultKey, vaultKeyExpiresAt } from '../lib/vault-session.js';
 
 const roleSchema = z.enum(['admin', 'editor', 'viewer']);
 const memberRoleSchema = z.enum(['owner', 'admin', 'editor', 'viewer']);
@@ -65,26 +79,59 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const body = parse(
       z.object({
         name: z.string().trim().min(1).max(80),
-        kind: z.enum(['personal', 'team']).default('team'),
+        kind: z.enum(['personal', 'team', 'vault']).default('team'),
         icon: z.string().trim().min(1).max(16).optional(),
         color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        vaultPassword: z.string().min(1).max(200).optional(),
       }),
       request.body,
     );
-    const icon = body.icon ?? (body.kind === 'team' ? '👥' : '📔');
+    const vault = body.kind === 'vault';
+    if (vault) {
+      if (!body.vaultPassword) throw errors.badRequest('请为加密空间设置空间密码');
+      const issues = passwordIssues(body.vaultPassword);
+      if (issues.length) throw errors.badRequest(issues[0]);
+    }
+    const icon = body.icon ?? (body.kind === 'team' ? '👥' : body.kind === 'vault' ? '🔒' : '📔');
     const color = body.color ?? '#17865b';
+    const salt = vault ? randomVaultSalt() : null;
+    const dataKey = vault ? randomVaultKey() : null;
+    const recoveryKey = vault ? generateVaultRecoveryKey() : null;
+    let workspaceId = '';
     const workspace = await transaction(async (client) => {
       const row = await client.query<{ id: string; created_at: Date }>(
-        `INSERT INTO workspaces (name, kind, icon, color, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
-        [body.name, body.kind, icon, color, auth.user.id],
+        `INSERT INTO workspaces (name, kind, icon, color, owner_id, vault_salt, vault_key_wrapped, vault_recovery_hash, vault_recovery_wrapped, vault_created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, created_at`,
+        [body.name, body.kind, icon, color, auth.user.id, null, null, null, null, vault ? new Date() : null],
       );
+      workspaceId = row.rows[0].id;
+      if (vault && salt && dataKey && recoveryKey) {
+        const kek = await deriveVaultKek(body.vaultPassword!, salt);
+        const wrapped = wrapVaultKey(dataKey, kek, vaultKeyAad(workspaceId));
+        const recoveryWrap = wrapVaultKey(dataKey, recoveryKek(recoveryKey), vaultRecoveryAad(workspaceId));
+        await client.query(
+          `UPDATE workspaces SET vault_salt = $2, vault_key_wrapped = $3, vault_recovery_hash = $4, vault_recovery_wrapped = $5 WHERE id = $1`,
+          [workspaceId, salt.toString('base64'), wrapped, recoveryKeyHash(recoveryKey), recoveryWrap],
+        );
+      }
       await client.query(`INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [
         row.rows[0].id,
         auth.user.id,
       ]);
       return row.rows[0];
     });
-    await audit({ workspaceId: workspace.id, actorId: auth.user.id, action: 'workspace.create', targetType: 'workspace', targetId: workspace.id, ip: clientIp(request) });
+    let vaultToken: string | undefined;
+    if (vault && dataKey) {
+      const sessionId = auth.session?.id;
+      if (sessionId) {
+        const token = randomToken(32);
+        const expiresAt = setVaultKey(workspace.id, token, sessionId, dataKey);
+        await rememberUnlock(workspace.id, auth.user.id, sessionId, token, expiresAt);
+        vaultToken = vaultTokenValue(workspace.id, token);
+      }
+      dataKey.fill(0);
+    }
+    await audit({ workspaceId: workspace.id, actorId: auth.user.id, action: 'workspace.create', targetType: 'workspace', targetId: workspace.id, meta: { kind: body.kind }, ip: clientIp(request) });
     return {
       workspace: {
         id: workspace.id,
@@ -98,7 +145,233 @@ export default async function workspaceRoutes(app: FastifyInstance) {
         createdAt: workspace.created_at.toISOString(),
         updatedAt: workspace.created_at.toISOString(),
       },
+      recoveryKey: recoveryKey ?? undefined,
+      vaultToken,
     };
+  });
+
+  async function membership(id: string, userId: string): Promise<{ kind: string; role: string }> {
+    const row = await one<{ kind: string; role: string }>(
+      `SELECT w.kind, m.role FROM workspaces w JOIN workspace_members m ON m.workspace_id = w.id
+       WHERE w.id = $1 AND m.user_id = $2 AND w.deleted_at IS NULL`,
+      [id, userId],
+    );
+    if (!row) throw errors.notFound('工作区不存在或无权访问');
+    return row;
+  }
+
+  async function rejectVaultMembers(id: string): Promise<void> {
+    if ((await workspaceKind(id)) === 'vault') {
+      throw errors.forbidden('加密空间只属于所有者，不支持成员、邀请或所有权转移');
+    }
+  }
+
+  function vaultTokenValue(id: string, token: string): string {
+    return `${id}.${token}`;
+  }
+
+  async function rememberUnlock(workspaceId: string, userId: string, sessionId: string, token: string, expiresAt: number): Promise<void> {
+    await one(
+      `INSERT INTO workspace_unlocks (workspace_id, user_id, session_id, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (workspace_id, session_id)
+       DO UPDATE SET token_hash = EXCLUDED.token_hash, last_used_at = now(), expires_at = EXCLUDED.expires_at`,
+      [workspaceId, userId, sessionId, sha256(token), new Date(expiresAt)],
+    );
+  }
+
+  app.get('/api/workspaces/:id/vault/status', async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const member = await membership(id, auth.user.id);
+    if (member.kind !== 'vault') return { vault: false, unlocked: true, expiresAt: null };
+    const parsed = parseVaultHeader(request.headers['x-360note-vault'] as string | undefined);
+    const expiresAt = parsed && parsed.workspaceId === id ? vaultKeyExpiresAt(id, parsed.token, auth.session?.id) : null;
+    return { vault: true, unlocked: Boolean(expiresAt), expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null };
+  });
+
+  app.post('/api/workspaces/:id/vault/unlock', {
+    config: { rateLimit: { max: 8, timeWindow: '1 minute' } },
+  }, async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const body = parse(z.object({ password: z.string().min(1).max(200) }), request.body);
+    const member = await membership(id, auth.user.id);
+    if (member.kind !== 'vault') return { unlocked: true };
+    if (!auth.session?.id) throw errors.forbidden('加密空间需要在浏览器会话中解锁');
+    const row = await one<{ vault_salt: string | null; vault_key_wrapped: string | null }>(
+      'SELECT vault_salt, vault_key_wrapped FROM workspaces WHERE id = $1',
+      [id],
+    );
+    if (!row?.vault_salt || !row.vault_key_wrapped) throw errors.internal('加密空间缺少密钥材料');
+    try {
+      const kek = await deriveVaultKek(body.password, Buffer.from(row.vault_salt, 'base64'));
+      const dataKey = unwrapVaultKey(row.vault_key_wrapped, kek, vaultKeyAad(id));
+      const token = randomToken(32);
+      const expiresAt = setVaultKey(id, token, auth.session.id, dataKey);
+      dataKey.fill(0);
+      await rememberUnlock(id, auth.user.id, auth.session.id, token, expiresAt);
+      await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.unlock', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+      return { unlocked: true, vaultToken: vaultTokenValue(id, token), expiresAt: new Date(expiresAt).toISOString() };
+    } catch {
+      await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.unlock.failed', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+      throw errors.forbidden('空间密码不正确');
+    }
+  });
+
+  app.post('/api/workspaces/:id/vault/lock', async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await membership(id, auth.user.id);
+    const parsed = parseVaultHeader(request.headers['x-360note-vault'] as string | undefined);
+    if (parsed && parsed.workspaceId === id) clearVaultKey(id, parsed.token);
+    if (auth.session?.id) {
+      await query('DELETE FROM workspace_unlocks WHERE workspace_id = $1 AND session_id = $2', [id, auth.session.id]);
+    }
+    await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.lock', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+    return { ok: true };
+  });
+
+  app.post('/api/workspaces/:id/vault/touch', {
+    config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+  }, async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await requireWorkspace(auth.user.id, id, 'read');
+    const parsed = parseVaultHeader(request.headers['x-360note-vault'] as string | undefined);
+    const expiresAt = parsed && parsed.workspaceId === id ? vaultKeyExpiresAt(id, parsed.token, auth.session?.id) : null;
+    if (!expiresAt || !auth.session || !parsed) throw errors.locked('加密空间已锁定，请输入空间密码');
+    await one('UPDATE workspace_unlocks SET last_used_at = now(), expires_at = $4 WHERE workspace_id = $1 AND session_id = $2 AND token_hash = $3', [
+      id,
+      auth.session.id,
+      sha256(parsed.token),
+      new Date(expiresAt),
+    ]);
+    return { unlocked: true, expiresAt: new Date(expiresAt).toISOString() };
+  });
+
+  app.post('/api/workspaces/:id/vault/password', async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await requireWorkspace(auth.user.id, id, 'manage');
+    const member = await membership(id, auth.user.id);
+    if (member.kind !== 'vault') throw errors.badRequest('这不是加密空间');
+    if (member.role !== 'owner') throw errors.forbidden('只有空间所有者可以修改空间密码');
+    const body = parse(
+      z.object({ currentPassword: z.string().min(1).max(200), newPassword: z.string().min(1).max(200) }),
+      request.body,
+    );
+    const issues = passwordIssues(body.newPassword);
+    if (issues.length) throw errors.badRequest(issues[0]);
+    const currentKey = activeVaultKey(id);
+    if (!currentKey) throw errors.locked('加密空间已锁定，请输入空间密码');
+    const row = await one<{ vault_salt: string | null; vault_key_wrapped: string | null }>(
+      'SELECT vault_salt, vault_key_wrapped FROM workspaces WHERE id = $1',
+      [id],
+    );
+    if (!row?.vault_salt || !row.vault_key_wrapped) throw errors.internal('加密空间缺少密钥材料');
+    try {
+      const oldKek = await deriveVaultKek(body.currentPassword, Buffer.from(row.vault_salt, 'base64'));
+      const dataKey = unwrapVaultKey(row.vault_key_wrapped, oldKek, vaultKeyAad(id));
+      const salt = randomVaultSalt();
+      const kek = await deriveVaultKek(body.newPassword, salt);
+      const wrapped = wrapVaultKey(dataKey, kek, vaultKeyAad(id));
+      await one('UPDATE workspaces SET vault_salt = $2, vault_key_wrapped = $3 WHERE id = $1', [id, salt.toString('base64'), wrapped]);
+      clearWorkspaceVaultKeys(id);
+      let vaultToken: string | undefined;
+      if (auth.session?.id) {
+        const token = randomToken(32);
+        const expiresAt = setVaultKey(id, token, auth.session.id, dataKey);
+        await rememberUnlock(id, auth.user.id, auth.session.id, token, expiresAt);
+        vaultToken = vaultTokenValue(id, token);
+      }
+      dataKey.fill(0);
+      await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.password', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+      return { ok: true, vaultToken };
+    } catch {
+      throw errors.forbidden('当前空间密码不正确');
+    }
+  });
+
+  app.post('/api/workspaces/:id/vault/recovery', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const member = await membership(id, auth.user.id);
+    if (member.kind !== 'vault' || member.role !== 'owner') throw errors.forbidden('只有空间所有者可以恢复加密空间');
+    const body = parse(
+      z.object({ recoveryKey: z.string().min(16).max(200), newPassword: z.string().min(1).max(200) }),
+      request.body,
+    );
+    const issues = passwordIssues(body.newPassword);
+    if (issues.length) throw errors.badRequest(issues[0]);
+    const row = await one<{ vault_recovery_hash: string | null; vault_recovery_wrapped: string | null }>(
+      'SELECT vault_recovery_hash, vault_recovery_wrapped FROM workspaces WHERE id = $1',
+      [id],
+    );
+    if (!row?.vault_recovery_hash || !row.vault_recovery_wrapped) throw errors.badRequest('此空间没有恢复密钥');
+    if (!safeEqual(recoveryKeyHash(body.recoveryKey), row.vault_recovery_hash)) {
+      await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.recover.failed', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+      throw errors.forbidden('恢复密钥不正确');
+    }
+    let dataKey: Buffer;
+    try {
+      dataKey = unwrapVaultKey(row.vault_recovery_wrapped, recoveryKek(body.recoveryKey), vaultRecoveryAad(id));
+    } catch {
+      throw errors.forbidden('恢复密钥不正确');
+    }
+    const salt = randomVaultSalt();
+    const kek = await deriveVaultKek(body.newPassword, salt);
+    const wrapped = wrapVaultKey(dataKey, kek, vaultKeyAad(id));
+    const newRecoveryKey = generateVaultRecoveryKey();
+    const newRecoveryWrapped = wrapVaultKey(dataKey, recoveryKek(newRecoveryKey), vaultRecoveryAad(id));
+    await one(
+      `UPDATE workspaces SET vault_salt = $2, vault_key_wrapped = $3, vault_recovery_hash = $4, vault_recovery_wrapped = $5 WHERE id = $1`,
+      [id, salt.toString('base64'), wrapped, recoveryKeyHash(newRecoveryKey), newRecoveryWrapped],
+    );
+    clearWorkspaceVaultKeys(id);
+    let vaultToken: string | undefined;
+    if (auth.session?.id) {
+      const token = randomToken(32);
+      const expiresAt = setVaultKey(id, token, auth.session.id, dataKey);
+      await rememberUnlock(id, auth.user.id, auth.session.id, token, expiresAt);
+      vaultToken = vaultTokenValue(id, token);
+    }
+    dataKey.fill(0);
+    await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.recover', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+    return { recoveryKey: newRecoveryKey, vaultToken };
+  });
+
+  app.post('/api/workspaces/:id/vault/recovery/regenerate', async (request) => {
+    const auth = requireAuth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await requireWorkspace(auth.user.id, id, 'manage');
+    const member = await membership(id, auth.user.id);
+    if (member.kind !== 'vault' || member.role !== 'owner') throw errors.forbidden('只有空间所有者可以重置恢复密钥');
+    const body = parse(z.object({ password: z.string().min(1).max(200) }), request.body);
+    const row = await one<{ vault_salt: string | null; vault_key_wrapped: string | null }>(
+      'SELECT vault_salt, vault_key_wrapped FROM workspaces WHERE id = $1',
+      [id],
+    );
+    if (!row?.vault_salt || !row.vault_key_wrapped) throw errors.internal('加密空间缺少密钥材料');
+    let dataKey: Buffer;
+    try {
+      const kek = await deriveVaultKek(body.password, Buffer.from(row.vault_salt, 'base64'));
+      dataKey = unwrapVaultKey(row.vault_key_wrapped, kek, vaultKeyAad(id));
+    } catch {
+      throw errors.forbidden('空间密码不正确');
+    }
+    const recoveryKey = generateVaultRecoveryKey();
+    const wrapped = wrapVaultKey(dataKey, recoveryKek(recoveryKey), vaultRecoveryAad(id));
+    await one('UPDATE workspaces SET vault_recovery_hash = $2, vault_recovery_wrapped = $3 WHERE id = $1', [
+      id,
+      recoveryKeyHash(recoveryKey),
+      wrapped,
+    ]);
+    dataKey.fill(0);
+    await audit({ workspaceId: id, actorId: auth.user.id, action: 'vault.recovery.regenerate', targetType: 'workspace', targetId: id, ip: clientIp(request) });
+    return { recoveryKey };
   });
 
   app.patch('/api/workspaces/:id', async (request) => {
@@ -140,9 +413,21 @@ export default async function workspaceRoutes(app: FastifyInstance) {
   app.delete('/api/workspaces/:id', async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    const role = await requireWorkspace(auth.user.id, id, 'transfer');
-    void role;
-    const workspace = await one<{ kind: string; name: string }>('SELECT kind, name FROM workspaces WHERE id = $1', [id]);
+    const target = await one<{ kind: string; name: string; role: string }>(
+      `SELECT w.kind, w.name, m.role FROM workspaces w
+       JOIN workspace_members m ON m.workspace_id = w.id AND m.user_id = $2
+       WHERE w.id = $1 AND w.deleted_at IS NULL`,
+      [id, auth.user.id],
+    );
+    if (!target) throw errors.notFound('工作区不存在或无权访问');
+    // Deleting a vault does not reveal content, so it stays possible even if
+    // the password/recovery key was lost. Only the owner may do it.
+    if (target.kind === 'vault') {
+      if (target.role !== 'owner') throw errors.forbidden('只有空间所有者可以删除加密空间');
+    } else {
+      await requireWorkspace(auth.user.id, id, 'transfer');
+    }
+    const workspace = { kind: target.kind, name: target.name };
     const remaining = await one<{ count: string }>(
       `SELECT count(*)::text AS count FROM workspace_members WHERE user_id = $1`,
       [auth.user.id],
@@ -153,6 +438,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const backups = await many<{ filename: string }>('SELECT filename FROM backups WHERE workspace_id = $1', [id]);
     await audit({ workspaceId: id, actorId: auth.user.id, action: 'workspace.delete', targetType: 'workspace', targetId: id, meta: { name: workspace?.name }, ip: clientIp(request) });
     await cleanupNotesMedia(noteIds.map((row) => row.id));
+    clearWorkspaceVaultKeys(id);
     await one('DELETE FROM workspaces WHERE id = $1 RETURNING id', [id]);
     await query("DELETE FROM jobs WHERE payload->>'workspaceId' = $1", [id]);
     await Promise.all([
@@ -197,6 +483,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), request.params);
     const actorRole = await requireWorkspace(auth.user.id, id, 'manage');
+    await rejectVaultMembers(id);
     const body = parse(z.object({ role: memberRoleSchema }), request.body);
     if (body.role === 'owner' && actorRole !== 'owner') throw errors.forbidden('只有所有者可以转移所有权');
     const target = await one<{ role: string }>('SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [id, userId]);
@@ -221,6 +508,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), request.params);
     await requireWorkspace(auth.user.id, id, 'manage');
+    await rejectVaultMembers(id);
     if (userId === auth.user.id) throw errors.badRequest('不能移除自己，请使用“离开空间”');
     const target = await one<{ role: string }>('SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [id, userId]);
     if (!target) throw errors.notFound('成员不存在');
@@ -234,6 +522,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const role = await requireWorkspace(auth.user.id, id, 'read');
+    await rejectVaultMembers(id);
     if (role === 'owner') throw errors.badRequest('所有者需要先转移所有权');
     await one('DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 RETURNING user_id', [id, auth.user.id]);
     return { ok: true };
@@ -243,6 +532,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     await requireWorkspace(auth.user.id, id, 'manage');
+    await rejectVaultMembers(id);
     const rows = await many<{
       id: string;
       email: string;
@@ -281,6 +571,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const actorRole = await requireWorkspace(auth.user.id, id, 'manage');
     const workspaceRow = await one<{ kind: string }>('SELECT kind FROM workspaces WHERE id = $1', [id]);
     if (workspaceRow?.kind === 'personal') throw errors.forbidden('个人空间是私密的，不能邀请成员');
+    if (workspaceRow?.kind === 'vault') throw errors.forbidden('加密空间只属于所有者，不能邀请成员');
     const body = parse(z.object({ email: emailSchema, role: roleSchema.default('editor') }), request.body);
     if (body.role === 'admin' && actorRole !== 'owner') throw errors.forbidden('只有所有者可以邀请管理员');
     const existingMember = await one<{ user_id: string }>(
@@ -366,6 +657,7 @@ export default async function workspaceRoutes(app: FastifyInstance) {
       request.params,
     );
     await requireWorkspace(auth.user.id, id, 'manage');
+    await rejectVaultMembers(id);
     await one(`UPDATE workspace_invitations SET status = 'revoked' WHERE id = $1 AND workspace_id = $2 RETURNING id`, [invitationId, id]);
     return { ok: true };
   });

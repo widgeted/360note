@@ -1,8 +1,9 @@
 import type { FastifyRequest } from 'fastify';
-import { one, query } from '../db.js';
+import { many, one, query } from '../db.js';
 import { randomToken, sha256 } from '../lib/crypto.js';
 import { config } from '../config.js';
 import { clientIp, userAgent } from '../auth.js';
+import { clearSessionVaultKeys } from '../lib/vault-session.js';
 
 export async function createSession(
   userId: string,
@@ -42,15 +43,23 @@ export async function revokeSession(sessionId: string, userId: string): Promise<
     'UPDATE sessions SET revoked_at = now() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL RETURNING id',
     [sessionId, userId],
   );
+  if (row) {
+    clearSessionVaultKeys(sessionId);
+    await query('DELETE FROM workspace_unlocks WHERE session_id = $1', [sessionId]).catch(() => {});
+  }
   return Boolean(row);
 }
 
 export async function revokeAllSessions(userId: string, exceptSessionId?: string): Promise<void> {
-  await one(
+  const rows = await many<{ id: string }>(
     `UPDATE sessions SET revoked_at = now()
      WHERE user_id = $1 AND revoked_at IS NULL ${exceptSessionId ? 'AND id <> $2' : ''} RETURNING id`,
     exceptSessionId ? [userId, exceptSessionId] : [userId],
   );
+  for (const row of rows) clearSessionVaultKeys(row.id);
+  if (rows.length) {
+    await query('DELETE FROM workspace_unlocks WHERE session_id = ANY($1::uuid[])', [rows.map((row) => row.id)]).catch(() => {});
+  }
 }
 
 export async function revokeAllApiTokens(userId: string): Promise<void> {
@@ -136,13 +145,17 @@ export async function revokeDeviceSession(sessionId: string, userId: string): Pr
     [sessionId, userId],
   );
   if (!target) return false;
-  await query(
+  const revoked = await many<{ id: string }>(
     `UPDATE sessions SET revoked_at = now()
      WHERE user_id = $1 AND revoked_at IS NULL
        AND COALESCE(device_id, user_agent || '|' || ip) = $2
      RETURNING id`,
     [userId, target.device_key],
   );
+  for (const row of revoked) clearSessionVaultKeys(row.id);
+  if (revoked.length) {
+    await query('DELETE FROM workspace_unlocks WHERE session_id = ANY($1::uuid[])', [revoked.map((row) => row.id)]).catch(() => {});
+  }
   return true;
 }
 

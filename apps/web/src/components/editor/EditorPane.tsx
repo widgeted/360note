@@ -414,6 +414,7 @@ export function EditorPane({
         contentMd: contentRef.current,
         baseVersion: baseVersionRef.current,
         updatedAt: Date.now(),
+        vault: Boolean(note.vault),
       });
     }, 280);
   }, [note?.id, workspaceId]);
@@ -429,6 +430,7 @@ export function EditorPane({
         contentMd: contentRef.current,
         baseVersion: baseVersionRef.current,
         updatedAt: Date.now(),
+        vault: Boolean(note.vault),
       });
     };
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -494,6 +496,7 @@ export function EditorPane({
           contentMd: contentRef.current,
           baseVersion: baseVersionRef.current,
           updatedAt: Date.now(),
+          vault: Boolean(note.vault),
         });
       }
     };
@@ -509,6 +512,7 @@ export function EditorPane({
   const chars = charCount(content);
   const readMinutes = Math.max(1, Math.round(words / 400));
   const canShare = note.canShare && !note.trashedAt && !isLocalNote(note.id);
+  const isVaultNote = Boolean(note.vault);
 
   function applyTitle(next: string) {
     if (next === titleValueRef.current) return;
@@ -874,23 +878,27 @@ export function EditorPane({
                 <MenuItem icon={<FileText size={14} />} onClick={() => { close(); void duplicateNote(note.id).then((copy) => { if (copy) navigate(`/app/note/${copy.id}`); }); }}>{t('创建副本')}</MenuItem>
                 <MenuItem icon={<FolderIcon />} onClick={() => { close(); setMoveTarget(note.folderId); setShowMove(true); }}>{t('移动到')}</MenuItem>
                 <MenuItem icon={<History size={14} />} onClick={() => { close(); setContextTab('history'); }}>{t('版本历史')}</MenuItem>
-                {instance?.aiEnabled && (
+                {instance?.aiEnabled && !isVaultNote && (
                   <MenuItem icon={<Sparkles size={14} />} onClick={() => { close(); setShowSummary(true); }}>{t('生成摘要')}</MenuItem>
                 )}
                 <MenuItem icon={<Mic size={14} />} onClick={() => { close(); startVoice(); }}>{voiceActive ? t('正在聆听…') : t('语音输入')}</MenuItem>
                 {!isMobile && (
                   <MenuItem icon={focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} onClick={() => { close(); setFocusMode(!focusMode); }}>{focusMode ? t('退出聚焦') : t('聚焦模式')}</MenuItem>
                 )}
-                <div className="menu-separator" />
-                <div className="menu-label">{t('导出')}</div>
-                <MenuItem icon={<FileText size={14} />} onClick={() => { close(); void exportNote('md'); }}>{t('导出为 Markdown')}</MenuItem>
-                <MenuItem icon={<FileCode2 size={14} />} onClick={() => { close(); void exportNote('html'); }}>{t('导出为 HTML')}</MenuItem>
-                {instance?.pdfExportEnabled && (
-                  <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportNote('pdf'); }}>{t('导出为 PDF')}</MenuItem>
+                {!isVaultNote && (
+                  <>
+                    <div className="menu-separator" />
+                    <div className="menu-label">{t('导出')}</div>
+                    <MenuItem icon={<FileText size={14} />} onClick={() => { close(); void exportNote('md'); }}>{t('导出为 Markdown')}</MenuItem>
+                    <MenuItem icon={<FileCode2 size={14} />} onClick={() => { close(); void exportNote('html'); }}>{t('导出为 HTML')}</MenuItem>
+                    {instance?.pdfExportEnabled && (
+                      <MenuItem icon={<Download size={14} />} onClick={() => { close(); void exportNote('pdf'); }}>{t('导出为 PDF')}</MenuItem>
+                    )}
+                    <div className="menu-separator" />
+                    {canShare && <MenuItem icon={<Share2 size={14} />} onClick={() => { close(); setShowShare(true); }}>{t('分享笔记')}</MenuItem>}
+                    <MenuItem icon={<Link2 size={14} />} onClick={() => { close(); setShowWiki(true); }}>{t('双向链接')}</MenuItem>
+                  </>
                 )}
-                <div className="menu-separator" />
-                {canShare && <MenuItem icon={<Share2 size={14} />} onClick={() => { close(); setShowShare(true); }}>{t('分享笔记')}</MenuItem>}
-                <MenuItem icon={<Link2 size={14} />} onClick={() => { close(); setShowWiki(true); }}>{t('双向链接')}</MenuItem>
                 <MenuItem icon={<span className="mono" style={{ fontSize: 13 }}>{mode === 'rich' ? 'M↓' : 'Aa'}</span>} onClick={() => { close(); void toggleMode(); }}>{mode === 'rich' ? t('Markdown 模式') : t('富文本模式')}</MenuItem>
                 <div className="menu-separator" />
                 <MenuItem danger icon={<Trash2 size={14} />} onClick={() => { close(); setDeleteOpen(true); }}>{t('删除')}</MenuItem>
@@ -999,6 +1007,7 @@ export function EditorPane({
           onImages={(files) => editorHandle?.insertFiles(files)}
           onImageGrid={(columns) => editorHandle?.setImageGrid(columns)}
           onUngroupImages={() => editorHandle?.ungroupImages()}
+          vault={isVaultNote}
         />
       )}
 

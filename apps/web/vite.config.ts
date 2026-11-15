@@ -146,6 +146,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // One shared instance across the app shell and lazy settings page.
+          if (id.includes('/src/stores/vault.') || id.includes('/src/lib/vault-header.')) return 'vault-state';
           if (!id.includes('node_modules')) return undefined;
           // Keep React out of the editor chunk. Otherwise the entry imports
           // the editor vendor just to get React, and every landing-page visitor

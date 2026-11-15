@@ -14,6 +14,7 @@ import { closePool, one } from './db.js';
 import { AppError, errorPayload } from './lib/errors.js';
 import { localizeMessage, requestLanguage } from './lib/i18n.js';
 import authPlugin from './auth.js';
+import requestContextPlugin from '@fastify/request-context';
 import authRoutes from './routes/auth.js';
 import workspaceRoutes from './routes/workspaces.js';
 import noteRoutes from './routes/notes.js';
@@ -198,6 +199,7 @@ async function buildServer() {
   await app.register(multipart, {
     limits: { fileSize: config.maxUploadBytes, files: 20, fields: 20 },
   });
+  await app.register(requestContextPlugin, { hook: 'onRequest' });
   await app.register(authPlugin);
 
   app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, request, reply) => {

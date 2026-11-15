@@ -20,6 +20,7 @@ import {
   Star,
   Sun,
   Trash2,
+  UserLock,
   UserRound,
   UsersRound,
   X,
@@ -31,6 +32,7 @@ import { getLocale, useT } from '../lib/i18n';
 import { getStoredTheme, storeTheme } from '../lib/theme';
 import { cn } from '../lib/utils';
 import { useIsMobile } from '../lib/useMediaQuery';
+import { useVaultStore } from '../stores/vault';
 import { Avatar } from './Avatar';
 import { LogoLockup } from './Logo';
 import { Dropdown, MenuItem } from './Dropdown';
@@ -128,7 +130,7 @@ export function Sidebar() {
   const toggleSidebar = useAppStore((state) => state.toggleSidebar);
   const setMobileSidebar = useAppStore((state) => state.setMobileSidebar);
   const setFilter = useAppStore((state) => state.setFilter);
-  const initialize = useAppStore((state) => state.initialize);
+  const selectWorkspace = useAppStore((state) => state.selectWorkspace);
   const createNote = useAppStore((state) => state.createNote);
   const refreshFolders = useAppStore((state) => state.refreshFolders);
   const refreshTags = useAppStore((state) => state.refreshTags);
@@ -165,8 +167,11 @@ export function Sidebar() {
 
   async function switchWorkspace(id: string) {
     if (id === workspaceId) return;
+    if (currentWorkspace?.kind === 'vault') {
+      await useVaultStore.getState().lock(currentWorkspace.id);
+    }
     localStorage.setItem('nh-workspace', id);
-    await initialize(id);
+    selectWorkspace(id);
     navigate('/app');
     closeMobile();
   }
@@ -417,15 +422,15 @@ export function Sidebar() {
                   color: currentWorkspace?.color ?? 'var(--sidebar-accent)',
                 }}
               >
-                {currentWorkspace?.icon ?? '📔'}
+                {currentWorkspace?.kind === 'vault' ? <UserLock size={14} /> : currentWorkspace?.icon ?? '📔'}
               </span>
               <span className="workspace-name">{currentWorkspace?.name ?? '360note'}</span>
               <span
                 className="workspace-kind-icon"
-                title={currentWorkspace?.kind === 'team' ? t('团队空间') : t('个人空间')}
-                aria-label={currentWorkspace?.kind === 'team' ? t('团队空间') : t('个人空间')}
+                title={currentWorkspace?.kind === 'team' ? t('团队空间') : currentWorkspace?.kind === 'vault' ? t('加密空间') : t('个人空间')}
+                aria-label={currentWorkspace?.kind === 'team' ? t('团队空间') : currentWorkspace?.kind === 'vault' ? t('加密空间') : t('个人空间')}
               >
-                {currentWorkspace?.kind === 'team' ? <UsersRound size={13} /> : <UserRound size={13} />}
+                {currentWorkspace?.kind === 'team' ? <UsersRound size={13} /> : currentWorkspace?.kind === 'vault' ? <UserLock size={13} /> : <UserRound size={13} />}
               </span>
               <ChevronDown size={13} className="workspace-chevron" />
             </button>
@@ -450,7 +455,7 @@ export function Sidebar() {
                         color: workspace.color ?? 'var(--sidebar-accent)',
                       }}
                     >
-                      {workspace.icon ?? '📔'}
+                      {workspace.kind === 'vault' ? <UserLock size={12} /> : workspace.icon ?? '📔'}
                     </span>
                   }
                   detail={workspace.id === workspaceId ? '✓' : undefined}

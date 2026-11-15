@@ -75,7 +75,7 @@ async function workspacesFor(userId: string) {
   return (await userWorkspaces(userId)).map((workspace) => ({
     id: workspace.id,
     name: workspace.name,
-    kind: workspace.kind as 'personal' | 'team',
+    kind: workspace.kind as 'personal' | 'team' | 'vault',
     icon: workspace.icon,
     color: workspace.color,
     ownerId: workspace.owner_id,

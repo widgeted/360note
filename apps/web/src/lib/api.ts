@@ -1,4 +1,5 @@
 import { getLocale, translate } from './i18n';
+import { getVaultHeader } from './vault-header';
 
 export class ApiError extends Error {
   status: number;
@@ -32,6 +33,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
   headers['Accept-Language'] = locale === 'en' ? 'en' : 'zh-CN';
   headers['X-Locale'] = locale;
+  const vaultHeader = getVaultHeader();
+  if (vaultHeader) headers['X-360note-Vault'] = vaultHeader;
   let body: BodyInit | undefined = options.rawBody;
   if (options.body !== undefined && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
@@ -74,6 +77,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         (typeof data === 'string' && !data.trim().startsWith('<') ? data : translate('请求失败'));
     if (response.status === 401 && !path.includes('/api/auth/')) {
       window.dispatchEvent(new CustomEvent('nh:unauthorized'));
+    }
+    if (response.status === 423) {
+      window.dispatchEvent(new CustomEvent('nh:vault-locked'));
     }
     throw new ApiError(response.status, code, message, payload?.error?.details);
   }

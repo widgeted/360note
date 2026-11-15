@@ -35,6 +35,7 @@ export async function saveAttachment(
   storageKey: string,
   data: Buffer,
   target?: 'local' | 's3',
+  key?: Buffer,
 ): Promise<string> {
   let config: Awaited<ReturnType<typeof getObjectStorageConfig>> | null = null;
   try {
@@ -45,7 +46,7 @@ export async function saveAttachment(
   }
   const wantS3 = target === 's3' || (target === undefined && config?.attachmentsEnabled === true && objectStorageConfigured(config) && !attachmentStorageMigrationMode());
   const effectiveKey = storageKey.startsWith('s3:') || !wantS3 ? storageKey : attachmentObjectStorageKey(storageKey);
-  const encrypted = encryptBuffer(data, ATTACHMENT_AAD);
+  const encrypted = encryptBuffer(data, ATTACHMENT_AAD, key);
   if (effectiveKey.startsWith('s3:')) {
     await putObject(effectiveKey, encrypted);
     return effectiveKey;
@@ -65,6 +66,7 @@ export async function saveAttachmentFromFile(
   storageKey: string,
   sourcePath: string,
   target?: 'local' | 's3',
+  key?: Buffer,
 ): Promise<string> {
   let config: Awaited<ReturnType<typeof getObjectStorageConfig>> | null = null;
   try {
@@ -77,7 +79,7 @@ export async function saveAttachmentFromFile(
   if (effectiveKey.startsWith('s3:')) {
     const temp = path.join(paths.temp, `attach-${crypto.randomUUID()}.enc`);
     try {
-      const size = await encryptFile(sourcePath, temp, ATTACHMENT_AAD);
+      const size = await encryptFile(sourcePath, temp, ATTACHMENT_AAD, key);
       await putObjectStream(effectiveKey, fs.createReadStream(temp), size);
       return effectiveKey;
     } finally {
@@ -87,17 +89,17 @@ export async function saveAttachmentFromFile(
   const localTarget = path.join(paths.attachments, effectiveKey);
   assertInside(paths.attachments, localTarget);
   await fsp.mkdir(path.dirname(localTarget), { recursive: true, mode: 0o700 });
-  await encryptFile(sourcePath, localTarget, ATTACHMENT_AAD);
+  await encryptFile(sourcePath, localTarget, ATTACHMENT_AAD, key);
   return effectiveKey;
 }
 
-export async function readAttachment(storageKey: string): Promise<Buffer> {
+export async function readAttachment(storageKey: string, key?: Buffer): Promise<Buffer> {
   if (storageKey.startsWith('s3:')) {
-    return decryptBuffer(await getObject(storageKey), ATTACHMENT_AAD);
+    return decryptBuffer(await getObject(storageKey), ATTACHMENT_AAD, key);
   }
   const target = path.join(paths.attachments, storageKey);
   assertInside(paths.attachments, target);
-  return decryptBuffer(await fsp.readFile(target), ATTACHMENT_AAD);
+  return decryptBuffer(await fsp.readFile(target), ATTACHMENT_AAD, key);
 }
 
 async function removeLocalAttachmentFiles(storageKey: string): Promise<void> {

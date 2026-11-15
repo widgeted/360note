@@ -15,6 +15,7 @@ export class AppError extends Error {
 export const errors = {
   unauthorized: (message = '请先登录') => new AppError(401, 'UNAUTHORIZED', message),
   forbidden: (message = '没有权限执行此操作') => new AppError(403, 'FORBIDDEN', message),
+  locked: (message = '加密空间已锁定，请输入空间密码') => new AppError(423, 'VAULT_LOCKED', message),
   notFound: (message = '未找到') => new AppError(404, 'NOT_FOUND', message),
   badRequest: (message = '请求无效', details?: unknown) => new AppError(400, 'BAD_REQUEST', message, details),
   conflict: (message = '内容已在其他位置更新', details?: unknown) => new AppError(409, 'CONFLICT', message, details),

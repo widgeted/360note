@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Check, Clock3, FileText, LayoutTemplate, PenLine, UploadCloud } from 'lucide-react';
+import { Check, Clock3, FileText, LayoutTemplate, LockKeyhole, PenLine, UploadCloud } from 'lucide-react';
 import { useAppStore } from '../../stores/app';
 import { useT } from '../../lib/i18n';
 import { shortcutLabel } from '../../lib/utils';
@@ -8,7 +8,7 @@ import { shortcutLabel } from '../../lib/utils';
  * Lightweight empty state shared by the editor route. Kept separate from the
  * heavy editor module so the shell never downloads TipTap before a note opens.
  */
-export function EmptyEditorState() {
+export function EmptyEditorState({ vault = false }: { vault?: boolean } = {}) {
   const t = useT();
   const navigate = useNavigate();
   const createNote = useAppStore((state) => state.createNote);
@@ -30,9 +30,11 @@ export function EmptyEditorState() {
         </button>
       </div>
       <div className="editor-empty-actions editor-empty-actions-secondary">
-        <button type="button" className="btn btn-secondary" onClick={() => navigate('/app/settings/data?import=1')}>
-          <UploadCloud size={13} /> {t('导入笔记')}
-        </button>
+        {!vault && (
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/app/settings/data?import=1')}>
+            <UploadCloud size={13} /> {t('导入笔记')}
+          </button>
+        )}
         <button type="button" className="btn btn-secondary" onClick={() => window.dispatchEvent(new Event('nh:open-templates'))}>
           <LayoutTemplate size={13} /> {t('从模板创建')}
         </button>
@@ -43,9 +45,19 @@ export function EmptyEditorState() {
         </button>
       </div>
       <div className="editor-empty-hints">
-        <span><Check size={12} /> {t('自动保存')} · {t('离线可写')}</span>
-        <span><Clock3 size={12} /> {t('历史版本与冲突副本')}</span>
-        <span><FileText size={12} /> {t('Markdown 随时导出')}</span>
+        {vault ? (
+          <>
+            <span><LockKeyhole size={12} /> {t('密码派生密钥加密')}</span>
+            <span><Check size={12} /> {t('自动保存需要联网')}</span>
+            <span><Clock3 size={12} /> {t('加密空间不支持导出')}</span>
+          </>
+        ) : (
+          <>
+            <span><Check size={12} /> {t('自动保存')} · {t('离线可写')}</span>
+            <span><Clock3 size={12} /> {t('历史版本与冲突副本')}</span>
+            <span><FileText size={12} /> {t('Markdown 随时导出')}</span>
+          </>
+        )}
       </div>
     </div>
   );

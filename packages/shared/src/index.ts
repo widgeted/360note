@@ -4,7 +4,7 @@
  */
 
 export type Role = 'owner' | 'admin' | 'editor' | 'viewer';
-export type WorkspaceKind = 'personal' | 'team';
+export type WorkspaceKind = 'personal' | 'team' | 'vault';
 export type SharePermission = 'view' | 'comment' | 'edit';
 export type ExportFormat = 'md' | 'html' | 'pdf' | 'json';
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -127,6 +127,7 @@ export interface NoteSummary {
   isFavorite: boolean;
   isPinned: boolean;
   encrypted: boolean;
+  vault?: boolean;
   createdAt: string;
   updatedAt: string;
   trashedAt: string | null;

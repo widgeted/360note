@@ -53,6 +53,7 @@ export function ContextPanel() {
   const restoreVersion = useAppStore((state) => state.restoreVersion);
   const reloadNote = useAppStore((state) => state.reloadNote);
 
+  const vault = Boolean(note?.vault);
   const [backlinks, setBacklinks] = useState<Backlink[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState('');
@@ -86,6 +87,10 @@ export function ContextPanel() {
   }, [note?.folderId, folders]);
 
   const open = useAppStore((state) => state.contextOpen);
+
+  useEffect(() => {
+    if (vault && (tab === 'backlinks' || tab === 'comments')) setTab('info');
+  }, [vault, tab, setTab]);
 
   useEffect(() => {
     if (!note) return;
@@ -267,7 +272,7 @@ export function ContextPanel() {
     <aside className={cn('context-panel', open && 'is-open')} aria-hidden={!open}>
       <div className="context-head">
         <div className="context-tabs">
-          {(['info', 'backlinks', 'comments', 'history'] as const).map((entry) => (
+          {(vault ? (['info', 'history'] as const) : (['info', 'backlinks', 'comments', 'history'] as const)).map((entry) => (
             <button key={entry} type="button" className={cn('context-tab', tab === entry && 'active')} onClick={() => setTab(entry)}>
               {entry === 'info' ? t('信息') : entry === 'backlinks' ? t('反向链接') : entry === 'comments' ? t('评论') : t('历史')}
               {entry === 'comments' && comments.length > 0 && <span style={{ marginLeft: 3, fontSize: 13, color: 'var(--text-tertiary)' }}>{comments.length}</span>}

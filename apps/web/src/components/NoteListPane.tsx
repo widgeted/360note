@@ -41,6 +41,7 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }
   const t = useT();
   const navigate = useNavigate();
   const notes = useAppStore((state) => state.notes);
+  const vaultWorkspace = useAppStore((state) => state.vaultWorkspace);
   const total = useAppStore((state) => state.total);
   const currentNote = useAppStore((state) => state.note);
   const loading = useAppStore((state) => state.loadingList);
@@ -180,7 +181,8 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }
               <input
                 ref={inputRef}
                 className="note-search-input"
-                value={searchValue}
+                value={vaultWorkspace ? '' : searchValue}
+                disabled={vaultWorkspace}
                 onChange={(event) => setSearchValue(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
@@ -192,8 +194,9 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }
                     void refreshList();
                   }
                 }}
-                placeholder={t('搜索笔记、标签或附件')}
+                placeholder={vaultWorkspace ? t('加密空间内搜索已关闭') : t('搜索笔记、标签或附件')}
                 aria-label={t('搜索')}
+                title={vaultWorkspace ? t('加密空间内容以密码派生密钥加密，服务器不建立搜索索引') : undefined}
                 style={{
                   border: 0,
                   outline: 'none',
@@ -203,13 +206,13 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }
                   color: 'var(--text)',
                 }}
               />
-              {searchValue ? (
+              {!vaultWorkspace && searchValue ? (
                 <button type="button" className="icon-btn icon-btn-sm" onClick={clearSearch} aria-label={t('清除搜索')} style={{ width: 20, height: 20 }}>
                   <X size={12} />
                 </button>
-              ) : (
+              ) : !vaultWorkspace ? (
                 <kbd>{shortcutLabel('Mod+K')}</kbd>
-              )}
+              ) : null}
             </div>
           </div>
           <button type="button" className="new-note-btn" onClick={newNote} disabled={creating} title={t('新建笔记')} aria-label={t('新建笔记')}>

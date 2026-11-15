@@ -20,16 +20,16 @@ export function validateCryptoConfig(): void {
 const KEY = () => masterKey();
 
 /** AES-256-GCM. Format: [version=1][iv 12][tag 16][ciphertext]. */
-export function encryptBuffer(plain: Buffer, aad = '360note'): Buffer {
+export function encryptBuffer(plain: Buffer, aad = '360note', key?: Buffer): Buffer {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', KEY(), iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key ?? KEY(), iv);
   cipher.setAAD(Buffer.from(aad));
   const encrypted = Buffer.concat([cipher.update(plain), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([Buffer.from([1]), iv, tag, encrypted]);
 }
 
-export function decryptBuffer(payload: Buffer, aad = '360note'): Buffer {
+export function decryptBuffer(payload: Buffer, aad = '360note', key?: Buffer): Buffer {
   if (payload.length < 29) throw new Error('Invalid encrypted payload');
   const version = payload[0];
   if (version !== 1 && version !== 2) throw new Error('Unsupported encrypted payload version');
@@ -39,16 +39,16 @@ export function decryptBuffer(payload: Buffer, aad = '360note'): Buffer {
   const tag = version === 1 ? payload.subarray(13, 29) : payload.subarray(payload.length - 16);
   const data = version === 1 ? payload.subarray(29) : payload.subarray(13, payload.length - 16);
   if (data.length === 0) throw new Error('Invalid encrypted payload');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', KEY(), iv);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key ?? KEY(), iv);
   decipher.setAAD(Buffer.from(aad));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }
 
 /** Streaming AES-256-GCM: [version=2][iv 12][ciphertext][tag 16]. */
-export async function encryptFile(inputPath: string, outputPath: string, aad = '360note'): Promise<number> {
+export async function encryptFile(inputPath: string, outputPath: string, aad = '360note', key?: Buffer): Promise<number> {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', KEY(), iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key ?? KEY(), iv);
   cipher.setAAD(Buffer.from(aad));
   const tempPath = `${outputPath}.tmp-${crypto.randomUUID()}`;
   let handle: fsp.FileHandle | null = null;
@@ -77,7 +77,7 @@ export async function encryptFile(inputPath: string, outputPath: string, aad = '
 }
 
 /** Decrypt a v1 or v2 payload to a file without holding the whole archive. */
-export async function decryptFile(inputPath: string, outputPath: string, aad = '360note'): Promise<void> {
+export async function decryptFile(inputPath: string, outputPath: string, aad = '360note', key?: Buffer): Promise<void> {
   const handle = await fsp.open(inputPath, 'r');
   let version: number;
   try {
@@ -88,7 +88,7 @@ export async function decryptFile(inputPath: string, outputPath: string, aad = '
     await handle.close();
   }
   if (version === 1) {
-    const plain = decryptBuffer(await fsp.readFile(inputPath), aad);
+    const plain = decryptBuffer(await fsp.readFile(inputPath), aad, key);
     const tempPath = `${outputPath}.tmp-${crypto.randomUUID()}`;
     let out: fsp.FileHandle | null = null;
     try {
@@ -118,7 +118,7 @@ export async function decryptFile(inputPath: string, outputPath: string, aad = '
   } finally {
     await ivHandle.close();
   }
-  const decipher = crypto.createDecipheriv('aes-256-gcm', KEY(), iv);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key ?? KEY(), iv);
   decipher.setAAD(Buffer.from(aad));
   decipher.setAuthTag(tag);
   const tempPath = `${outputPath}.tmp-${crypto.randomUUID()}`;

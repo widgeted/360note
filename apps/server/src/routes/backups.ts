@@ -9,7 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import { clientIp, requireAuth } from '../auth.js';
 import { errors } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
-import { requireWorkspace } from '../services/workspaces.js';
+import { requireWorkspace, workspaceKind } from '../services/workspaces.js';
 import { createJob, getJob, runJob } from '../lib/jobs.js';
 import {
   backupRecord,
@@ -26,10 +26,17 @@ import { readBackupToFile, safeFilename } from '../lib/storage.js';
 import { audit } from '../lib/audit.js';
 import { getSetting } from '../services/settings.js';
 
+async function rejectVaultBackup(workspaceId: string): Promise<void> {
+  if ((await workspaceKind(workspaceId)) === 'vault') {
+    throw errors.forbidden('加密空间不支持导出或备份，内容只能通过空间密码访问');
+  }
+}
+
 export default async function backupRoutes(app: FastifyInstance) {
   app.get('/api/workspaces/:id/backups', async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    await rejectVaultBackup(id);
     return { backups: await listBackups(id, auth.user.id) };
   });
 
@@ -37,6 +44,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     await requireWorkspace(auth.user.id, id, 'manage');
+    await rejectVaultBackup(id);
     const jobId = await createJob('backup-create', { workspaceId: id }, auth.user.id);
     runJob(jobId, async () => {
       try {
@@ -57,6 +65,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     const { workspaceId } = parse(z.object({ workspaceId: z.string().uuid() }), request.query);
     const record = await backupRecord(id, workspaceId, auth.user.id);
     await requireWorkspace(auth.user.id, workspaceId, 'manage');
+    await rejectVaultBackup(workspaceId);
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-download-'));
     const decrypted = path.join(tempDir, 'backup.zip');
     try {
@@ -90,6 +99,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     const { workspaceId } = parse(z.object({ workspaceId: z.string().uuid() }), request.query);
     const record = await backupRecord(id, workspaceId, auth.user.id);
     await requireWorkspace(auth.user.id, workspaceId, 'manage');
+    await rejectVaultBackup(workspaceId);
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-preview-'));
     const decrypted = path.join(tempDir, 'backup.zip');
     try {
@@ -107,6 +117,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     const body = parse(z.object({ mode: z.enum(['replace', 'merge']).default('merge') }), request.body ?? {});
     const record = await backupRecord(id, workspaceId, auth.user.id);
     await requireWorkspace(auth.user.id, workspaceId, body.mode === 'replace' ? 'manage' : 'write');
+    await rejectVaultBackup(workspaceId);
     const jobId = await createJob('backup-restore', { workspaceId, backupId: id, mode: body.mode }, auth.user.id);
     runJob(jobId, async () => {
       const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), '360note-restore-'));
@@ -129,6 +140,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     await requireWorkspace(auth.user.id, id, 'manage');
+    await rejectVaultBackup(id);
     const part = await request.file({ limits: { fileSize: 600 * 1024 * 1024, files: 1 } });
     if (!part) throw errors.badRequest('请选择备份文件');
     const uploadId = crypto.randomUUID();
@@ -171,6 +183,7 @@ export default async function backupRoutes(app: FastifyInstance) {
     }
     const payload = uploadJob.payload as { workspaceId: string; storedPath: string };
     await requireWorkspace(auth.user.id, payload.workspaceId, body.mode === 'replace' ? 'manage' : 'write');
+    await rejectVaultBackup(payload.workspaceId);
     const jobId = await createJob(
       'backup-restore',
       { workspaceId: payload.workspaceId, uploadId, mode: body.mode },

@@ -84,7 +84,8 @@ Fastify API (Node.js, TypeScript)
 
 | 表 | 关键字段 | 说明 |
 |---|---|---|
-| `workspaces` | id, name, kind(personal/team), owner_id, deleted_at | 个人空间 / 团队空间 |
+| `workspaces` | id, name, kind(personal/team/vault), owner_id, vault_salt, vault_key_wrapped, vault_recovery_hash, vault_recovery_wrapped, deleted_at | 个人空间 / 团队空间 / 加密空间 |
+| `workspace_unlocks` | workspace_id, user_id, session_id, token_hash, expires_at | 加密空间的短期解锁记录；密钥本身只在内存 |
 | `workspace_members` | workspace_id, user_id, role(owner/admin/editor/viewer) | 成员与角色 |
 | `workspace_invitations` | workspace_id, email, role, token_hash, token_cipher, status | 邀请；发送邮件并保留复制链接 |
 | `audit_logs` | workspace_id, actor_id, action, target_type/id, meta, ip | 审计 |
@@ -274,6 +275,7 @@ ORDER BY rank DESC, is_pinned DESC, updated_at DESC
 - 文件格式：`[version=1][iv 12][tag 16][ciphertext]`，AAD=`360note:attachment`。
 - 启用/停用对象存储时按行迁移：上传完成后才更新 `storage_key`；回迁时先写入本机并校验，再更新 `storage_key`。迁移期间新上传保持在本机，结束后补迁，避免快照遗漏。
 - 备份也用同一主密钥加密，AAD=`360note:backup`。
+- 加密空间不使用主密钥加密正文：随机数据密钥由空间密码 scrypt 派生的 KEK 包裹；笔记/版本/附件使用该数据密钥，AES-256-GCM，AAD 绑定 workspace/note/attachment。解锁期间数据密钥只在 Node 内存，按标签页 token + 会话 + 15 分钟滑动过期保存。
 - 丢失主密钥 = 附件/备份不可读；运行手册要求离线保存密钥。
 
 ---
@@ -329,7 +331,7 @@ attachments/<sha256>.bin  # 相同内容只存一份（备份内去重）
 ### 8.2 自动备份
 
 - 服务启动后调度，每天约 03:15；实际以最多 6 小时检查一次，若 20 小时内已有自动备份则跳过。
-- 每个工作区分别备份；保留 14 份自动备份，最多 30 天（可配置）。
+- 每个工作区分别备份；保留 14 份自动备份，最多 30 天（可配置）。加密空间不参与工作区备份/恢复，避免明文导出；实例备份只包含密文。
 - 创建手动备份 / 恢复前自动创建 `pre-restore` 备份。
 - 旧备份删除时同时删除加密文件。
 

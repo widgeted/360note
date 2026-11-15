@@ -44,6 +44,7 @@ export function EditorToolbar({
   onImages,
   onImageGrid,
   onUngroupImages,
+  vault = false,
 }: {
   editor: Editor;
   onLink: () => void;
@@ -51,6 +52,7 @@ export function EditorToolbar({
   onImages: (files: File[]) => void;
   onImageGrid: (columns: 2 | 3 | 4) => void;
   onUngroupImages: () => void;
+  vault?: boolean;
 }) {
   const t = useT();
   const isMobile = useIsMobile();
@@ -153,7 +155,7 @@ export function EditorToolbar({
                 <MenuItem icon={<ListChecks size={15} />} onClick={() => { close(); editor.chain().focus().toggleTaskList().run(); }}>{t('任务列表')}</MenuItem>
                 <MenuItem icon={<Quote size={15} />} onClick={() => { close(); editor.chain().focus().toggleBlockquote().run(); }}>{t('引用')}</MenuItem>
                 <MenuItem icon={<Code2 size={15} />} onClick={() => { close(); editor.chain().focus().toggleCodeBlock().run(); }}>{t('代码块')}</MenuItem>
-                <MenuItem icon={<Link2 size={15} />} onClick={() => { close(); onWiki(); }}>{t('双向链接')}</MenuItem>
+                {!vault && <MenuItem icon={<Link2 size={15} />} onClick={() => { close(); onWiki(); }}>{t('双向链接')}</MenuItem>}
                 <div className="menu-separator" />
                 <MenuItem icon={<LayoutGrid size={15} />} detail={state?.imageGridColumns === 2 ? '✓' : undefined} onClick={() => { close(); onImageGrid(2); }}>{t('一排 2 张')}</MenuItem>
                 <MenuItem icon={<LayoutGrid size={15} />} detail={state?.imageGridColumns === 3 ? '✓' : undefined} onClick={() => { close(); onImageGrid(3); }}>{t('一排 3 张')}</MenuItem>

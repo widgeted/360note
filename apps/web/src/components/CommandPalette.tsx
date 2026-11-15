@@ -54,6 +54,7 @@ export function CommandPalette() {
   const open = useAppStore((state) => state.commandOpen);
   const setOpen = useAppStore((state) => state.setCommandOpen);
   const workspaceId = useAppStore((state) => state.workspaceId);
+  const vaultWorkspace = useAppStore((state) => state.vaultWorkspace);
   const note = useAppStore((state) => state.note);
   const storeNotes = useAppStore((state) => state.notes);
   const createNote = useAppStore((state) => state.createNote);
@@ -82,6 +83,18 @@ export function CommandPalette() {
       setResults(storeNotes.slice(0, 7));
       return;
     }
+    if (vaultWorkspace) {
+      // The server never indexes vault plaintext. Search the notes already
+      // decrypted into this tab instead.
+      const q = query.trim().toLowerCase();
+      setResults(
+        storeNotes
+          .filter((entry) => entry.title.toLowerCase().includes(q) || entry.excerpt.toLowerCase().includes(q))
+          .slice(0, 8),
+      );
+      setSearching(false);
+      return;
+    }
     const timer = window.setTimeout(async () => {
       setSearching(true);
       try {
@@ -102,7 +115,7 @@ export function CommandPalette() {
       }
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [query, open, workspaceId, storeNotes]);
+  }, [query, open, workspaceId, storeNotes, vaultWorkspace]);
 
   useEffect(() => {
     if (!open) return;
@@ -333,6 +346,7 @@ export function CommandPalette() {
   ];
 
   const filteredCommands = commands.filter((command) => {
+    if (vaultWorkspace && ['share', 'summary', 'export-note', 'settings-export', 'settings-import'].includes(command.id)) return false;
     if (isMobile && command.id === 'focus') return false;
     if (!query.trim()) return true;
     const haystack = `${command.title} ${command.description ?? ''} ${command.keywords ?? ''}`.toLowerCase();

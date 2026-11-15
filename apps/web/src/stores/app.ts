@@ -4,6 +4,7 @@ import { api, ApiError, isNetworkError } from '../lib/api';
 import {
   cacheNote,
   cacheWorkspace,
+  clearWorkspaceCache,
   clearDraft,
   enqueueOutbox,
   readCachedNote,
@@ -34,6 +35,7 @@ export type ContextTab = 'info' | 'backlinks' | 'comments' | 'history';
 interface AppState {
   workspaceId: string | null;
   initializedWorkspace: string | null;
+  vaultWorkspace: boolean;
   notes: NoteSummary[];
   total: number;
   allTotal: number;
@@ -66,7 +68,9 @@ interface AppState {
   hasMore: boolean;
   serverOffset: number;
 
-  initialize: (workspaceId: string) => Promise<void>;
+  initialize: (workspaceId: string, options?: { vault?: boolean }) => Promise<void>;
+  selectWorkspace: (workspaceId: string) => void;
+  clearVaultMemory: () => void;
   refreshAll: () => Promise<void>;
   refreshList: (options?: { append?: boolean; silent?: boolean }) => Promise<void>;
   loadMore: () => Promise<void>;
@@ -130,7 +134,7 @@ async function prefetchOfflineBundle(workspaceId: string): Promise<void> {
 
 
 async function persistSnapshot(state: AppState): Promise<void> {
-  if (!state.workspaceId) return;
+  if (!state.workspaceId || state.vaultWorkspace) return;
   await cacheWorkspace(state.workspaceId, {
     notes: state.notes,
     folders: state.folders,
@@ -207,6 +211,7 @@ const initialCollapsed = (() => {
 export const useAppStore = create<AppState>((set, get) => ({
   workspaceId: null,
   initializedWorkspace: null,
+  vaultWorkspace: false,
   notes: [],
   total: 0,
   allTotal: 0,
@@ -239,11 +244,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   hasMore: false,
   serverOffset: 0,
 
-  initialize: async (workspaceId) => {
+  initialize: async (workspaceId, options) => {
     const state = get();
+    const vault = options?.vault === true;
     if (state.workspaceId !== workspaceId) {
       set({
         workspaceId,
+        vaultWorkspace: vault,
         note: null,
         notes: [],
         folders: [],
@@ -257,9 +264,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncMessage: null,
       });
       localStorage.setItem('nh-workspace', workspaceId);
+    } else if (state.vaultWorkspace !== vault) {
+      set({ vaultWorkspace: vault });
     }
     set({ loadingList: true, listError: null });
-    const cached = await readWorkspaceCache(workspaceId);
+    if (vault) {
+      // A locked vault must not leave a previous session's plaintext snapshot
+      // behind in IndexedDB.
+      await clearWorkspaceCache(workspaceId);
+    }
+    const cached = vault ? null : await readWorkspaceCache(workspaceId);
     if (cached) {
       set({
         notes: cached.notes,
@@ -292,14 +306,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         hasMore: notesResponse.notes.length < notesResponse.total,
         syncState: outbox.length ? 'offline' : get().syncState === 'idle' ? 'saved' : get().syncState,
       });
-      await cacheWorkspace(workspaceId, {
-        notes,
-        folders: foldersResponse.folders,
-        tags: tagsResponse.tags,
-        total: notesResponse.total,
-      });
-      if (outbox.length) void get().flushOutbox();
-      window.setTimeout(() => void prefetchOfflineBundle(workspaceId), 2500);
+      if (!vault) {
+        await cacheWorkspace(workspaceId, {
+          notes,
+          folders: foldersResponse.folders,
+          tags: tagsResponse.tags,
+          total: notesResponse.total,
+        });
+        if (outbox.length) void get().flushOutbox();
+        window.setTimeout(() => void prefetchOfflineBundle(workspaceId), 2500);
+      }
     } catch (error) {
       const network = !navigator.onLine || isNetworkError(error);
       set({
@@ -311,6 +327,47 @@ export const useAppStore = create<AppState>((set, get) => ({
         initializedWorkspace: workspaceId,
       });
     }
+  },
+
+  clearVaultMemory: () => {
+    set({
+      note: null,
+      notes: [],
+      folders: [],
+      tags: [],
+      total: 0,
+      allTotal: 0,
+      hasMore: false,
+      serverOffset: 0,
+      initializedWorkspace: null,
+      loadingList: false,
+      loadingNote: false,
+      listError: null,
+      conflictNoteId: null,
+      freshNoteId: null,
+    });
+  },
+
+  selectWorkspace: (workspaceId) => {
+    set({
+      workspaceId,
+      initializedWorkspace: null,
+      vaultWorkspace: false,
+      note: null,
+      notes: [],
+      folders: [],
+      tags: [],
+      filter: 'all',
+      folderId: null,
+      tagId: null,
+      query: '',
+      sort: 'updated',
+      loadingList: false,
+      listError: null,
+      syncState: 'idle',
+      syncMessage: null,
+    });
+    localStorage.setItem('nh-workspace', workspaceId);
   },
 
   refreshAll: async () => {
@@ -356,13 +413,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         serverOffset: offset,
         hasMore: offset < response.total,
       });
-      await cacheWorkspace(workspaceId, {
-        notes: merged,
-        folders: get().folders,
-        tags: get().tags,
-        total: response.total,
-        allTotal: get().allTotal,
-      });
+      if (!get().vaultWorkspace) {
+        await cacheWorkspace(workspaceId, {
+          notes: merged,
+          folders: get().folders,
+          tags: get().tags,
+          total: response.total,
+          allTotal: get().allTotal,
+        });
+      }
     } catch (error) {
       if (requestSeq !== listRequestSeq) return;
       if (isNetworkError(error) || !navigator.onLine) {
@@ -419,13 +478,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         serverOffset: offset,
         hasMore: offset < response.total,
       });
-      await cacheWorkspace(get().workspaceId!, {
-        notes,
-        folders: get().folders,
-        tags: get().tags,
-        total: response.total,
-        allTotal: get().allTotal,
-      });
+      if (!get().vaultWorkspace) {
+        await cacheWorkspace(get().workspaceId!, {
+          notes,
+          folders: get().folders,
+          tags: get().tags,
+          total: response.total,
+          allTotal: get().allTotal,
+        });
+      }
     } catch (error) {
       set({ loadingList: false, listError: (error as Error).message });
     }
@@ -480,8 +541,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openNote: async (noteId, options) => {
     const requestSeq = ++noteRequestSeq;
+    const vault = get().vaultWorkspace;
     set({ loadingNote: !options?.silent, sidebarMobileOpen: false });
-    const cached = await readCachedNote(noteId);
+    const cached = vault ? null : await readCachedNote(noteId);
     if (requestSeq !== noteRequestSeq) return;
     if (cached) {
       set({ note: cached.note, loadingNote: false });
@@ -508,10 +570,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         conflictNoteId: null,
         ...(changed ? { reloadTick: get().reloadTick + 1 } : {}),
       });
-      await cacheNote(response.note);
+      if (!vault && !response.note.vault) await cacheNote(response.note);
       set({ notes: upsertSummary(get().notes, response.note) });
       void api.post(`/api/notes/${noteId}/open`).catch(() => {});
-      const draft = await readDraft(noteId);
+      const draft = vault ? null : await readDraft(noteId);
       if (draft && draft.updatedAt > new Date(response.note.updatedAt).getTime()) {
         window.dispatchEvent(new CustomEvent('nh:draft-available', { detail: draft }));
       }
@@ -542,7 +604,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       // Do not overwrite the cached baseContent while an editor may have
       // unsaved changes; the base must remain the last acknowledged revision.
-      if (!get().note || get().note?.id !== response.note.id) await cacheNote(response.note);
+      if (!get().vaultWorkspace && !response.note.vault && (!get().note || get().note?.id !== response.note.id)) await cacheNote(response.note);
     } catch {
       /* keep current */
     }
@@ -576,8 +638,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         conflictNoteId: null,
         freshNoteId: note.id,
       });
-      await cacheNote(note);
-      await persistSnapshot(get());
+      if (!get().vaultWorkspace && !note.vault) {
+        await cacheNote(note);
+        await persistSnapshot(get());
+      }
       if (input?.tagNames?.length) void get().refreshTags();
       void folders;
       void tags;
@@ -585,6 +649,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       if (!isNetworkError(error) && navigator.onLine) {
         toast('error', translate('保存失败'), (error as Error).message);
+        return null;
+      }
+      if (get().vaultWorkspace) {
+        toast('error', translate('保存失败'), translate('加密空间需要联网才能新建或保存笔记'));
         return null;
       }
       const now = new Date().toISOString();
@@ -700,8 +768,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       await persistSnapshot(get());
       return { ok: false, queued: true };
     }
+    const vault = Boolean(current.vault) || get().vaultWorkspace;
     set({ syncState: 'saving', syncMessage: null });
-    await saveDraft({ noteId: current.id, workspaceId, title, contentMd, baseVersion, updatedAt: Date.now() });
+    if (!vault) await saveDraft({ noteId: current.id, workspaceId, title, contentMd, baseVersion, updatedAt: Date.now() });
     try {
       const response = await api.patch<{ note: Note }>(`/api/notes/${current.id}`, {
         title,
@@ -718,14 +787,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastSavedAt: Date.now(),
         conflictNoteId: null,
       });
-      await cacheNote(note);
+      if (!vault) {
+        await cacheNote(note);
+        await removeOutboxByNote(note.id);
+        set({ pendingCount: (await readOutbox()).length });
+        await persistSnapshot(get());
+      }
       broadcastNoteSaved(note);
-      await removeOutboxByNote(note.id);
-      set({ pendingCount: (await readOutbox()).length });
-      await persistSnapshot(get());
       return { ok: true, note };
     } catch (error) {
       if (isNetworkError(error) || !navigator.onLine) {
+        if (vault) {
+          set({ offline: true, syncState: 'error', syncMessage: translate('加密空间需要联网才能保存') });
+          return { ok: false, error: translate('加密空间需要联网才能保存') };
+        }
         const local: Note = { ...current, title, contentMd, updatedAt: new Date().toISOString() };
         set({ note: local, notes: upsertSummary(get().notes, local), offline: true, syncState: 'offline', syncMessage: translate('离线编辑') });
         await updateCachedNote(local);

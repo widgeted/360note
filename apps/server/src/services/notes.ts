@@ -4,7 +4,17 @@ import { many, one, transaction, type Queryable } from '../db.js';
 import { config } from '../config.js';
 import { errors } from '../lib/errors.js';
 import { excerpt as makeExcerpt, extractWikiLinks, stripTitleHeading, wordCount } from '../lib/text.js';
-import { requireWorkspace } from './workspaces.js';
+import { requireWorkspace, workspaceKind } from './workspaces.js';
+import { activeVaultKey } from '../lib/vault-session.js';
+import {
+  decryptVaultText,
+  encryptVaultText,
+  vaultNoteBodyAad,
+  vaultNoteTitleAad,
+  vaultVersionBodyAad,
+  vaultVersionTitleAad,
+  vaultFilenameAad,
+} from '../lib/vault-crypto.js';
 import { attachmentStorageKey, deleteAttachment, readAttachment, saveAttachment } from '../lib/storage.js';
 import { cleanupNoteMedia, cleanupNotesMedia } from './media.js';
 
@@ -19,6 +29,9 @@ interface NoteRow {
   is_favorite: boolean;
   is_pinned: boolean;
   encrypted: boolean;
+  cipher_title?: string | null;
+  cipher_body?: string | null;
+  workspace_kind?: string;
   created_by: string;
   updated_by: string;
   created_at: Date;
@@ -43,6 +56,20 @@ interface AttachmentRow {
   created_at: Date;
 }
 
+function currentVaultKey(workspaceId: string): Buffer | null {
+  return activeVaultKey(workspaceId);
+}
+
+function requireVaultDataKey(workspaceId: string): Buffer {
+  const key = currentVaultKey(workspaceId);
+  if (!key) throw errors.locked('加密空间已锁定，请输入空间密码');
+  return key;
+}
+
+function isVaultRow(row: { workspace_kind?: string }): boolean {
+  return row.workspace_kind === 'vault';
+}
+
 function mapTags(input: unknown): TagRef[] {
   if (!Array.isArray(input)) return [];
   return input.map((tag) => ({
@@ -52,11 +79,13 @@ function mapTags(input: unknown): TagRef[] {
   }));
 }
 
-function mapAttachment(row: AttachmentRow): Attachment {
+function mapAttachment(row: AttachmentRow, vaultKey?: Buffer | null, workspaceId?: string): Attachment {
   return {
     id: row.id,
     noteId: row.note_id,
-    filename: row.filename,
+    filename: vaultKey && workspaceId
+      ? decryptVaultText(vaultKey, row.filename, vaultFilenameAad(workspaceId, row.id))
+      : row.filename,
     mime: row.mime,
     size: Number(row.size_bytes),
     width: row.width,
@@ -69,16 +98,25 @@ function mapAttachment(row: AttachmentRow): Attachment {
 }
 
 export function mapSummary(row: NoteRow): NoteSummary {
+  const vault = isVaultRow(row);
+  const key = vault ? requireVaultDataKey(row.workspace_id) : null;
+  const title = vault
+    ? decryptVaultText(key!, row.cipher_title, vaultNoteTitleAad(row.workspace_id, row.id))
+    : row.title;
+  const content = vault
+    ? decryptVaultText(key!, row.cipher_body, vaultNoteBodyAad(row.workspace_id, row.id))
+    : row.content_md;
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     folderId: row.folder_id,
-    title: row.title || '未命名笔记',
-    excerpt: row.excerpt,
+    title: title || '未命名笔记',
+    excerpt: vault ? makeExcerpt(content, 160) : row.excerpt,
     version: row.version,
     isFavorite: row.is_favorite,
     isPinned: row.is_pinned,
-    encrypted: row.encrypted,
+    encrypted: vault || row.encrypted,
+    vault,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
     trashedAt: row.trashed_at?.toISOString() ?? null,
@@ -87,10 +125,15 @@ export function mapSummary(row: NoteRow): NoteSummary {
   };
 }
 
-const SUMMARY_FIELDS = `
+const SUMMARY_BASE = `
   n.id, n.workspace_id, n.folder_id, n.title, n.excerpt, n.version,
-  n.is_favorite, n.is_pinned, n.encrypted, n.created_by, n.updated_by,
-  n.created_at, n.updated_at, n.last_opened_at, n.trashed_at,
+  n.is_favorite, n.is_pinned, n.encrypted, n.cipher_title, n.cipher_body,
+  n.created_by, n.updated_by,
+  n.created_at, n.updated_at, n.last_opened_at, n.trashed_at
+`;
+
+const SUMMARY_EXTRA = `
+  (SELECT w.kind FROM workspaces w WHERE w.id = n.workspace_id) AS workspace_kind,
   COALESCE((
     SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY lower(t.name))
     FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = n.id
@@ -99,9 +142,9 @@ const SUMMARY_FIELDS = `
 `;
 
 /** List/search rows never need the full note body. */
-const SUMMARY_SELECT = SUMMARY_FIELDS;
-/** Single-note reads still need content_md and the encryption columns. */
-const NOTE_SELECT = `n.*,${SUMMARY_FIELDS.replace(/^\s*n\.id, n\.workspace_id, n\.folder_id, n\.title, n\.excerpt, n\.version,\s*n\.is_favorite, n\.is_pinned, n\.encrypted, n\.created_by, n\.updated_by,\s*n\.created_at, n\.updated_at, n\.last_opened_at, n\.trashed_at,/, '')}`;
+const SUMMARY_SELECT = `${SUMMARY_BASE},${SUMMARY_EXTRA}`;
+/** Single-note reads still need content_md and every encryption column. */
+const NOTE_SELECT = `n.*,${SUMMARY_EXTRA}`;
 
 export async function getNoteRow(noteId: string, client?: Queryable, forUpdate = false): Promise<NoteRow | null> {
   return one<NoteRow>(
@@ -133,6 +176,8 @@ export async function getFolderPath(
 }
 
 export async function serializeNote(row: NoteRow, role: Role, client?: Queryable): Promise<Note> {
+  const vault = isVaultRow(row);
+  const vaultKey = vault ? requireVaultDataKey(row.workspace_id) : null;
   const attachments = await many<AttachmentRow>(
     `SELECT id, note_id, filename, mime, size_bytes, width, height, ocr_status, image_tags, has_thumbnail, created_at
      FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
@@ -140,16 +185,19 @@ export async function serializeNote(row: NoteRow, role: Role, client?: Queryable
     client,
   );
   const canEdit = ['editor', 'admin', 'owner'].includes(role);
+  const content = vault
+    ? decryptVaultText(vaultKey!, row.cipher_body, vaultNoteBodyAad(row.workspace_id, row.id))
+    : row.content_md;
   return {
     ...mapSummary(row),
-    contentMd: row.content_md,
+    contentMd: content,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
     folderPath: await getFolderPath(row.folder_id, row.workspace_id, client),
-    attachments: attachments.map(mapAttachment),
-    wordCount: wordCount(row.content_md),
+    attachments: attachments.map((attachment) => mapAttachment(attachment, vaultKey, row.workspace_id)),
+    wordCount: wordCount(content),
     canEdit,
-    canShare: canEdit,
+    canShare: canEdit && !vault,
   };
 }
 
@@ -165,6 +213,9 @@ export async function listingNotes(input: {
   offset?: number;
 }): Promise<{ notes: NoteSummary[]; total: number; allTotal: number }> {
   await requireWorkspace(input.userId, input.workspaceId, 'read');
+  if (input.q && input.q.trim() && (await workspaceKind(input.workspaceId)) === 'vault') {
+    throw errors.badRequest('加密空间内搜索不可用，请直接浏览笔记');
+  }
   const conditions: string[] = ['n.workspace_id = $1', 'n.deleted_at IS NULL'];
   const params: unknown[] = [input.workspaceId];
   const add = (value: unknown) => {
@@ -338,6 +389,34 @@ async function setTags(client: Queryable, noteId: string, workspaceId: string, t
   }
 }
 
+function versionStorage(
+  dataKey: Buffer | null,
+  workspaceId: string,
+  noteId: string,
+  title: string,
+  content: string,
+): { title: string; content: string } {
+  if (!dataKey) return { title, content };
+  return {
+    title: encryptVaultText(dataKey, title, vaultVersionTitleAad(workspaceId, noteId)),
+    content: encryptVaultText(dataKey, content, vaultVersionBodyAad(workspaceId, noteId)),
+  };
+}
+
+function decryptVersion(
+  dataKey: Buffer | null,
+  workspaceId: string,
+  noteId: string,
+  title: string,
+  content: string,
+): { title: string; content: string } {
+  if (!dataKey) return { title, content };
+  return {
+    title: decryptVaultText(dataKey, title, vaultVersionTitleAad(workspaceId, noteId)),
+    content: decryptVaultText(dataKey, content, vaultVersionBodyAad(workspaceId, noteId)),
+  };
+}
+
 export async function createNote(input: {
   workspaceId: string;
   userId: string;
@@ -349,27 +428,46 @@ export async function createNote(input: {
   reason?: string;
 }): Promise<Note> {
   const role = await requireWorkspace(input.userId, input.workspaceId, 'write');
+  const vault = (await workspaceKind(input.workspaceId)) === 'vault';
+  const dataKey = vault ? requireVaultDataKey(input.workspaceId) : null;
   let content = input.contentMd ?? '';
   const title = deriveTitle(input.title, content);
   content = stripTitleHeading(content, title);
   const folderId = await validateFolder(input.folderId, input.workspaceId);
+  const noteId = crypto.randomUUID();
+  const storedTitle = vault ? '' : title;
+  const storedContent = vault ? '' : content;
+  const cipherTitle = vault ? encryptVaultText(dataKey!, title, vaultNoteTitleAad(input.workspaceId, noteId)) : null;
+  const cipherBody = vault ? encryptVaultText(dataKey!, content, vaultNoteBodyAad(input.workspaceId, noteId)) : null;
+  const version = versionStorage(dataKey, input.workspaceId, noteId, title, content);
   const note = await transaction(async (client) => {
     const row = await client.query<NoteRow>(
-      `INSERT INTO notes (workspace_id, folder_id, title, content_md, excerpt, version, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, 1, $6, $6) RETURNING *`,
-      [input.workspaceId, folderId, title, content, makeExcerpt(content), input.userId],
+      `INSERT INTO notes (id, workspace_id, folder_id, title, content_md, excerpt, cipher_title, cipher_body, encrypted, enc_version, version, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 2, 1, $10, $10) RETURNING *`,
+      [
+        noteId,
+        input.workspaceId,
+        folderId,
+        storedTitle,
+        storedContent,
+        vault ? '' : makeExcerpt(content),
+        cipherTitle,
+        cipherBody,
+        vault,
+        input.userId,
+      ],
     );
-    const noteId = row.rows[0].id;
     await client.query(
       `INSERT INTO note_versions (note_id, version, title, content_md, reason, created_by)
        VALUES ($1, 1, $2, $3, 'auto', $4) ON CONFLICT DO NOTHING`,
-      [noteId, title, content, input.userId],
+      [noteId, version.title, version.content, input.userId],
     );
     await setTags(client, noteId, input.workspaceId, input.tagIds, input.tagNames);
-    await rebuildLinks(client, noteId, input.workspaceId, content);
-    return getNoteRow(noteId, client);
+    if (!vault) await rebuildLinks(client, noteId, input.workspaceId, content);
+    return row.rows[0];
   });
-  return serializeNote(note!, role);
+  const fresh = (await getNoteRow(noteId)) ?? note;
+  return serializeNote(fresh, role);
 }
 
 async function snapshotVersion(
@@ -381,7 +479,10 @@ async function snapshotVersion(
   userId: string,
   reason: 'auto' | 'manual' | 'restore' | 'import' | 'conflict',
   force = false,
+  workspaceId = '',
+  dataKey: Buffer | null = null,
 ): Promise<void> {
+  const stored = versionStorage(dataKey, workspaceId, noteId, title, content);
   if (!force) {
     const recent = await one<{ created_at: Date }>(
       'SELECT created_at FROM note_versions WHERE note_id = $1 ORDER BY version DESC LIMIT 1',
@@ -393,7 +494,7 @@ async function snapshotVersion(
   await client.query(
     `INSERT INTO note_versions (note_id, version, title, content_md, reason, created_by)
      VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (note_id, version) DO NOTHING`,
-    [noteId, version, title, content, reason, userId],
+    [noteId, version, stored.title, stored.content, reason, userId],
   );
   await client.query(
     `DELETE FROM note_versions WHERE note_id = $1 AND id NOT IN (
@@ -412,6 +513,9 @@ export async function addConflictVersion(input: {
   const existing = await getNoteRow(input.noteId);
   if (!existing) throw errors.notFound('笔记不存在');
   await requireWorkspace(input.userId, existing.workspace_id, 'write');
+  const vault = isVaultRow(existing);
+  const dataKey = vault ? requireVaultDataKey(existing.workspace_id) : null;
+  const stored = versionStorage(dataKey, existing.workspace_id, input.noteId, input.title.slice(0, 500) || '未命名笔记', input.contentMd);
   const version = await transaction(async (client) => {
     // Serialize concurrent conflict saves for the same note; the unique
     // (note_id, version) index must never turn a preserved snapshot into a 500.
@@ -428,7 +532,7 @@ export async function addConflictVersion(input: {
     await client.query(
       `INSERT INTO note_versions (note_id, version, title, content_md, reason, created_by)
        VALUES ($1, $2, $3, $4, 'conflict', $5)`,
-      [input.noteId, next, input.title.slice(0, 500) || '未命名笔记', input.contentMd, input.userId],
+      [input.noteId, next, stored.title, stored.content, input.userId],
     );
     await client.query(
       `DELETE FROM note_versions WHERE note_id = $1 AND id NOT IN (
@@ -459,6 +563,14 @@ export async function updateNote(input: {
   if (!initial) throw errors.notFound('笔记不存在');
   const role = await requireWorkspace(input.userId, initial.workspace_id, 'write');
   if (initial.trashed_at) throw errors.badRequest('请先恢复这篇笔记');
+  const vault = isVaultRow(initial);
+  const dataKey = vault ? requireVaultDataKey(initial.workspace_id) : null;
+  const currentTitle = vault
+    ? decryptVaultText(dataKey!, initial.cipher_title, vaultNoteTitleAad(initial.workspace_id, initial.id))
+    : initial.title;
+  const currentContent = vault
+    ? decryptVaultText(dataKey!, initial.cipher_body, vaultNoteBodyAad(initial.workspace_id, initial.id))
+    : initial.content_md;
 
   const result = await transaction(async (client) => {
     // Lock the note before reading its version. Concurrent saves queue on this
@@ -480,11 +592,17 @@ export async function updateNote(input: {
       input.folderId === undefined
         ? locked.folder_id
         : await validateFolder(input.folderId, locked.workspace_id, client);
+    const lockedTitle = vault
+      ? decryptVaultText(dataKey!, locked.cipher_title, vaultNoteTitleAad(locked.workspace_id, locked.id))
+      : locked.title;
+    const lockedContent = vault
+      ? decryptVaultText(dataKey!, locked.cipher_body, vaultNoteBodyAad(locked.workspace_id, locked.id))
+      : locked.content_md;
     const title =
-      input.title === undefined ? locked.title : (input.title.trim().slice(0, 500) || untitledTitle());
-    let content = input.contentMd === undefined ? locked.content_md : input.contentMd;
+      input.title === undefined ? lockedTitle : (input.title.trim().slice(0, 500) || untitledTitle());
+    let content = input.contentMd === undefined ? lockedContent : input.contentMd;
     content = stripTitleHeading(content, title);
-    const oldTitle = locked.title;
+    const oldTitle = lockedTitle;
     const reason = input.reason ?? 'auto';
     const forceSnapshot = reason !== 'auto';
     // Metadata-only changes (favorite, pin, folder, tags) must not consume a
@@ -493,17 +611,26 @@ export async function updateNote(input: {
     const contentEdited = input.title !== undefined || input.contentMd !== undefined;
     const version = contentEdited ? locked.version + 1 : locked.version;
 
+    const storedTitle = vault ? '' : title;
+    const storedContent = vault ? '' : content;
+    const cipherTitle = vault
+      ? encryptVaultText(dataKey!, title, vaultNoteTitleAad(locked.workspace_id, locked.id))
+      : locked.cipher_title ?? null;
+    const cipherBody = vault
+      ? encryptVaultText(dataKey!, content, vaultNoteBodyAad(locked.workspace_id, locked.id))
+      : locked.cipher_body ?? null;
     const row = await client.query<NoteRow>(
       `UPDATE notes SET title = $2, content_md = $3, excerpt = $4, folder_id = $5,
          is_favorite = COALESCE($6, is_favorite), is_pinned = COALESCE($7, is_pinned),
          version = $8, updated_by = $9, updated_at = now(),
+         cipher_title = $12, cipher_body = $13, encrypted = $14,
          last_opened_at = CASE WHEN $10 THEN now() ELSE last_opened_at END
        WHERE id = $1 AND version = $11 RETURNING *`,
       [
         input.noteId,
-        title,
-        content,
-        makeExcerpt(content),
+        storedTitle,
+        storedContent,
+        vault ? '' : makeExcerpt(content),
         folderId,
         input.isFavorite ?? null,
         input.isPinned ?? null,
@@ -511,6 +638,9 @@ export async function updateNote(input: {
         input.userId,
         input.touchOpened ?? false,
         locked.version,
+        cipherTitle,
+        cipherBody,
+        vault,
       ],
     );
     if (row.rowCount !== 1) {
@@ -523,9 +653,20 @@ export async function updateNote(input: {
     }
 
     await setTags(client, input.noteId, locked.workspace_id, input.tagIds, input.tagNames);
-    await rebuildLinks(client, input.noteId, locked.workspace_id, content);
+    if (!vault) await rebuildLinks(client, input.noteId, locked.workspace_id, content);
     if (contentEdited) {
-      await snapshotVersion(client, input.noteId, version, title, content, input.userId, reason, forceSnapshot);
+      await snapshotVersion(
+        client,
+        input.noteId,
+        version,
+        title,
+        content,
+        input.userId,
+        reason,
+        forceSnapshot,
+        locked.workspace_id,
+        dataKey,
+      );
     }
 
     const fresh = await getNoteRow(input.noteId, client);
@@ -539,7 +680,7 @@ export async function updateNote(input: {
   });
 
   let linkUpdates = 0;
-  if (result.oldTitle && result.title !== result.oldTitle) {
+  if (!vault && result.oldTitle && result.title !== result.oldTitle) {
     linkUpdates = await propagateTitleRename(result.workspaceId, input.userId, result.oldTitle, result.title, input.noteId);
   }
   return { note: result.note, linkUpdates };
@@ -580,7 +721,7 @@ export async function propagateTitleRename(
       if (!updated.rowCount) return;
       changed = true;
       await rebuildLinks(client, row.id, workspaceId, content);
-      await snapshotVersion(client, row.id, version, row.title, content, userId, 'auto', false);
+      await snapshotVersion(client, row.id, version, row.title, content, userId, 'auto', false, workspaceId, null);
     });
     if (changed) count++;
   }
@@ -664,23 +805,28 @@ export async function listVersions(noteId: string, userId: string) {
      WHERE v.note_id = $1 ORDER BY v.version DESC`,
     [noteId],
   );
+  const vault = isVaultRow(row);
+  const dataKey = vault ? requireVaultDataKey(row.workspace_id) : null;
   return {
     currentVersion: row.version,
-    versions: rows.map((version) => ({
-      id: Number(version.id),
-      noteId,
-      version: version.version,
-      title: version.title,
-      createdAt: version.created_at.toISOString(),
-      reason: version.reason as 'auto' | 'manual' | 'restore' | 'import' | 'conflict',
-      authorName: version.author_name ?? undefined,
-      preview: makeExcerpt(version.content_md, 120),
-    })),
+    versions: rows.map((version) => {
+      const plain = decryptVersion(dataKey, row.workspace_id, noteId, version.title, version.content_md);
+      return {
+        id: Number(version.id),
+        noteId,
+        version: version.version,
+        title: plain.title,
+        createdAt: version.created_at.toISOString(),
+        reason: version.reason as 'auto' | 'manual' | 'restore' | 'import' | 'conflict',
+        authorName: version.author_name ?? undefined,
+        preview: makeExcerpt(plain.content, 120),
+      };
+    }),
   };
 }
 
 export async function getVersion(noteId: string, versionId: number, userId: string) {
-  await getNoteForUser(noteId, userId);
+  const { row: noteRow } = await getNoteForUser(noteId, userId);
   const row = await many<{
     id: string;
     version: number;
@@ -696,12 +842,15 @@ export async function getVersion(noteId: string, versionId: number, userId: stri
     [noteId, versionId],
   );
   if (!row[0]) throw errors.notFound('版本不存在');
+  const vault = isVaultRow(noteRow);
+  const dataKey = vault ? requireVaultDataKey(noteRow.workspace_id) : null;
+  const plain = decryptVersion(dataKey, noteRow.workspace_id, noteId, row[0].title, row[0].content_md);
   return {
     id: Number(row[0].id),
     noteId,
     version: row[0].version,
-    title: row[0].title,
-    contentMd: row[0].content_md,
+    title: plain.title,
+    contentMd: plain.content,
     createdAt: row[0].created_at.toISOString(),
     reason: row[0].reason,
     authorName: row[0].author_name ?? undefined,
@@ -722,6 +871,7 @@ export async function restoreVersion(noteId: string, versionId: number, userId: 
 
 export async function getBacklinks(noteId: string, userId: string) {
   const { row } = await getNoteForUser(noteId, userId);
+  if (isVaultRow(row)) return [];
   const rows = await many<{ id: string; title: string; excerpt: string; updated_at: Date }>(
     `SELECT DISTINCT n.id, n.title, n.excerpt, n.updated_at
      FROM note_links l JOIN notes n ON n.id = l.source_note_id
@@ -741,6 +891,8 @@ export async function getBacklinks(noteId: string, userId: string) {
 
 export async function duplicateNote(noteId: string, userId: string): Promise<Note> {
   const { row } = await getNoteForUser(noteId, userId);
+  const vault = isVaultRow(row);
+  const dataKey = vault ? requireVaultDataKey(row.workspace_id) : null;
   const tags = await many<{ tag_id: string }>('SELECT tag_id FROM note_tags WHERE note_id = $1', [noteId]);
   const originalAttachments = await many<{
     id: string;
@@ -753,20 +905,26 @@ export async function duplicateNote(noteId: string, userId: string): Promise<Not
     'SELECT id, filename, mime, width, height, storage_key FROM attachments WHERE note_id = $1 AND deleted_at IS NULL ORDER BY created_at',
     [noteId],
   );
-  let contentMd = row.content_md;
+  const summary = mapSummary(row);
+  let contentMd = vault
+    ? decryptVaultText(dataKey!, row.cipher_body, vaultNoteBodyAad(row.workspace_id, row.id))
+    : row.content_md;
   const copied: Array<{ id: string; filename: string; mime: string; size: number; sha256: string; width: number | null; height: number | null; storageKey: string }> = [];
   for (const attachment of originalAttachments) {
-    const data = await readAttachment(attachment.storage_key);
+    const data = await readAttachment(attachment.storage_key, dataKey ?? undefined);
     const id = crypto.randomUUID();
     const localKey = attachmentStorageKey(row.workspace_id, id);
-    const storageKey = await saveAttachment(localKey, data);
-    copied.push({ id, filename: attachment.filename, mime: attachment.mime, size: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex'), width: attachment.width, height: attachment.height, storageKey });
+    const storageKey = await saveAttachment(localKey, data, undefined, dataKey ?? undefined);
+    const filename = vault
+      ? encryptVaultText(dataKey!, decryptVaultText(dataKey!, attachment.filename, vaultFilenameAad(row.workspace_id, attachment.id)), vaultFilenameAad(row.workspace_id, id))
+      : attachment.filename;
+    copied.push({ id, filename, mime: attachment.mime, size: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex'), width: attachment.width, height: attachment.height, storageKey });
     contentMd = contentMd.replaceAll(`/api/attachments/${attachment.id}/content`, `/api/attachments/${id}/content`);
   }
   const created = await createNote({
     workspaceId: row.workspace_id,
     userId,
-    title: `${row.title} 副本`,
+    title: `${summary.title} 副本`,
     contentMd,
     folderId: row.folder_id,
     tagIds: tags.map((tag) => tag.tag_id),

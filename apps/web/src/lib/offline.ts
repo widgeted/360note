@@ -34,6 +34,7 @@ export interface Draft {
   contentMd: string;
   baseVersion: number;
   updatedAt: number;
+  vault?: boolean;
   failedAt?: number;
   lastError?: string;
 }
@@ -61,6 +62,29 @@ export async function cacheWorkspace(workspaceId: string, snapshot: Omit<Workspa
     await set(`${PREFIX}workspace:${workspaceId}`, { ...snapshot, cachedAt: Date.now() } satisfies WorkspaceSnapshot);
   } catch {
     /* storage may be unavailable in private mode */
+  }
+}
+
+export async function clearWorkspaceCache(workspaceId: string): Promise<void> {
+  try {
+    await del(`${PREFIX}workspace:${workspaceId}`);
+    // Remove any note/draft/outbox entries that a previous build may have
+    // written for this workspace before encrypted-space caching was disabled.
+    const allKeys = await keys();
+    for (const key of allKeys) {
+      if (typeof key !== 'string' || !key.startsWith(PREFIX)) continue;
+      if (key.startsWith(`${PREFIX}note:`) || key.startsWith(`${PREFIX}draft:`)) {
+        const entry = await get<{ note?: { workspaceId?: string }; workspaceId?: string }>(key);
+        const owner = entry?.note?.workspaceId ?? entry?.workspaceId;
+        if (owner === workspaceId) await del(key);
+      }
+    }
+    const outbox = await readOutbox();
+    if (outbox.some((item) => item.workspaceId === workspaceId)) {
+      await set(`${PREFIX}outbox`, outbox.filter((item) => item.workspaceId !== workspaceId));
+    }
+  } catch {
+    /* storage may be unavailable */
   }
 }
 
@@ -102,7 +126,7 @@ export async function removeCachedNote(noteId: string): Promise<void> {
 }
 
 export async function saveDraft(draft: Draft): Promise<void> {
-  if (!localWritesEnabled) return;
+  if (!localWritesEnabled || draft.vault) return;
   try {
     await set(`${PREFIX}draft:${draft.noteId}`, draft);
   } catch {

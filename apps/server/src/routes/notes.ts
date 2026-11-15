@@ -7,7 +7,7 @@ import { errors } from '../lib/errors.js';
 import { noteContentSchema, noteTitleSchema, parse, uuidSchema } from '../lib/validate.js';
 import { snippetFor } from '../lib/text.js';
 import { deleteAttachment } from '../lib/storage.js';
-import { requireWorkspace } from '../services/workspaces.js';
+import { requireWorkspace, workspaceKind } from '../services/workspaces.js';
 import {
   createNote,
   getRecentFullNotes,
@@ -84,6 +84,9 @@ export default async function noteRoutes(app: FastifyInstance) {
       return { notes: result.notes, attachments: [], total: result.total, allTotal: result.allTotal, tookMs: Date.now() - started };
     }
     await requireWorkspace(auth.user.id, params.workspaceId, 'read');
+    if ((await workspaceKind(params.workspaceId)) === 'vault') {
+      throw errors.badRequest('加密空间内搜索不可用，请直接浏览笔记');
+    }
     const q = params.q.trim();
     const like = `%${q.replace(/[%_\\]/g, (value) => `\\${value}`)}%`;
     const offset = Math.max(params.offset, 0);
@@ -194,6 +197,9 @@ export default async function noteRoutes(app: FastifyInstance) {
   app.get('/api/notes/offline-bundle', async (request) => {
     const auth = requireAuth(request);
     const params = parse(z.object({ workspaceId: z.string().uuid(), limit: z.coerce.number().int().min(1).max(300).default(120) }), request.query);
+    if ((await workspaceKind(params.workspaceId)) === 'vault') {
+      throw errors.badRequest('加密空间不支持离线缓存');
+    }
     const notes = await getRecentFullNotes(params.workspaceId, auth.user.id, params.limit);
     return { notes, cachedAt: new Date().toISOString() };
   });
@@ -323,9 +329,8 @@ export default async function noteRoutes(app: FastifyInstance) {
   app.post('/api/notes/:id/versions', async (request) => {
     const auth = requireAuth(request);
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    const row = await getNoteRow(id);
-    if (!row) throw errors.notFound();
-    const result = await updateNote({ noteId: id, userId: auth.user.id, contentMd: row.content_md, title: row.title, reason: 'manual' });
+    const { note: current } = await getNoteForUser(id, auth.user.id);
+    const result = await updateNote({ noteId: id, userId: auth.user.id, contentMd: current.contentMd, title: current.title, reason: 'manual' });
     return { note: result.note, linkUpdates: result.linkUpdates };
   });
 
@@ -387,6 +392,7 @@ export default async function noteRoutes(app: FastifyInstance) {
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const { format } = parse(z.object({ format: z.enum(['md', 'html', 'pdf']).default('md') }), request.query);
     const { note } = await getNoteForUser(id, auth.user.id);
+    if (note.vault) throw errors.forbidden('加密空间内容不可导出');
     const { exportSingleNote } = await import('../services/export.js');
     await exportSingleNote(note, format, reply, app);
     return reply;

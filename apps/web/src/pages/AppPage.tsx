@@ -21,6 +21,10 @@ import { cn } from '../lib/utils';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { toast } from '../stores/toast';
 import { isLocalNote } from '../stores/app';
+import { useVaultStore } from '../stores/vault';
+import { useVaultAutoLock } from '../lib/useVaultAutoLock';
+import { VaultLockScreen } from '../components/VaultLockScreen';
+import type { Workspace } from '@360note/shared';
 
 export default function AppPage() {
   const t = useT();
@@ -33,6 +37,7 @@ export default function AppPage() {
   const note = useAppStore((state) => state.note);
   const loadingNote = useAppStore((state) => state.loadingNote);
   const initialize = useAppStore((state) => state.initialize);
+  const selectWorkspace = useAppStore((state) => state.selectWorkspace);
   const openNote = useAppStore((state) => state.openNote);
   const closeNote = useAppStore((state) => state.closeNote);
   const createNote = useAppStore((state) => state.createNote);
@@ -47,6 +52,7 @@ export default function AppPage() {
   const toggleSidebar = useAppStore((state) => state.toggleSidebar);
   const sidebarMobileOpen = useAppStore((state) => state.sidebarMobileOpen);
   const setMobileSidebar = useAppStore((state) => state.setMobileSidebar);
+  const sidebarCollapsed = useAppStore((state) => state.sidebarCollapsed);
   const [showTemplates, setShowTemplates] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -70,6 +76,8 @@ export default function AppPage() {
   const collapsedBySplitRef = useRef(false);
   const newNoteGuard = useRef(false);
   const autoOpenedNote = useRef<string | null>(null);
+  const [vaultLocked, setVaultLocked] = useState<Workspace | null>(null);
+  const previousWorkspaceRef = useRef<Workspace | null>(null);
 
   async function loadTemplates() {
     setTemplatesLoading(true);
@@ -125,10 +133,60 @@ export default function AppPage() {
       workspaces.find((workspace) => workspace.id === stored) ??
       workspaces.find((workspace) => workspace.kind === 'personal') ??
       workspaces[0];
-    if (valid && (workspaceId !== valid.id || initializedWorkspace !== valid.id)) {
-      void initialize(valid.id);
+    if (!valid) return;
+    if (workspaceId !== valid.id) {
+      selectWorkspace(valid.id);
+      return;
     }
-  }, [workspaces, workspaceId, initializedWorkspace, initialize]);
+    if (vaultLocked?.id === valid.id) return;
+    if (initializedWorkspace === valid.id) return;
+    if (valid.kind === 'vault') {
+      if (!useVaultStore.getState().hasToken(valid.id)) {
+        useAppStore.getState().clearVaultMemory();
+        setVaultLocked(valid);
+        return;
+      }
+      useVaultStore.getState().activate(valid.id);
+      void initialize(valid.id, { vault: true });
+      return;
+    }
+    void initialize(valid.id);
+  }, [workspaces, workspaceId, initializedWorkspace, initialize, selectWorkspace, vaultLocked?.id]);
+
+  useEffect(() => {
+    const previous = previousWorkspaceRef.current;
+    const current = workspaces.find((workspace) => workspace.id === workspaceId) ?? null;
+    if (previous && previous.kind === 'vault' && previous.id !== current?.id) {
+      void useVaultStore.getState().lock(previous.id);
+    }
+    previousWorkspaceRef.current = current;
+  }, [workspaceId, workspaces]);
+
+  const currentWorkspace = workspaces.find((workspace) => workspace.id === workspaceId) ?? null;
+  useVaultAutoLock(
+    workspaceId,
+    currentWorkspace?.kind === 'vault' && !vaultLocked,
+    () => {
+      const locked = workspaces.find((workspace) => workspace.id === workspaceId);
+      if (locked?.kind === 'vault') {
+        useAppStore.getState().clearVaultMemory();
+        setVaultLocked(locked);
+      }
+    },
+  );
+
+  async function enterUnlockedVault(workspace: Workspace) {
+    setVaultLocked(null);
+    useVaultStore.getState().activate(workspace.id);
+    selectWorkspace(workspace.id);
+    await initialize(workspace.id, { vault: true });
+  }
+
+  function switchAwayFromVault() {
+    setVaultLocked(null);
+    const personal = workspaces.find((workspace) => workspace.kind === 'personal') ?? workspaces[0];
+    if (personal) selectWorkspace(personal.id);
+  }
 
   useEffect(() => {
     if (!note || !requestedPanel) return;
@@ -407,10 +465,20 @@ export default function AppPage() {
     if (created) navigate(`/app/note/${created.id}`);
   }
 
+  if (vaultLocked) {
+    return (
+      <VaultLockScreen
+        workspace={vaultLocked}
+        onUnlocked={() => void enterUnlockedVault(vaultLocked)}
+        onSwitch={switchAwayFromVault}
+      />
+    );
+  }
+
   const showEditor = Boolean(noteId);
   const appClass = cn(
     'app-root',
-    useAppStore((state) => state.sidebarCollapsed) && 'sidebar-collapsed',
+    sidebarCollapsed && 'sidebar-collapsed',
     showEditor && 'has-note',
     focusMode && 'focus-mode',
     sidebarMobileOpen && 'sidebar-open',
@@ -510,7 +578,7 @@ export default function AppPage() {
                 </div>
               )
             ) : (
-              <EmptyEditorState />
+              <EmptyEditorState vault={currentWorkspace?.kind === 'vault'} />
             )}
           </main>
           {note && (

@@ -6,6 +6,46 @@
 
 ---
 
+## 2026-11-15 · 登录通知/移动缩放修复与加密空间（0.2.7 / 0.3.0）
+
+### 登录通知
+
+- 根因：`isNewSignInDevice` 拿“最近一条会话”比较 IP/UA；移动网络/Wi-Fi 切换、另一台设备最近登录、同浏览器重开都会误判。修复为设备 Cookie 优先、30 天 UA 回退，IP 变化本身不通知；同浏览器登录轮换并只保留一个活动会话。集成测试覆盖“同设备换 IP 不通知、真正新浏览器只通知一次”。
+- 已清理测试登录产生的未读安全通知；旧的真实用户通知保留。
+
+### 移动端输入缩放
+
+- 根因：首页搜索框内联 `font-size:13px`，iOS Safari 聚焦 <16px 输入会放大页面且不还原。移除内联字号，移动端所有文本输入/搜索/下拉统一 16px；390px 实测无横向溢出。
+
+### 加密空间
+
+- 产品决策：用户选择“密码派生密钥加密 + 一次性恢复密钥”。落地为 `kind='vault'`，单所有者。
+- 密钥：随机 32B 数据密钥；密码 scrypt KEK 包裹；恢复密钥 SHA-256 KEK 包裹；均 AES-256-GCM。修改密码只重包裹；恢复后轮换恢复密钥。
+- 解锁：每标签页随机 token，客户端内存保存并经 `X-360note-Vault` 发送；服务端按 token 哈希 + 登录会话 + 15 分钟滑动过期校验。刷新/关闭标签页/切换空间/锁屏都需重新输入密码。密钥只在 Node 内存，重启即失。
+- 加密范围：笔记标题/正文/摘要、版本、附件字节与文件名；明文列置空、FTS 向量为空。文件夹/标签名、时间戳、大小、MIME 未加密，文档明确披露。
+- 禁止：分享、评论、双链/反链、单篇/整库导出、导入、AI/OCR、离线缓存/PWA 预取、工作区备份/恢复、API token。服务端路由拒绝，UI 隐藏。
+- 锁定与恢复：全屏锁屏；错误密码 403（不触发账户 401 登出）；恢复密钥流程；忘记密码且丢恢复密钥可确认删除空间。锁屏 z-index 70，低于共享 Modal 80，避免确认框被遮挡。
+- 附件响应 `Cache-Control: no-store` 且禁用 304，防止锁定后浏览器缓存泄露明文。
+- 测试：`tests/integration/encrypted-space.mjs` 覆盖密文落库、版本/附件、423、分享/评论/导出/搜索、密码/恢复密钥轮换；UI 实测创建、恢复密钥、锁屏、解锁、刷新锁定、修改密码、数据页隐藏导出/备份、删除空间。
+
+### 关键文件
+
+- `apps/server/src/lib/vault-crypto.ts`、`vault-session.ts`、`request-context.ts`
+- `apps/server/src/migrations/018_vault_spaces.sql`
+- `apps/server/src/routes/workspaces.ts`（创建/解锁/锁定/密码/恢复）
+- `apps/server/src/services/notes.ts`（笔记/版本加解密与 AAD）
+- `apps/server/src/routes/attachments.ts` + `lib/storage.ts`（附件密钥与 no-store）
+- `apps/web/src/stores/vault.ts`、`lib/vault-header.ts`、`lib/useVaultAutoLock.ts`
+- `apps/web/src/components/VaultLockScreen.tsx`、`settings/TeamSettings.tsx`
+- `apps/web/src/pages/AppPage.tsx`（锁屏状态、空间切换）
+- `docs/decisions/007-encrypted-spaces.md`
+
+### 未完成
+
+- 文件夹/标签名等元数据加密；客户端索引搜索；多进程共享密钥服务；真机 iOS/Android 键盘与 15 分钟自动锁定实测。
+
+---
+
 ## 2026-11-14 · 全站质量审查修复（0.2.6）
 
 ### 背景

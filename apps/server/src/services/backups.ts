@@ -1005,7 +1005,8 @@ export async function backupRecord(id: string, workspaceId: string, userId: stri
 
 export async function runAutoBackups(): Promise<void> {
   const workspaces = await many<{ id: string; owner_id: string; name: string }>(
-    'SELECT id, owner_id, name FROM workspaces WHERE deleted_at IS NULL',
+    `SELECT id, owner_id, name FROM workspaces
+     WHERE deleted_at IS NULL AND kind <> 'vault'`,
   );
   for (const workspace of workspaces) {
     try {
