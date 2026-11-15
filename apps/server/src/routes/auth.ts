@@ -35,15 +35,39 @@ async function userCount(): Promise<number> {
   return Number(row?.count ?? 0);
 }
 
-async function isNewSignInDevice(userId: string, deviceId: string, ip: string, agent: string): Promise<boolean> {
-  const previous = await one<{ ip: string | null; device_id: string | null; user_agent: string | null }>(
-    'SELECT ip, device_id, user_agent FROM sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+/**
+ * A sign-in is only "new" when this browser has not signed in before.
+ *
+ * The previous implementation compared the newest session globally, so any
+ * login on device A after using device B looked like a new device. It also
+ * treated every mobile IP change as a new device. That produced a security
+ * notification on ordinary close/reopen and trained users to ignore them.
+ *
+ * Device id is the stable signal. When cookies were cleared (private mode),
+ * fall back to the user agent for 30 days. An IP change alone is never enough.
+ */
+async function isNewSignInDevice(userId: string, deviceId: string, _ip: string, agent: string): Promise<boolean> {
+  const previous = await one<{ id: string }>(
+    'SELECT id FROM sessions WHERE user_id = $1 LIMIT 1',
     [userId],
   );
-  if (!previous) return false;
-  if (previous.device_id && previous.device_id !== deviceId) return true;
-  if (!previous.device_id && previous.user_agent && previous.user_agent !== agent) return true;
-  return Boolean(previous.ip && previous.ip !== ip);
+  if (!previous) return false; // first-ever sign-in; nothing to compare against
+  if (deviceId) {
+    const knownDevice = await one<{ id: string }>(
+      `SELECT id FROM sessions
+       WHERE user_id = $1 AND device_id = $2 AND created_at > now() - interval '365 days'
+       LIMIT 1`,
+      [userId, deviceId],
+    );
+    if (knownDevice) return false;
+  }
+  const knownAgent = await one<{ id: string }>(
+    `SELECT id FROM sessions
+     WHERE user_id = $1 AND user_agent = $2 AND created_at > now() - interval '30 days'
+     LIMIT 1`,
+    [userId, agent],
+  );
+  return !knownAgent;
 }
 
 async function workspacesFor(userId: string) {

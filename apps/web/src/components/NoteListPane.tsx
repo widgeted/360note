@@ -179,6 +179,7 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }
               <Search size={14} style={{ flex: 'none' }} />
               <input
                 ref={inputRef}
+                className="note-search-input"
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
                 onKeyDown={(event) => {
@@ -199,7 +200,6 @@ export function NoteListPane({ onOpenAsReference, referenceNoteId, splitActive }
                   background: 'transparent',
                   flex: 1,
                   minWidth: 0,
-                  fontSize: 13,
                   color: 'var(--text)',
                 }}
               />

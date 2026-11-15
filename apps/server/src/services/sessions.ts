@@ -21,6 +21,13 @@ export async function createSession(
        WHERE user_id = $1 AND device_id IS NULL AND user_agent = $3 AND ip = $4 AND revoked_at IS NULL`,
       [userId, deviceId, agent, ip],
     ).catch(() => {});
+    // One active session per browser. The device cookie is shared by every tab,
+    // so the previous token can no longer be used after the cookie rotates.
+    await query(
+      `UPDATE sessions SET revoked_at = now()
+       WHERE user_id = $1 AND device_id = $2 AND revoked_at IS NULL`,
+      [userId, deviceId],
+    ).catch(() => {});
   }
   const row = await one<{ id: string }>(
     `INSERT INTO sessions (user_id, token_hash, device_id, user_agent, ip, expires_at)

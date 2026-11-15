@@ -424,6 +424,18 @@
   }
 }
 
+/* iOS Safari zooms the whole page when a focused text control is below 16px,
+   and does not zoom back out reliably. Keep every editable control at 16px on
+   small screens; the editor already uses a larger body size. */
+@media (max-width: 900px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  textarea,
+  select,
+  .note-search-input {
+    font-size: 16px;
+  }
+}
+
 /* Safe-area padding for the editor footbar on iOS PWA. */
 @supports (padding: env(safe-area-inset-bottom)) {
   .editor-footbar {

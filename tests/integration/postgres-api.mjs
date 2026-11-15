@@ -40,9 +40,10 @@ async function waitForHealth(timeoutMs = 30_000) {
   throw new Error('API did not become healthy');
 }
 
-async function req(path, { method = 'GET', cookie, body } = {}) {
-  const headers = { 'x-360note-csrf': '1', 'x-forwarded-for': `198.51.100.${Math.floor(Math.random() * 200) + 20}` };
+async function req(path, { method = 'GET', cookie, body, ip, userAgent } = {}) {
+  const headers = { 'x-360note-csrf': '1', 'x-forwarded-for': ip ?? `198.51.100.${Math.floor(Math.random() * 200) + 20}` };
   if (cookie) headers.cookie = cookie;
+  if (userAgent) headers['user-agent'] = userAgent;
   if (body !== undefined) headers['content-type'] = 'application/json';
   const response = await fetch(`${base}${path}`, {
     method,
@@ -92,6 +93,17 @@ async function uploadBackup(workspaceId, cookie, filename, data) {
   return { status: response.status, json, text };
 }
 
+function responseCookies(response) {
+  return typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : [response.headers.get('set-cookie') ?? ''];
+}
+
+function cookieNamed(response, name) {
+  const match = responseCookies(response).find((value) => new RegExp(`(?:^|;)\\s*(?:__Host-)?${name}=`).test(value));
+  return (match ?? '').split(';')[0];
+}
+
 async function register(email, code) {
   await pool.query(
     `INSERT INTO email_codes (email, purpose, code_hash, expires_at)
@@ -103,8 +115,7 @@ async function register(email, code) {
     body: { email, displayName: email.split('@')[0], password: 'K9m!tR4#vQ2@2026', emailCode: code },
   });
   assert.equal(response.status, 200, response.text);
-  const cookie = response.headers.get('set-cookie').split(';')[0];
-  return { ...response.json, cookie };
+  return { ...response.json, cookie: cookieNamed(response, 'nh_session'), deviceCookie: cookieNamed(response, 'nh_device') };
 }
 
 async function main() {
@@ -135,6 +146,54 @@ async function main() {
   const b = await register(emailB, '222222');
   assert.equal(a.firstUser, true);
   assert.equal(b.firstUser, false);
+
+  // Same browser + changed network (mobile/Wi-Fi) must not be reported as a
+  // new sign-in. A genuinely new browser still gets one security notification.
+  const firstLogin = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: emailA, password: 'K9m!tR4#vQ2@2026' },
+    cookie: a.deviceCookie,
+    ip: '203.0.113.10',
+    userAgent: 'IntegrationBrowser/1.0',
+  });
+  assert.equal(firstLogin.status, 200, firstLogin.text);
+  const firstLoginCookie = cookieNamed(firstLogin, 'nh_session');
+  const secondLogin = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: emailA, password: 'K9m!tR4#vQ2@2026' },
+    cookie: a.deviceCookie,
+    ip: '203.0.113.99',
+    userAgent: 'IntegrationBrowser/1.0',
+  });
+  assert.equal(secondLogin.status, 200, secondLogin.text);
+  const secondLoginCookie = cookieNamed(secondLogin, 'nh_session');
+  const quietNotifications = await req('/api/notifications?limit=50', { cookie: secondLoginCookie || firstLoginCookie });
+  assert.equal(quietNotifications.status, 200, quietNotifications.text);
+  assert.ok(
+    !quietNotifications.json.notifications.some((entry) => entry.title === '新的登录活动'),
+    'same device with a changed IP must not create a security notification',
+  );
+
+  const newDeviceLogin = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: emailA, password: 'K9m!tR4#vQ2@2026' },
+    ip: '203.0.113.77',
+    userAgent: 'IntegrationNewDevice/2.0',
+  });
+  assert.equal(newDeviceLogin.status, 200, newDeviceLogin.text);
+  const newDeviceCookie = cookieNamed(newDeviceLogin, 'nh_session');
+  const loudNotifications = await req('/api/notifications?limit=50', { cookie: newDeviceCookie });
+  assert.equal(loudNotifications.status, 200, loudNotifications.text);
+  assert.equal(
+    loudNotifications.json.notifications.filter((entry) => entry.title === '新的登录活动').length,
+    1,
+    'a genuinely new browser gets exactly one sign-in notification',
+  );
+  console.log('PASS  sign-in notifications ignore IP changes and only fire for a new browser');
+  assert.ok(secondLoginCookie, 'second login returns a session cookie');
+  // Signing in on the same browser rotates its session token; keep using the
+  // current cookie for the rest of the suite.
+  a.cookie = secondLoginCookie;
 
   const spaceA = a.workspaces.find((workspace) => workspace.kind === 'personal');
   const seeded = await req(`/api/notes?workspaceId=${spaceA.id}`, { cookie: a.cookie });

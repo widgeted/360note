@@ -506,6 +506,10 @@
   min-width: 0;
 }
 
+.note-search-input {
+  font-size: 13px;
+}
+
 .search-trigger {
   flex: 1 1 0;
   min-width: 0;
