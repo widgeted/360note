@@ -3,6 +3,20 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.3.2] — 2026-11-15
+
+纠正加密空间图标语义：`UserLock` 是空间类型指示图标，不是工作区自身图标。
+
+### Fixed
+
+- 加密空间恢复自定义工作区图标（emoji/字符）与图标选择器；`UserLock` 只作为类型指示显示在空间概览、侧栏当前空间和创建向导的类型选项中。
+- 移除“加密空间使用固定人+锁图标，只可选择背景颜色”的说明与限制；创建向导和设置页恢复完整的图标 + 背景颜色选择。
+- 空间概览与侧栏工作区标记恢复显示用户选择的图标，类型指示仍单独显示。
+
+### Clarified
+
+- 个人空间类型指示：`UserRound`；团队空间：`UsersRound`；加密空间：`UserLock`；工作区自身图标三种类型都可自定义。
+
 ## [0.3.1] — 2026-11-15
 
 统一空间创建入口与空间类型图标，修复切换到团队空间后创建按钮样式不一致。

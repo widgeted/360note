@@ -369,7 +369,7 @@ export default function TeamSettings() {
                   color: entry.color ?? 'var(--blue)',
                 }}
               >
-                {entry.kind === 'vault' ? <UserLock size={13} /> : entry.icon ?? '📔'}
+                {entry.icon ?? '📔'}
               </span>
               <div className="space-overview-main">
                 <div className="space-overview-title">
@@ -408,20 +408,18 @@ export default function TeamSettings() {
         </div>
         <div className="setting-card">
           <div className="setting-inline-form">
-            {workspace?.kind !== 'vault' && (
-              <div className="field field-icon">
-                <label>{t('图标')}</label>
-                <input
-                  className="input"
-                  value={icon}
-                  onChange={(event) => setIcon(event.target.value.slice(0, 4))}
-                  disabled={!canManage}
-                  maxLength={4}
-                  style={{ textAlign: 'center', fontSize: 18 }}
-                  aria-label={t('空间图标')}
-                />
-              </div>
-            )}
+            <div className="field field-icon">
+              <label>{t('图标')}</label>
+              <input
+                className="input"
+                value={icon}
+                onChange={(event) => setIcon(event.target.value.slice(0, 4))}
+                disabled={!canManage}
+                maxLength={4}
+                style={{ textAlign: 'center', fontSize: 18 }}
+                aria-label={t('空间图标')}
+              />
+            </div>
             <div className="field">
               <label>{t('空间名称')}</label>
               <input className="input" value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage} maxLength={80} />
@@ -433,17 +431,7 @@ export default function TeamSettings() {
             )}
           </div>
           {canManage && (
-            workspace?.kind === 'vault' ? (
-              <>
-                <div className="banner banner-info" style={{ marginTop: 12 }}>
-                  <UserLock size={15} />
-                  <div>{t('加密空间使用固定的“人+锁”图标，只可修改背景颜色。')}</div>
-                </div>
-                <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} showIcons={false} />
-              </>
-            ) : (
-              <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
-            )
+            <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 13, color: 'var(--text-tertiary)' }}>
             {workspace?.kind === 'vault' ? <UserLock size={12} /> : workspace?.kind === 'team' ? <UsersRound size={12} /> : <UserRound size={12} />}{' '}
@@ -681,17 +669,7 @@ export default function TeamSettings() {
             </button>
           ))}
         </div>
-        {createKind === 'vault' ? (
-          <>
-            <div className="banner banner-info" style={{ marginTop: 14 }}>
-              <UserLock size={15} />
-              <div>{t('加密空间使用固定的“人+锁”图标，只可选择背景颜色。')}</div>
-            </div>
-            <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} showIcons={false} />
-          </>
-        ) : (
-          <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} />
-        )}
+        <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} />
         <div className="field" style={{ marginTop: 14 }}>
           <label>{createKind === 'personal' ? t('个人空间名称') : createKind === 'vault' ? t('加密空间名称') : t('团队空间名称')}</label>
           <input
@@ -884,35 +862,31 @@ function IdentityPicker({
   color,
   onIcon,
   onColor,
-  showIcons = true,
 }: {
   icon: string;
   color: string;
   onIcon: (value: string) => void;
   onColor: (value: string) => void;
-  showIcons?: boolean;
 }) {
   const t = useT();
   return (
     <div className="identity-picker">
-      {showIcons && (
-        <div>
-          <div className="setting-note" style={{ marginBottom: 6 }}>{t('图标')}</div>
-          <div className="identity-options">
-            {WORKSPACE_ICONS.map((symbol) => (
-              <button
-                key={symbol}
-                type="button"
-                className={`identity-symbol ${icon === symbol ? 'selected' : ''}`}
-                onClick={() => onIcon(symbol)}
-                aria-label={symbol}
-              >
-                {symbol}
-              </button>
-            ))}
-          </div>
+      <div>
+        <div className="setting-note" style={{ marginBottom: 6 }}>{t('图标')}</div>
+        <div className="identity-options">
+          {WORKSPACE_ICONS.map((symbol) => (
+            <button
+              key={symbol}
+              type="button"
+              className={`identity-symbol ${icon === symbol ? 'selected' : ''}`}
+              onClick={() => onIcon(symbol)}
+              aria-label={symbol}
+            >
+              {symbol}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
       <div>
         <div className="setting-note" style={{ marginBottom: 6 }}>{t('背景颜色')}</div>
         <div className="identity-options">

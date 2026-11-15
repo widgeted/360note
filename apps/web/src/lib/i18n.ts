@@ -1923,8 +1923,6 @@ const en: Record<string, string> = {
   "使用上方“创建空间”即可创建团队空间或加密空间。": "Use “Create space” above to create a team or encrypted space.",
   "空间与成员": "Spaces and members",
   "个人、团队、加密空间与成员": "Personal, team and encrypted spaces, members and roles",
-  "加密空间使用固定的“人+锁”图标，只可修改背景颜色。": "Encrypted spaces use a fixed person-with-lock icon; only the background colour can change.",
-  "加密空间使用固定的“人+锁”图标，只可选择背景颜色。": "Encrypted spaces use a fixed person-with-lock icon; you can only choose a background colour.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

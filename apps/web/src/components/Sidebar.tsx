@@ -423,7 +423,7 @@ export function Sidebar() {
                   color: currentWorkspace?.color ?? 'var(--sidebar-accent)',
                 }}
               >
-                {currentWorkspace?.kind === 'vault' ? <UserLock size={14} /> : currentWorkspace?.icon ?? '📔'}
+                {currentWorkspace?.icon ?? '📔'}
               </span>
               <span className="workspace-name">{currentWorkspace?.name ?? '360note'}</span>
               <span
@@ -456,7 +456,7 @@ export function Sidebar() {
                         color: workspace.color ?? 'var(--sidebar-accent)',
                       }}
                     >
-                      {workspace.kind === 'vault' ? <UserLock size={12} /> : workspace.icon ?? '📔'}
+                      {workspace.icon ?? '📔'}
                     </span>
                   }
                   detail={workspace.id === workspaceId ? '✓' : undefined}
