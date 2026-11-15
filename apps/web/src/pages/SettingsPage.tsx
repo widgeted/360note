@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Bot,
+  Boxes,
   CloudDownload,
   Code2,
   Keyboard,
@@ -11,7 +12,6 @@ import {
   ServerCog,
   ShieldCheck,
   UserRound,
-  Users,
 } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { useScrollFade } from '../lib/useScrollFade';
@@ -41,7 +41,7 @@ const SECTIONS = [
   { id: 'data', icon: CloudDownload, label: '数据与备份', short: '数据', group: '数据' },
   { id: 'comments', icon: MessageCircle, label: '评论管理', short: '评论', group: '数据' },
   { id: 'templates', icon: LayoutTemplate, label: '模板', group: '数据' },
-  { id: 'team', icon: Users, label: '空间', group: '数据' },
+  { id: 'team', icon: Boxes, label: '空间', short: '空间', group: '数据' },
   { id: 'api', icon: Code2, label: 'API 与集成', short: 'API', group: '数据' },
   { id: 'ai', icon: Bot, label: 'AI 与隐私', short: 'AI', group: '高级' },
   { id: 'about', icon: null, label: '关于', group: '高级' },

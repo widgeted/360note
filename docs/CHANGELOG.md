@@ -3,6 +3,20 @@
 All notable changes to 360note are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] — 2026-11-15
+
+统一空间创建入口与空间类型图标，修复切换到团队空间后创建按钮样式不一致。
+
+### Fixed
+
+- Spaces 设置页只保留空间概览中的一个 `+ 创建空间` 按钮，所有空间类型位置一致；图标统一为 `Plus`，不再使用团队双人图标。
+- 创建按钮统一为 `.btn-primary` 主按钮；切换个人/团队/加密空间后背景色与样式不再变化。
+- 从 Spaces 设置页切换空间后停留在设置页；切换到加密空间先显示锁屏，解锁后回到原设置页。
+- 加密空间设置不再请求成员/邀请接口，避免出现无意义的加载失败；成员与邀请只属于团队空间。
+- 加密空间使用固定 `UserLock` 图标：设置页隐藏 emoji 图标选择，只保留背景颜色；创建向导同样说明固定图标。
+- 团队类型图标统一为 `UsersRound`，个人为 `UserRound`，加密为 `UserLock`；Spaces 导航、管理入口和命令面板使用 `Boxes`。
+- 个人空间“需要协作？”区块不再出现重复创建按钮，改为指向概览中的统一入口。
+
 ## [0.3.0] — 2026-11-15
 
 新增“加密空间”：独立密码派生密钥、服务端强制锁定与一次性恢复密钥。

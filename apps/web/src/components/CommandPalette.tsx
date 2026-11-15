@@ -6,6 +6,7 @@ import {
   Trash2,
   ArrowRight,
   Bot,
+  Boxes,
   CloudDownload,
   Download,
   FilePlus2,
@@ -24,7 +25,6 @@ import {
   Sun,
   Tags,
   Upload,
-  Users,
   Wand2,
 } from 'lucide-react';
 import type { NoteSummary } from '@360note/shared';
@@ -270,9 +270,9 @@ export function CommandPalette() {
     },
     {
       id: 'settings-team',
-      title: t('团队与空间'),
-      description: t('成员、角色、审计日志'),
-      icon: <Users size={15} />,
+      title: t('空间与成员'),
+      description: t('个人、团队、加密空间与成员'),
+      icon: <Boxes size={15} />,
       keywords: 'team members roles audit',
       run: () => go('/app/settings/team'),
     },

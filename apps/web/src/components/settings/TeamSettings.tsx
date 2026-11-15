@@ -7,13 +7,14 @@ import {
   Crown,
   LogOut,
   MailPlus,
+  Plus,
   Shield,
   ShieldAlert,
   Trash2,
   UserMinus,
   UserRound,
   UserLock,
-  Users,
+  UsersRound,
   KeyRound,
   LockKeyhole,
 } from 'lucide-react';
@@ -87,9 +88,15 @@ export default function TeamSettings() {
 
   useEffect(() => {
     setName(workspace?.name ?? '');
-    setIcon(workspace?.icon ?? (workspace?.kind === 'team' ? '👥' : '📔'));
+    setIcon(workspace?.icon ?? (workspace?.kind === 'team' ? '👥' : workspace?.kind === 'vault' ? '🔒' : '📔'));
     setColor(workspace?.color ?? '#17865b');
+    setLoadError(null);
     if (!workspaceId) return;
+    if (workspace?.kind === 'vault') {
+      // Vaults have no members or invitations; only load the audit log.
+      if (canManage) void loadAudit();
+      return;
+    }
     void loadMembers();
     if (canManage) {
       void loadInvitations();
@@ -287,7 +294,8 @@ export default function TeamSettings() {
     localStorage.setItem('nh-workspace', id);
     useAppStore.getState().selectWorkspace(id);
     await refreshAuth();
-    navigate('/app');
+    // Stay on Spaces settings so the newly selected space's controls are
+    // immediately visible. Switching from the sidebar still goes to notes.
   }
 
   async function changeVaultPassword() {
@@ -341,7 +349,7 @@ export default function TeamSettings() {
   return (
     <>
       <h1 className="settings-title">{t('空间')}</h1>
-      <p className="settings-subtitle">{t('个人空间是账户自带的私有空间；团队空间用于多人协作。每个账户始终有一个个人空间，团队空间可以创建多个。')}</p>
+      <p className="settings-subtitle">{t('每个账户始终有一个个人空间；团队空间用于多人协作；加密空间使用独立密码派生密钥。可以创建多个空间并随时切换。')}</p>
 
       {loadError && <LoadFailure message={loadError} onRetry={() => { void loadMembers(); if (canManage) { void loadInvitations(); void loadAudit(); } }} />}
 
@@ -367,7 +375,7 @@ export default function TeamSettings() {
                 <div className="space-overview-title">
                   <span className="space-overview-name">{entry.name}</span>
                   <span className="workspace-kind-icon" title={entry.kind === 'team' ? t('团队空间') : entry.kind === 'vault' ? t('加密空间') : t('个人空间')} aria-label={entry.kind === 'team' ? t('团队空间') : entry.kind === 'vault' ? t('加密空间') : t('个人空间')}>
-                    {entry.kind === 'team' ? <Users size={12} /> : entry.kind === 'vault' ? <UserLock size={12} /> : <UserRound size={12} />}
+                    {entry.kind === 'team' ? <UsersRound size={12} /> : entry.kind === 'vault' ? <UserLock size={12} /> : <UserRound size={12} />}
                   </span>
                   {entry.id === workspaceId && <span className="badge badge-green">{t('当前')}</span>}
                 </div>
@@ -383,6 +391,11 @@ export default function TeamSettings() {
             </div>
           ))}
         </div>
+        <div style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
+            <Plus size={13} /> {t('创建空间')}
+          </button>
+        </div>
         <p className="setting-note" style={{ marginTop: 10 }}>
           {t('个人空间只有你可见；团队空间用于协作；加密空间使用独立密码派生密钥，内容不可分享、评论、双链或导出。')}
         </p>
@@ -395,18 +408,20 @@ export default function TeamSettings() {
         </div>
         <div className="setting-card">
           <div className="setting-inline-form">
-            <div className="field field-icon">
-              <label>{t('图标')}</label>
-              <input
-                className="input"
-                value={icon}
-                onChange={(event) => setIcon(event.target.value.slice(0, 4))}
-                disabled={!canManage}
-                maxLength={4}
-                style={{ textAlign: 'center', fontSize: 18 }}
-                aria-label={t('空间图标')}
-              />
-            </div>
+            {workspace?.kind !== 'vault' && (
+              <div className="field field-icon">
+                <label>{t('图标')}</label>
+                <input
+                  className="input"
+                  value={icon}
+                  onChange={(event) => setIcon(event.target.value.slice(0, 4))}
+                  disabled={!canManage}
+                  maxLength={4}
+                  style={{ textAlign: 'center', fontSize: 18 }}
+                  aria-label={t('空间图标')}
+                />
+              </div>
+            )}
             <div className="field">
               <label>{t('空间名称')}</label>
               <input className="input" value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage} maxLength={80} />
@@ -418,10 +433,20 @@ export default function TeamSettings() {
             )}
           </div>
           {canManage && (
-            <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
+            workspace?.kind === 'vault' ? (
+              <>
+                <div className="banner banner-info" style={{ marginTop: 12 }}>
+                  <UserLock size={15} />
+                  <div>{t('加密空间使用固定的“人+锁”图标，只可修改背景颜色。')}</div>
+                </div>
+                <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} showIcons={false} />
+              </>
+            ) : (
+              <IdentityPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
+            )
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 13, color: 'var(--text-tertiary)' }}>
-            {workspace?.kind === 'vault' ? <UserLock size={12} /> : <Users size={12} />}{' '}
+            {workspace?.kind === 'vault' ? <UserLock size={12} /> : workspace?.kind === 'team' ? <UsersRound size={12} /> : <UserRound size={12} />}{' '}
             {workspace?.kind === 'vault'
               ? t('仅所有者')
               : getLocale() === 'en'
@@ -485,14 +510,12 @@ export default function TeamSettings() {
         <section className="settings-section">
           <div className="settings-section-head"><span className="settings-section-title">{t('需要协作？')}</span></div>
           <div className="banner banner-info">
-            <Users size={15} />
+            <UsersRound size={15} />
             <div>{t('团队空间让多位成员共享文件夹、标签与笔记，并拥有独立成员角色、邀请与审计日志。个人空间保持简单，只属于你。')}</div>
           </div>
-          <div style={{ marginTop: 12 }}>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
-              <Users size={13} /> {t('创建空间')}
-            </button>
-          </div>
+          <p className="setting-note" style={{ marginTop: 10 }}>
+            {t('使用上方“创建空间”即可创建团队空间或加密空间。')}
+          </p>
         </section>
       ) : (
         <>
@@ -597,17 +620,6 @@ export default function TeamSettings() {
         </>
       ))}
 
-      {workspace?.kind === 'team' && (
-        <section className="settings-section">
-          <div className="settings-section-head"><span className="settings-section-title">{t('创建空间')}</span></div>
-          <div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCreateOpen(true)}>
-              <Users size={13} /> {t('创建空间')}
-            </button>
-          </div>
-        </section>
-      )}
-
       {workspace && (workspace.kind === 'team' || workspaces.length > 1) && (
         <section className="settings-section">
           <div className="settings-section-head"><span className="settings-section-title" style={{ color: 'var(--red)' }}>{t('危险操作')}</span></div>
@@ -639,7 +651,7 @@ export default function TeamSettings() {
           <>
             <button type="button" className="btn btn-secondary btn-sm" onClick={closeCreate}>{t('取消')}</button>
             <button type="button" className="btn btn-primary btn-sm" onClick={createWorkspace} disabled={creating || !createName.trim() || (createKind === 'vault' && (vaultPassword.length < 10 || vaultPassword !== vaultPasswordConfirm))}>
-              {creating ? <span className="spinner" /> : createKind === 'personal' ? <UserRound size={13} /> : createKind === 'vault' ? <UserLock size={13} /> : <Users size={13} />}
+              {creating ? <span className="spinner" /> : createKind === 'personal' ? <UserRound size={13} /> : createKind === 'vault' ? <UserLock size={13} /> : <UsersRound size={13} />}
               {createKind === 'personal' ? t('创建个人空间') : createKind === 'vault' ? t('创建加密空间') : t('创建团队空间')}
             </button>
           </>
@@ -648,7 +660,7 @@ export default function TeamSettings() {
         <div className="share-permission-list" style={{ marginBottom: 16 }}>
           {([
             { value: 'personal' as const, icon: <UserRound size={15} />, name: t('个人空间'), desc: t('只有你可见的私有空间，可重命名。') },
-            { value: 'team' as const, icon: <Users size={15} />, name: t('团队空间'), desc: t('可邀请成员、分配角色并查看审计。') },
+            { value: 'team' as const, icon: <UsersRound size={15} />, name: t('团队空间'), desc: t('可邀请成员、分配角色并查看审计。') },
             { value: 'vault' as const, icon: <UserLock size={15} />, name: t('加密空间'), desc: t('独立密码派生密钥；不可分享、评论、双链或导出。') },
           ]).map((option) => (
             <button
@@ -669,7 +681,17 @@ export default function TeamSettings() {
             </button>
           ))}
         </div>
-        <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} />
+        {createKind === 'vault' ? (
+          <>
+            <div className="banner banner-info" style={{ marginTop: 14 }}>
+              <UserLock size={15} />
+              <div>{t('加密空间使用固定的“人+锁”图标，只可选择背景颜色。')}</div>
+            </div>
+            <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} showIcons={false} />
+          </>
+        ) : (
+          <IdentityPicker icon={createIcon} color={createColor} onIcon={setCreateIcon} onColor={setCreateColor} />
+        )}
         <div className="field" style={{ marginTop: 14 }}>
           <label>{createKind === 'personal' ? t('个人空间名称') : createKind === 'vault' ? t('加密空间名称') : t('团队空间名称')}</label>
           <input
@@ -862,31 +884,35 @@ function IdentityPicker({
   color,
   onIcon,
   onColor,
+  showIcons = true,
 }: {
   icon: string;
   color: string;
   onIcon: (value: string) => void;
   onColor: (value: string) => void;
+  showIcons?: boolean;
 }) {
   const t = useT();
   return (
     <div className="identity-picker">
-      <div>
-        <div className="setting-note" style={{ marginBottom: 6 }}>{t('图标')}</div>
-        <div className="identity-options">
-          {WORKSPACE_ICONS.map((symbol) => (
-            <button
-              key={symbol}
-              type="button"
-              className={`identity-symbol ${icon === symbol ? 'selected' : ''}`}
-              onClick={() => onIcon(symbol)}
-              aria-label={symbol}
-            >
-              {symbol}
-            </button>
-          ))}
+      {showIcons && (
+        <div>
+          <div className="setting-note" style={{ marginBottom: 6 }}>{t('图标')}</div>
+          <div className="identity-options">
+            {WORKSPACE_ICONS.map((symbol) => (
+              <button
+                key={symbol}
+                type="button"
+                className={`identity-symbol ${icon === symbol ? 'selected' : ''}`}
+                onClick={() => onIcon(symbol)}
+                aria-label={symbol}
+              >
+                {symbol}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <div>
         <div className="setting-note" style={{ marginBottom: 6 }}>{t('背景颜色')}</div>
         <div className="identity-options">

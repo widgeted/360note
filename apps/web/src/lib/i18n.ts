@@ -1919,6 +1919,12 @@ const en: Record<string, string> = {
   "这会永久删除空间内的笔记、版本和附件。没有密码或恢复密钥时，内容无法恢复。": "This permanently deletes notes, versions and attachments in the space. Without the password or recovery key, the content cannot be recovered.",
   "输入空间名称“{name}”确认": "Type “{name}” to confirm",
   "仅所有者": "Owner only",
+  "每个账户始终有一个个人空间；团队空间用于多人协作；加密空间使用独立密码派生密钥。可以创建多个空间并随时切换。": "Every account always has a personal space; team spaces are for collaboration; encrypted spaces use a separate password-derived key. Create multiple spaces and switch at any time.",
+  "使用上方“创建空间”即可创建团队空间或加密空间。": "Use “Create space” above to create a team or encrypted space.",
+  "空间与成员": "Spaces and members",
+  "个人、团队、加密空间与成员": "Personal, team and encrypted spaces, members and roles",
+  "加密空间使用固定的“人+锁”图标，只可修改背景颜色。": "Encrypted spaces use a fixed person-with-lock icon; only the background colour can change.",
+  "加密空间使用固定的“人+锁”图标，只可选择背景颜色。": "Encrypted spaces use a fixed person-with-lock icon; you can only choose a background colour.",
 };
 
 export type Translate = (zh: string, vars?: Record<string, string | number>) => string;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Archive,
+  Boxes,
   ChevronDown,
   ChevronRight,
   Clock3,
@@ -469,7 +470,7 @@ export function Sidebar() {
               ))}
               <div className="menu-separator" />
               <MenuItem
-                icon={<Settings size={14} />}
+                icon={<Boxes size={14} />}
                 onClick={() => {
                   close();
                   navigate('/app/settings/team');
